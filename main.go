@@ -491,15 +491,14 @@ func (a *P2PAgent) identifyAndConnectPeer(expectedName string, peerID peer.ID) e
 	return fmt.Errorf("peer %s has name %s, not %s", peerID, card.Name, expectedName)
 }
 
-// connectToKnownPeerAddresses tries to connect to known peer addresses for discovery
 func (a *P2PAgent) connectToKnownPeerAddresses(peerName string) error {
-	// Known peer mappings for our setup (can be made configurable)
-	knownPeers := map[string][]string{
+
+	knownAddresses := map[string][]string{
 		"go-agent-1": {"/ip4/172.20.0.2/tcp/4001"},
 		"go-agent-2": {"/ip4/172.20.0.3/tcp/4002"},
 	}
 	
-	addresses, exists := knownPeers[peerName]
+	addresses, exists := knownAddresses[peerName]
 	if !exists {
 		return fmt.Errorf("no known addresses for peer %s", peerName)
 	}
@@ -507,40 +506,31 @@ func (a *P2PAgent) connectToKnownPeerAddresses(peerName string) error {
 	a.logger.Infof("🔍 [P2P Pure] Trying to connect to %s at known addresses", peerName)
 	
 	for _, addrStr := range addresses {
-		addr, err := multiaddr.NewMultiaddr(addrStr)
-		if err != nil {
-			a.logger.Warnf("⚠️ [P2P Pure] Invalid address %s: %v", addrStr, err)
-			continue
-		}
-		
-		// Extract peer ID from connection after successful dial
 		ctx, cancel := context.WithTimeout(a.ctx, 10*time.Second)
 		defer cancel()
 		
-		// This will trigger connection through libp2p transport
-		addrInfo, err := peer.AddrInfoFromP2pAddr(addr)
-		if err != nil {
-			// If no peer ID in address, try to connect and discover
-			if err := a.host.Connect(ctx, peer.AddrInfo{Addrs: []multiaddr.Multiaddr{addr}}); err != nil {
-				a.logger.Warnf("⚠️ [P2P Pure] Failed to connect to %s: %v", addrStr, err)
+		if peerInfo, err := a.discoverPeerIDFromHTTP(peerName, addrStr); err == nil {
+			// Build full multiaddr with discovered peer ID
+			fullAddr := fmt.Sprintf("%s/p2p/%s", addrStr, peerInfo)
+			fullMultiaddr, err := multiaddr.NewMultiaddr(fullAddr)
+			if err != nil {
+				a.logger.Warnf("⚠️ [P2P Pure] Invalid full multiaddr %s: %v", fullAddr, err)
 				continue
 			}
 			
-			// After connection, check connected peers
-			connectedPeers := a.host.Network().Peers()
-			for _, connectedPeerID := range connectedPeers {
-				if err := a.identifyAndConnectPeer(peerName, connectedPeerID); err == nil {
-					return nil
-				}
+			addrInfo, err := peer.AddrInfoFromP2pAddr(fullMultiaddr)
+			if err != nil {
+				a.logger.Warnf("⚠️ [P2P Pure] Invalid multiaddr %s: %v", fullAddr, err)
+				continue
 			}
-		} else {
-			// Connect directly with peer ID
+			
 			if err := a.host.Connect(ctx, *addrInfo); err != nil {
-				a.logger.Warnf("⚠️ [P2P Pure] Failed to connect to %s (%s): %v", peerName, addrInfo.ID, err)
+				a.logger.Warnf("⚠️ [P2P Pure] Failed to connect to %s: %v", fullAddr, err)
 				continue
 			}
 			
-			// Verify this is the right peer
+			a.logger.Infof("🎯 [P2P Pure] Successfully connected to peer at %s", fullAddr)
+			
 			if err := a.identifyAndConnectPeer(peerName, addrInfo.ID); err == nil {
 				return nil
 			}
@@ -550,9 +540,55 @@ func (a *P2PAgent) connectToKnownPeerAddresses(peerName string) error {
 	return fmt.Errorf("failed to connect to %s at any known address", peerName)
 }
 
-// ConnectToPeerBidirectional establishes bidirectional P2P connection (DEPRECATED - use ConnectToPeerPure)
+func (a *P2PAgent) discoverPeerIDFromHTTP(peerName string, address string) (string, error) {
+	httpPorts := map[string]string{
+		"/ip4/172.20.0.2/tcp/4001": "8000", // go-agent-1
+		"/ip4/172.20.0.3/tcp/4002": "8001", // go-agent-2
+	}
+	
+	httpPort, exists := httpPorts[address]
+	if !exists {
+		return "", fmt.Errorf("no HTTP port mapping for address %s", address)
+	}
+	
+	parts := strings.Split(address, "/")
+	if len(parts) < 4 {
+		return "", fmt.Errorf("invalid multiaddr format: %s", address)
+	}
+	ip := parts[2] // /ip4/172.20.0.2/tcp/4001 -> 172.20.0.2
+	
+	url := fmt.Sprintf("http://%s:%s/p2p/info", ip, httpPort)
+	
+	a.logger.Infof("🔍 [P2P Pure] Discovering peer ID from %s", url)
+	
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get(url)
+	if err != nil {
+		return "", fmt.Errorf("failed to get peer info from %s: %v", url, err)
+	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("HTTP error %d from %s", resp.StatusCode, url)
+	}
+	
+	var peerInfo struct {
+		PeerID string `json:"peer_id"`
+	}
+	
+	if err := json.NewDecoder(resp.Body).Decode(&peerInfo); err != nil {
+		return "", fmt.Errorf("failed to decode peer info: %v", err)
+	}
+	
+	if peerInfo.PeerID == "" {
+		return "", fmt.Errorf("empty peer ID received from %s", url)
+	}
+	
+	a.logger.Infof("🎯 [P2P Pure] Discovered peer ID: %s", peerInfo.PeerID)
+	return peerInfo.PeerID, nil
+}
+
 func (a *P2PAgent) ConnectToPeerBidirectional(peerName string) error {
-	// Use pure P2P method instead of HTTP-dependent method
 	return a.ConnectToPeerPure(peerName)
 }
 
