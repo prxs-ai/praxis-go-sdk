@@ -37,17 +37,12 @@ The SDK consists of several core components:
 ```bash
 git clone https://github.com/prxs-ai/praxis-go-sdk.git
 cd praxis-go-sdk
-go mod download
-go build -o praxis-agent
-```
-
-### Docker Build
-
-```bash
 ./build-docker.sh
+docker-compose up -d
+docker ps
 ```
 
-## Usage
+### Usage
 
 ### Basic Agent
 
@@ -71,19 +66,6 @@ The SDK uses YAML configuration files for MCP server settings. Example configura
 
 - `mcp_config_sse_node1.yaml` - Configuration for node 1
 - `mcp_config_sse_node2.yaml` - Configuration for node 2
-
-### Running the Agent
-
-```bash
-# Run with default settings
-./praxis-agent
-
-# Run with custom HTTP port
-./praxis-agent -http-port 8080
-
-# Run with specific P2P port
-./praxis-agent -p2p-port 9000
-```
 
 ### Docker Deployment
 
