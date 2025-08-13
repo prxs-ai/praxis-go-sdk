@@ -1,0 +1,38 @@
+mcp_bridge:
+  enabled: true
+  log_level: info
+  servers:
+    - name: "filesystem-sse-server-2"
+      enabled: true
+      transport: "sse"
+      url: "http://localhost:8091"
+      timeout: "30s"
+    
+    - name: "memory-server-2"
+      enabled: true
+      transport: "stdio"
+      command: "npx"
+      args: ["@modelcontextprotocol/server-memory"]
+      env:
+        NODE_ENV: "production"
+        MCP_SERVER_NAME: "memory-server-2"
+      timeout: "30s"
+
+    - name: "context-server-2"
+      enabled: true
+      transport: "stdio"
+      command: "./examples/mcp-server"
+      args: []
+      env:
+        MCP_SERVER_NAME: "context-server-2"
+        MCP_DATA_PATH: "data2"
+      timeout: "30s"
+
+  limits:
+    max_concurrent_requests: 50
+    request_timeout_ms: 30000
+    max_response_size_bytes: 5242880
+    max_servers_per_node: 5
+    connection_pool_size: 3
+    retry_attempts: 2
+    retry_backoff_ms: 500

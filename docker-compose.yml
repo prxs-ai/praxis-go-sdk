@@ -1,0 +1,78 @@
+services:
+  go-agent-1:
+    image: go-agent:v4-pure-p2p
+    container_name: go-agent-1
+    hostname: go-agent-1
+    environment:
+      - AGENT_NAME=go-agent-1
+      - AGENT_VERSION=1.0.0
+      - AGENT_DESCRIPTION=Go P2P Agent Node 1 with SSE
+      - HTTP_PORT=8000
+      - P2P_PORT=4001
+      - MCP_ENABLED=true
+      - MCP_CONFIG_PATH=config/mcp_config_sse_node1.yaml
+      - INSECURE_P2P=false
+    ports:
+      - "8000:8000"  # Main API
+      - "4001:4001"  # P2P
+      - "8090:8090"  # SSE Server
+    volumes:
+      - ./config:/app/config:ro
+      - ./examples:/app/examples:ro
+      - node1-data:/data
+    networks:
+      - mcp-network
+    command: ["./go-agent"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  go-agent-2:
+    image: go-agent:v4-pure-p2p
+    container_name: go-agent-2
+    hostname: go-agent-2
+    environment:
+      - AGENT_NAME=go-agent-2
+      - AGENT_VERSION=1.0.0
+      - AGENT_DESCRIPTION=Go P2P Agent Node 2 with SSE
+      - HTTP_PORT=8001
+      - P2P_PORT=4002
+      - MCP_ENABLED=true
+      - MCP_CONFIG_PATH=config/mcp_config_sse_node2.yaml
+      - INSECURE_P2P=false
+    ports:
+      - "8001:8001"  # Main API
+      - "4002:4002"  # P2P
+      - "8091:8091"  # SSE Server
+    volumes:
+      - ./config:/app/config:ro
+      - ./examples:/app/examples:ro
+      - node2-data:/data
+    networks:
+      - mcp-network
+    command: ["./go-agent"]
+    depends_on:
+      go-agent-1:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+networks:
+  mcp-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  node1-data:
+    driver: local
+  node2-data:
+    driver: local
