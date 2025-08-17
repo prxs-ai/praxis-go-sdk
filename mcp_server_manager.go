@@ -24,7 +24,7 @@ type MCPServerInstance struct {
 	Config      MCPServerConfig
 	Process     *exec.Cmd
 	SSEServer   *MCPSSEServer
-	Status      string // "starting", "running", "stopped", "error"
+	Status      string 
 	StartTime   time.Time
 	LastSeen    time.Time
 	Tools       []MCPTool
@@ -366,7 +366,7 @@ func (m *MCPServerManager) monitorProcess(instance *MCPServerInstance) {
 }
 
 func (m *MCPServerManager) restartServer(name string) {
-	time.Sleep(5 * time.Second) // Wait before restart
+	time.Sleep(5 * time.Second) 
 	
 	m.mu.Lock()
 	instance, exists := m.servers[name]
@@ -452,7 +452,7 @@ func (m *MCPServerManager) IsHealthy() bool {
 		}
 	}
 	
-	return len(m.servers) == 0 // Consider healthy if no servers configured
+	return len(m.servers) == 0 
 }
 
 func (m *MCPServerManager) GetStats() map[string]interface{} {

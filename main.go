@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -24,6 +25,7 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v2"
 )
 
 const (
@@ -34,21 +36,39 @@ const (
 )
 
 type AgentSkill struct {
-	ID          string      `json:"id"`
-	Name        string      `json:"name"`
-	Description string      `json:"description"`
-	Path        string      `json:"path"`
-	Method      string      `json:"method"`
-	ParamsSchema interface{} `json:"params_schema"`
-	InputSchema  interface{} `json:"input_schema"`
-	OutputSchema interface{} `json:"output_schema"`
+	ID           string   `json:"id"`
+	Name         string   `json:"name"`
+	Description  string   `json:"description"`
+	Tags         []string `json:"tags,omitempty"`
+	Examples     []string `json:"examples,omitempty"`
+	InputModes   []string `json:"inputModes,omitempty"`
+	OutputModes  []string `json:"outputModes,omitempty"`
+}
+
+type AgentProvider struct {
+	Organization string `json:"organization"`
+	URL          string `json:"url"`
+}
+
+type AgentCapabilities struct {
+	Streaming               *bool `json:"streaming,omitempty"`
+	PushNotifications       *bool `json:"pushNotifications,omitempty"`
+	StateTransitionHistory  *bool `json:"stateTransitionHistory,omitempty"`
 }
 
 type AgentCard struct {
-	Name        string       `json:"name"`
-	Version     string       `json:"version"`
-	Description string       `json:"description"`
-	Skills      []AgentSkill `json:"skills"`
+	Name                string             `json:"name"`
+	Description         string             `json:"description"`
+	URL                 string             `json:"url"`
+	Version             string             `json:"version"`
+	ProtocolVersion     string             `json:"protocolVersion"`
+	Provider            *AgentProvider     `json:"provider,omitempty"`
+	Capabilities        AgentCapabilities  `json:"capabilities"`
+	DefaultInputModes   []string           `json:"defaultInputModes"`
+	DefaultOutputModes  []string           `json:"defaultOutputModes"`
+	Skills              []AgentSkill       `json:"skills"`
+	SecuritySchemes     interface{}        `json:"securitySchemes,omitempty"`
+	Security            interface{}        `json:"security,omitempty"`
 }
 
 type P2PAgent struct {
@@ -62,6 +82,8 @@ type P2PAgent struct {
 	cancel      context.CancelFunc
 	mcpBridge   *MCPBridge
 	mcpEnabled  bool
+	llmAgent    *LLMAgentImpl
+	llmEnabled  bool
 }
 
 func NewP2PAgent() (*P2PAgent, error) {
@@ -73,52 +95,50 @@ func NewP2PAgent() (*P2PAgent, error) {
 	agentName := getEnv("AGENT_NAME", "go-agent")
 	agentVersion := getEnv("AGENT_VERSION", "1.0.0")
 	agentDescription := getEnv("AGENT_DESCRIPTION", "Go P2P Agent")
+	agentURL := getEnv("AGENT_URL", "http://localhost:8000")
+	
+	
+	streaming := true
+	pushNotifications := false
+	stateTransitionHistory := false
 	
 	baseCard := AgentCard{
-		Name:        agentName,
-		Version:     agentVersion,
-		Description: agentDescription,
+		Name:            agentName,
+		Description:     agentDescription,
+		URL:             agentURL,
+		Version:         agentVersion,
+		ProtocolVersion: "0.2.5",
+		Provider: &AgentProvider{
+			Organization: "Praxis AI",
+			URL:          "https://praxis.ai",
+		},
+		Capabilities: AgentCapabilities{
+			Streaming:              &streaming,
+			PushNotifications:      &pushNotifications,
+			StateTransitionHistory: &stateTransitionHistory,
+		},
+		DefaultInputModes:  []string{"text/plain"},
+		DefaultOutputModes: []string{"text/plain"},
 		Skills: []AgentSkill{
 			{
 				ID:          "echo",
 				Name:        "Echo",
-				Description: "Simple echo skill",
-				Path:        "/echo",
-				Method:      "POST",
-				ParamsSchema: map[string]interface{}{
-					"type": "object",
-					"properties": map[string]interface{}{
-						"message": map[string]interface{}{
-							"type": "string",
-						},
-					},
-				},
-				InputSchema: map[string]interface{}{
-					"type": "object",
-					"properties": map[string]interface{}{
-						"text": map[string]interface{}{
-							"type": "string",
-						},
-					},
-				},
-				OutputSchema: map[string]interface{}{
-					"type": "object",
-					"properties": map[string]interface{}{
-						"result": map[string]interface{}{
-							"type": "string",
-						},
-					},
-				},
+				Description: "Simple echo skill that returns the input message",
+				Tags:        []string{"utility", "echo"},
+				Examples:    []string{"echo hello world", "repeat this message"},
+				InputModes:  []string{"text/plain"},
+				OutputModes: []string{"text/plain"},
 			},
 		},
 	}
 	
 	card := ExtendedAgentCard{
 		AgentCard:  baseCard,
-		MCPServers: []MCPCapability{}, // Will be populated when MCP bridge starts
+		MCPServers: []MCPCapability{}, 
 	}
 	
 	mcpEnabled := strings.ToLower(getEnv("MCP_ENABLED", "true")) == "true"
+	llmEnabled := strings.ToLower(getEnv("LLM_ENABLED", "true")) == "true"
 	
 	agent := &P2PAgent{
 		agentCard:   card,
@@ -127,6 +147,7 @@ func NewP2PAgent() (*P2PAgent, error) {
 		ctx:         ctx,
 		cancel:      cancel,
 		mcpEnabled:  mcpEnabled,
+		llmEnabled:  llmEnabled,
 	}
 	
 	return agent, nil
@@ -137,6 +158,27 @@ func getEnv(key, defaultVal string) string {
 		return val
 	}
 	return defaultVal
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+
+func expandEnvVars(s string) string {
+	expanded := os.ExpandEnv(s)
+	
+	if strings.Contains(s, "${OPENAI_API_KEY}") {
+		originalKey := "${OPENAI_API_KEY}"
+		envKey := os.Getenv("OPENAI_API_KEY")
+		if len(envKey) > 0 {
+			log.Printf("🔑 [DEBUG] API Key substitution: %s -> %s (first 20 chars)", originalKey, envKey[:min(20, len(envKey))])
+		}
+	}
+	return expanded
 }
 
 func getContainerIP() string {
@@ -207,6 +249,82 @@ func (a *P2PAgent) updateMCPCapabilities() {
 	a.logger.Infof("🔄 [P2P Agent] Updated agent card with %d MCP servers", len(capabilities))
 }
 
+func (a *P2PAgent) StartLLM() error {
+	if !a.llmEnabled {
+		a.logger.Info("📴 [P2P Agent] LLM agent is disabled")
+		return nil
+	}
+	
+	a.logger.Info("🤖 [P2P Agent] Starting LLM agent...")
+	
+	
+	llmConfig, err := a.loadLLMConfig()
+	if err != nil {
+		return fmt.Errorf("failed to load LLM config: %w", err)
+	}
+	
+	
+	llmAgent, err := NewLLMAgent(llmConfig, a.mcpBridge, a, a.logger)
+	if err != nil {
+		return fmt.Errorf("failed to create LLM agent: %w", err)
+	}
+	
+	a.llmAgent = llmAgent
+	
+	
+	if err := a.llmAgent.Health(); err != nil {
+		a.logger.Warnf("⚠️ [P2P Agent] LLM health check failed: %v", err)
+		
+	}
+	
+	a.logger.Info("✅ [P2P Agent] LLM agent started successfully")
+	return nil
+}
+
+func (a *P2PAgent) loadLLMConfig() (*LLMConfig, error) {
+	llmConfigPath := getEnv("LLM_CONFIG_PATH", "config/llm_config.yaml")
+	
+	configData, err := os.ReadFile(llmConfigPath)
+	if err != nil {
+		a.logger.Warnf("⚠️ [P2P Agent] Failed to read LLM config from %s: %v", llmConfigPath, err)
+		a.logger.Info("📝 [P2P Agent] Using default LLM configuration")
+		
+		
+		config := DefaultLLMConfig
+		if apiKey := os.Getenv("OPENAI_API_KEY"); apiKey != "" {
+			config.APIKey = apiKey
+		} else {
+			return nil, fmt.Errorf("OPENAI_API_KEY environment variable is required")
+		}
+		
+		return &config, nil
+	}
+	
+	
+	configString := string(configData)
+	a.logger.Infof("🔧 [P2P Agent] Original config: %s", configString)
+	configString = expandEnvVars(configString)
+	a.logger.Infof("🔧 [P2P Agent] Expanded config: %s", configString)
+	
+	
+	var configFile struct {
+		LLMAgent LLMConfig `yaml:"llm_agent"`
+	}
+	
+	if err := yaml.Unmarshal([]byte(configString), &configFile); err != nil {
+		return nil, fmt.Errorf("failed to parse LLM config: %w", err)
+	}
+	
+	config := configFile.LLMAgent
+	
+	if config.APIKey == "" {
+		return nil, fmt.Errorf("OPENAI_API_KEY is required in config or environment")
+	}
+	
+	a.logger.Infof("📋 [P2P Agent] Loaded LLM config: provider=%s, model=%s", config.Provider, config.Model)
+	return &config, nil
+}
+
 func (a *P2PAgent) StartP2P() error {
 	a.logger.Info("Starting P2P node...")
 	
@@ -251,6 +369,10 @@ func (a *P2PAgent) StartP2P() error {
 	
 	if err := a.StartMCP(); err != nil {
 		a.logger.Errorf("❌ [P2P Agent] Failed to start MCP bridge: %v", err)
+	}
+	
+	if err := a.StartLLM(); err != nil {
+		a.logger.Errorf("❌ [P2P Agent] Failed to start LLM agent: %v", err)
 	}
 	
 	a.logger.Infof("P2P node started with ID: %s", h.ID())
@@ -388,8 +510,8 @@ func (a *P2PAgent) ConnectToPeer(peerName string) error {
 	return fmt.Errorf("failed to connect to any address for peer %s", peerName)
 }
 
-// ConnectToPeerDirect connects to a peer using existing P2P connection
-// This bypasses HTTP API and uses libp2p directly for bidirectional connectivity
+
+
 func (a *P2PAgent) ConnectToPeerDirect(peerName string, peerID peer.ID) error {
 	if a.host == nil {
 		return fmt.Errorf("P2P host not initialized")
@@ -397,18 +519,18 @@ func (a *P2PAgent) ConnectToPeerDirect(peerName string, peerID peer.ID) error {
 	
 	a.logger.Infof("🔗 [P2P Direct] Connecting to peer %s (%s) via existing P2P", peerName, peerID)
 	
-	// Check if we can create a stream to this peer (validates connection)
+	
 	ctx, cancel := context.WithTimeout(a.ctx, 10*time.Second)
 	defer cancel()
 	
-	// Try to open a test stream to verify connectivity
+	
 	stream, err := a.host.NewStream(ctx, peerID, CardProtocol)
 	if err != nil {
 		return fmt.Errorf("failed to establish direct P2P connection to %s: %w", peerID, err)
 	}
 	stream.Close()
 	
-	// Store the connection
+	
 	a.mu.Lock()
 	a.connections[peerName] = peerID
 	a.mu.Unlock()
@@ -417,7 +539,50 @@ func (a *P2PAgent) ConnectToPeerDirect(peerName string, peerID peer.ID) error {
 	return nil
 }
 
-// ConnectToPeerPure connects to peer using pure P2P without HTTP dependencies  
+
+func (a *P2PAgent) ConnectToPeerDirectWithAddr(peerName string, peerID peer.ID, addr string) error {
+	if a.host == nil {
+		return fmt.Errorf("P2P host not initialized")
+	}
+	
+	a.logger.Infof("🔗 [P2P Direct] Connecting to peer %s (%s) at %s", peerName, peerID, addr)
+	
+	
+	maddr, err := multiaddr.NewMultiaddr(addr)
+	if err != nil {
+		return fmt.Errorf("invalid multiaddr %s: %w", addr, err)
+	}
+	
+	
+	a.host.Peerstore().AddAddr(peerID, maddr, time.Hour)
+	a.logger.Infof("🔍 [P2P Direct] Added address %s for peer %s to peerstore", addr, peerID)
+	
+	
+	ctx, cancel := context.WithTimeout(a.ctx, 15*time.Second)
+	defer cancel()
+	
+	err = a.host.Connect(ctx, peer.AddrInfo{ID: peerID, Addrs: []multiaddr.Multiaddr{maddr}})
+	if err != nil {
+		return fmt.Errorf("failed to connect to peer %s at %s: %w", peerID, addr, err)
+	}
+	
+	
+	stream, err := a.host.NewStream(ctx, peerID, CardProtocol)
+	if err != nil {
+		return fmt.Errorf("failed to establish stream to %s: %w", peerID, err)
+	}
+	stream.Close()
+	
+	
+	a.mu.Lock()
+	a.connections[peerName] = peerID
+	a.mu.Unlock()
+	
+	a.logger.Infof("✅ [P2P Direct] Successfully connected to peer %s via P2P at %s", peerName, addr)
+	return nil
+}
+
+
 func (a *P2PAgent) ConnectToPeerPure(peerName string) error {
 	if a.host == nil {
 		return fmt.Errorf("P2P host not initialized")
@@ -425,7 +590,7 @@ func (a *P2PAgent) ConnectToPeerPure(peerName string) error {
 	
 	a.logger.Infof("🌐 [P2P Pure] Connecting to %s using pure P2P discovery", peerName)
 	
-	// Check if peer is already connected
+	
 	a.mu.RLock()
 	if existingPeerID, exists := a.connections[peerName]; exists {
 		a.mu.RUnlock()
@@ -434,19 +599,19 @@ func (a *P2PAgent) ConnectToPeerPure(peerName string) error {
 	}
 	a.mu.RUnlock()
 	
-	// Get all currently connected peers from libp2p
+	
 	connectedPeers := a.host.Network().Peers()
 	a.logger.Infof("🔍 [P2P Pure] Scanning %d connected peers for %s", len(connectedPeers), peerName)
 	
 	for _, connectedPeerID := range connectedPeers {
-		// Try to request card via P2P stream to identify the peer
+		
 		if err := a.identifyAndConnectPeer(peerName, connectedPeerID); err == nil {
 			a.logger.Infof("✅ [P2P Pure] Successfully identified and connected to %s (%s)", peerName, connectedPeerID)
 			return nil
 		}
 	}
 	
-	// If not found in existing connections, try known peer addresses
+	
 	if err := a.connectToKnownPeerAddresses(peerName); err == nil {
 		return nil
 	}
@@ -454,19 +619,19 @@ func (a *P2PAgent) ConnectToPeerPure(peerName string) error {
 	return fmt.Errorf("pure P2P connection failed: peer %s not found in network", peerName)
 }
 
-// identifyAndConnectPeer tries to identify a peer by requesting its card via P2P
+
 func (a *P2PAgent) identifyAndConnectPeer(expectedName string, peerID peer.ID) error {
 	ctx, cancel := context.WithTimeout(a.ctx, 10*time.Second)
 	defer cancel()
 	
-	// Try to open a stream and request the peer's card
+	
 	stream, err := a.host.NewStream(ctx, peerID, CardProtocol)
 	if err != nil {
 		return fmt.Errorf("failed to open stream to %s: %w", peerID, err)
 	}
 	defer stream.Close()
 	
-	// Read the card response
+	
 	responseData, err := io.ReadAll(stream)
 	if err != nil {
 		return fmt.Errorf("failed to read card from %s: %w", peerID, err)
@@ -477,9 +642,9 @@ func (a *P2PAgent) identifyAndConnectPeer(expectedName string, peerID peer.ID) e
 		return fmt.Errorf("failed to parse card from %s: %w", peerID, err)
 	}
 	
-	// Check if this is the peer we're looking for
+	
 	if card.Name == expectedName {
-		// Store the connection
+		
 		a.mu.Lock()
 		a.connections[expectedName] = peerID
 		a.mu.Unlock()
@@ -510,7 +675,7 @@ func (a *P2PAgent) connectToKnownPeerAddresses(peerName string) error {
 		defer cancel()
 		
 		if peerInfo, err := a.discoverPeerIDFromHTTP(peerName, addrStr); err == nil {
-			// Build full multiaddr with discovered peer ID
+			
 			fullAddr := fmt.Sprintf("%s/p2p/%s", addrStr, peerInfo)
 			fullMultiaddr, err := multiaddr.NewMultiaddr(fullAddr)
 			if err != nil {
@@ -542,8 +707,8 @@ func (a *P2PAgent) connectToKnownPeerAddresses(peerName string) error {
 
 func (a *P2PAgent) discoverPeerIDFromHTTP(peerName string, address string) (string, error) {
 	httpPorts := map[string]string{
-		"/ip4/172.20.0.2/tcp/4001": "8000", // go-agent-1
-		"/ip4/172.20.0.3/tcp/4002": "8001", // go-agent-2
+		"/ip4/172.20.0.2/tcp/4001": "8000", 
+		"/ip4/172.20.0.3/tcp/4002": "8001", 
 	}
 	
 	httpPort, exists := httpPorts[address]
@@ -555,7 +720,7 @@ func (a *P2PAgent) discoverPeerIDFromHTTP(peerName string, address string) (stri
 	if len(parts) < 4 {
 		return "", fmt.Errorf("invalid multiaddr format: %s", address)
 	}
-	ip := parts[2] // /ip4/172.20.0.2/tcp/4001 -> 172.20.0.2
+	ip := parts[2] 
 	
 	url := fmt.Sprintf("http://%s:%s/p2p/info", ip, httpPort)
 	
@@ -669,14 +834,118 @@ func (a *P2PAgent) StartHTTPServer() error {
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
 	
-	// setupDocsRoutes(r) // Removed docs routes for production
 	
-	r.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"status": "healthy"})
-	})
 	
 	r.GET("/card", func(c *gin.Context) {
 		c.JSON(http.StatusOK, a.agentCard)
+	})
+	
+	
+	r.GET("/.well-known/agent-card.json", func(c *gin.Context) {
+		
+		streaming := true
+		pushNotifications := false
+		stateTransitionHistory := false
+		
+		card := AgentCard{
+			Name:            getEnv("AGENT_NAME", "go-agent"),
+			Version:         getEnv("AGENT_VERSION", "1.0.0"),
+			ProtocolVersion: "1.0.0",
+			Description:     getEnv("AGENT_DESCRIPTION", "Go P2P Agent with A2A support"),
+			URL:             fmt.Sprintf("http://localhost:%s", getEnv("HTTP_PORT", "8000")),
+			Provider: &AgentProvider{
+				Organization: "Praxis",
+				URL:          "https://praxis.ai",
+			},
+			Capabilities: AgentCapabilities{
+				Streaming:              &streaming,
+				PushNotifications:      &pushNotifications,
+				StateTransitionHistory: &stateTransitionHistory,
+			},
+			DefaultInputModes:  []string{"text"},
+			DefaultOutputModes: []string{"text", "json"},
+			Skills: []AgentSkill{
+				{
+					ID:          "p2p-communication",
+					Name:        "P2P Communication",
+					Description: "Peer-to-peer messaging and tool invocation",
+					Tags:        []string{"p2p", "communication"},
+					InputModes:  []string{"text", "json"},
+					OutputModes: []string{"text", "json"},
+				},
+				{
+					ID:          "llm-processing",
+					Name:        "LLM Processing",
+					Description: "Natural language processing with OpenAI GPT-4o",
+					Tags:        []string{"llm", "ai", "nlp"},
+					InputModes:  []string{"text"},
+					OutputModes: []string{"text", "json"},
+				},
+			},
+		}
+		
+		c.JSON(http.StatusOK, card)
+	})
+	
+	
+	r.GET("/a2a/agent-card", func(c *gin.Context) {
+		
+		streaming := true
+		pushNotifications := false
+		stateTransitionHistory := false
+		
+		card := AgentCard{
+			Name:            getEnv("AGENT_NAME", "go-agent"),
+			Version:         getEnv("AGENT_VERSION", "1.0.0"),
+			ProtocolVersion: "1.0.0",
+			Description:     getEnv("AGENT_DESCRIPTION", "Go P2P Agent with A2A support"),
+			URL:             fmt.Sprintf("http://localhost:%s", getEnv("HTTP_PORT", "8000")),
+			Provider: &AgentProvider{
+				Organization: "Praxis",
+				URL:          "https://praxis.ai",
+			},
+			Capabilities: AgentCapabilities{
+				Streaming:              &streaming,
+				PushNotifications:      &pushNotifications,
+				StateTransitionHistory: &stateTransitionHistory,
+			},
+			DefaultInputModes:  []string{"text"},
+			DefaultOutputModes: []string{"text", "json"},
+			Skills: []AgentSkill{
+				{
+					ID:          "p2p-communication",
+					Name:        "P2P Communication",
+					Description: "Peer-to-peer messaging and tool invocation",
+					Tags:        []string{"p2p", "communication"},
+					InputModes:  []string{"text", "json"},
+					OutputModes: []string{"text", "json"},
+				},
+				{
+					ID:          "llm-processing",
+					Name:        "LLM Processing",
+					Description: "Natural language processing with OpenAI GPT-4o",
+					Tags:        []string{"llm", "ai", "nlp"},
+					InputModes:  []string{"text"},
+					OutputModes: []string{"text", "json"},
+				},
+			},
+		}
+		
+		c.JSON(http.StatusOK, card)
+	})
+	
+	
+	r.GET("/health", func(c *gin.Context) {
+		status := gin.H{
+			"status": "healthy",
+			"timestamp": time.Now().Unix(),
+			"services": gin.H{
+				"p2p": a.host != nil,
+				"mcp": a.mcpBridge != nil,
+				"llm": a.llmAgent != nil,
+			},
+		}
+		c.JSON(http.StatusOK, status)
 	})
 	
 	r.GET("/p2p/info", func(c *gin.Context) {
@@ -792,6 +1061,41 @@ func (a *P2PAgent) StartHTTPServer() error {
 		})
 	})
 	
+	r.POST("/p2p/connect-with-addr/:peer_name/:peer_id", func(c *gin.Context) {
+		peerName := c.Param("peer_name")
+		peerIDStr := c.Param("peer_id")
+		
+		var request struct {
+			Addr string `json:"addr" binding:"required"`
+		}
+		
+		if err := c.ShouldBindJSON(&request); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "addr field is required"})
+			return
+		}
+		
+		peerID, err := peer.Decode(peerIDStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid peer ID: %v", err)})
+			return
+		}
+		
+		err = a.ConnectToPeerDirectWithAddr(peerName, peerID, request.Addr)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "connected",
+			"peer":    peerName,
+			"peer_id": peerID.String(),
+			"addr":    request.Addr,
+			"method":  "direct_with_addr",
+			"message": fmt.Sprintf("Successfully connected to %s via P2P at %s", peerName, request.Addr),
+		})
+	})
+	
 	r.POST("/p2p/request-card/:peer_name", func(c *gin.Context) {
 		peerName := c.Param("peer_name")
 		
@@ -820,6 +1124,99 @@ func (a *P2PAgent) StartHTTPServer() error {
 		
 		c.JSON(http.StatusOK, gin.H{
 			"result": fmt.Sprintf("Echo: %s", input.Text),
+		})
+	})
+	
+	
+	r.POST("/llm/chat", func(c *gin.Context) {
+		a.logger.Infof("📥 [LLM API] Received POST request to /llm/chat")
+		if a.llmAgent == nil {
+			a.logger.Errorf("❌ [LLM API] LLM agent not available")
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "LLM agent not available"})
+			return
+		}
+		
+		var req LLMRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			a.logger.Errorf("❌ [LLM API] JSON binding failed: %v", err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		a.logger.Infof("📋 [LLM API] Parsed request: ID='%s', UserInput='%s' (len=%d)", req.ID, req.UserInput, len(req.UserInput))
+		
+		
+		a.logger.Infof("🔍 [LLM API] Validating request: UserInput='%s', length=%d", req.UserInput, len(req.UserInput))
+		
+		if req.UserInput == "" || strings.TrimSpace(req.UserInput) == "" {
+			a.logger.Warnf("⚠️ [LLM API] Empty user_input detected, replacing with space to prevent null content")
+			req.UserInput = " "
+		}
+		
+		
+		if req.ID == "" {
+			req.ID = fmt.Sprintf("llm_%d", time.Now().UnixNano())
+		}
+		
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+		
+		resp, err := a.llmAgent.ProcessRequest(ctx, &req)
+		if err != nil {
+			a.logger.Errorf("❌ [LLM API] Request failed: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		
+		c.JSON(http.StatusOK, resp)
+	})
+	
+	r.GET("/llm/tools", func(c *gin.Context) {
+		if a.llmAgent == nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "LLM agent not available"})
+			return
+		}
+		
+		tools := a.llmAgent.getAvailableTools()
+		c.JSON(http.StatusOK, gin.H{
+			"tools": tools,
+			"count": len(tools),
+		})
+	})
+	
+	r.GET("/llm/status", func(c *gin.Context) {
+		if a.llmAgent == nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"status":  "unavailable",
+				"enabled": a.llmEnabled,
+			})
+			return
+		}
+		
+		metrics := a.llmAgent.GetMetrics()
+		
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "active",
+			"enabled": a.llmEnabled,
+			"metrics": metrics,
+		})
+	})
+	
+	r.GET("/llm/health", func(c *gin.Context) {
+		if a.llmAgent == nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "LLM agent not available"})
+			return
+		}
+		
+		if err := a.llmAgent.Health(); err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"status": "unhealthy",
+				"error":  err.Error(),
+			})
+			return
+		}
+		
+		c.JSON(http.StatusOK, gin.H{
+			"status": "healthy",
 		})
 	})
 	
@@ -950,10 +1347,42 @@ func (a *P2PAgent) StartHTTPServer() error {
 	return nil
 }
 
+
+func (a *P2PAgent) GetPeerByName(peerName string) (peer.ID, error) {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	
+	peerID, exists := a.connections[peerName]
+	if !exists {
+		
+		a.mu.RUnlock()
+		
+		
+		if err := a.ConnectToPeer(peerName); err != nil {
+			return "", fmt.Errorf("peer '%s' not found and auto-connect failed: %w", peerName, err)
+		}
+		
+		
+		a.mu.RLock()
+		peerID, exists = a.connections[peerName]
+		if !exists {
+			return "", fmt.Errorf("peer '%s' not found even after connection attempt", peerName)
+		}
+	}
+	
+	return peerID, nil
+}
+
 func (a *P2PAgent) Shutdown() error {
 	a.logger.Info("Shutting down P2P agent...")
 	
 	a.cancel()
+	
+	if a.llmAgent != nil {
+		a.logger.Info("🤖 [P2P Agent] Shutting down LLM agent...")
+		
+		a.logger.Info("✅ [P2P Agent] LLM agent shutdown complete")
+	}
 	
 	if a.mcpBridge != nil {
 		if err := a.mcpBridge.Shutdown(); err != nil {

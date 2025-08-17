@@ -99,6 +99,13 @@ var DefaultMCPLimits = MCPLimits{
 }
 
 const (
+	
+	MCPToolsCallProtocol     = "/mcp/tools/call/1.0.0"
+	MCPToolsListProtocol     = "/mcp/tools/list/1.0.0"
+	MCPResourcesListProtocol = "/mcp/resources/list/1.0.0"
+	MCPResourcesReadProtocol = "/mcp/resources/read/1.0.0"
+	
+	
 	MCPBridgeProtocol = "/mcp/bridge/1.0.0"
 	
 	MCPMethodToolCall      = "tools/call"

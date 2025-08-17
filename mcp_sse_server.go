@@ -394,7 +394,7 @@ func (s *MCPSSEServer) initializeCapabilities() error {
 	
 	s.resources = []MCPResource{
 		{
-			URI:         "file://filesystem",
+			URI:         "file://localhost/filesystem",
 			Name:        "Filesystem Access",
 			Description: "Access to filesystem operations via SSE",
 			MimeType:    "application/json",

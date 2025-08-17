@@ -274,7 +274,7 @@ func (b *MCPBridge) executeSSEToolCall(ctx context.Context, server *MCPServerIns
 		}
 	}
 
-	// Создаем JSON-RPC 2.0 запрос для SSE сервера
+	
 	sseRequest := map[string]interface{}{
 		"jsonrpc": "2.0",
 		"method":  "tools/call",
@@ -294,7 +294,7 @@ func (b *MCPBridge) executeSSEToolCall(ctx context.Context, server *MCPServerIns
 		}
 	}
 
-	// Отправляем запрос к SSE серверу
+	
 	sseURL := server.Config.URL + "/message"
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", sseURL, bytes.NewBuffer(reqData))
 	if err != nil {
@@ -344,7 +344,7 @@ func (b *MCPBridge) executeSSEToolCall(ctx context.Context, server *MCPServerIns
 		}
 	}
 
-	// Проверяем на JSON-RPC ошибки
+	
 	if errorData, exists := sseResponse["error"]; exists {
 		return nil, &MCPError{
 			Code:    MCPErrorServerError,
@@ -353,7 +353,7 @@ func (b *MCPBridge) executeSSEToolCall(ctx context.Context, server *MCPServerIns
 		}
 	}
 
-	// Возвращаем результат
+	
 	if result, exists := sseResponse["result"]; exists {
 		return result, nil
 	}

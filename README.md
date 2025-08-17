@@ -1,132 +1,77 @@
-# Praxis Go SDK
+# Praxis Go SDK - Comprehensive Documentation
 
-A Go implementation of the Praxis SDK for building P2P AI agents with Model Context Protocol (MCP) support.
+## System Overview
 
-## Overview
+### Architecture Description
 
-The Praxis Go SDK provides a framework for creating decentralized AI agents that can communicate via peer-to-peer networks and integrate with MCP servers. This SDK enables developers to build autonomous agents that can discover, connect, and collaborate with other agents in a distributed network.
+The Praxis Go SDK is a sophisticated peer-to-peer agent communication system that enables intelligent agents to discover, connect, and collaborate using multiple protocols and communication channels. The architecture is designed around four core components working in harmony.
 
-## Features
+### Core Components
 
-- **P2P Communication**: Built on libp2p for robust peer-to-peer networking
-- **MCP Integration**: Full support for Model Context Protocol servers
-- **Agent Discovery**: Automatic discovery and connection to other agents
-- **RESTful API**: HTTP interface for agent interaction and management
-- **SSE Support**: Server-Sent Events for real-time updates
-- **Docker Support**: Ready-to-use Docker configuration for containerized deployment
+#### 1. P2P Agent (LibP2P-based)
 
-## Architecture
+- **Purpose**: Establishes secure, encrypted peer-to-peer connections between agents
+- **Technology**: Built on libp2p with Noise security protocol and Yamux multiplexing
+- **Protocols Supported**:
+  - `/ai-agent/card/1.0.0` - A2A card exchange protocol
+  - `/mcp/bridge/1.0.0` - MCP tool invocation protocol
+- **Features**:
+  - Automatic peer discovery and connection management
+  - Bidirectional communication streams
+  - Connection persistence and recovery
+  - Multi-address support with fallback mechanisms
 
-The SDK consists of several core components:
+#### 2. MCP Bridge
 
-- **P2P Layer**: Handles peer-to-peer communication using libp2p
-- **MCP Client**: Manages connections to MCP servers
-- **MCP Bridge**: Bridges P2P and MCP protocols
-- **MCP Server Manager**: Manages multiple MCP server instances
-- **SSE Server**: Provides real-time updates via Server-Sent Events
+- **Purpose**: Enables agents to share and execute tools across the network
+- **Technology**: Model Context Protocol (MCP) implementation
+- **Transport Types**:
+  - **SSE (Server-Sent Events)**: HTTP-based streaming for web-compatible servers
+  - **stdio**: Process stdin/stdout for command-line MCP servers
+- **Features**:
+  - Tool discovery and caching
+  - Cross-agent tool execution
+  - Resource sharing and management
+  - Connection pooling and retry mechanisms
 
-## Installation
+#### 3. LLM Agent
 
-### Prerequisites
+- **Purpose**: Provides natural language processing and intelligent function calling
+- **Technology**: OpenAI GPT-4o-mini integration
+- **Capabilities**:
+  - Natural language understanding and generation
+  - Function calling with strict mode support
+  - Local and remote tool orchestration
+  - Context management and caching
+- **Built-in Functions**:
+  - `echo` - Message echoing with timestamps
+  - `calculate` - Mathematical calculations
+  - `get_current_time` - Time retrieval in various formats
+  - `generate_uuid` - UUID v4 generation
+  - `hash_text` - SHA256/MD5 text hashing
+  - `manipulate_text` - Text operations (case, reverse, word count)
+  - `get_system_info` - System and agent information
+  - `execute_remote_tool` - **Key feature for P2P tool execution**
 
-- Go 1.23.4 or higher
-- Docker (optional, for containerized deployment)
+#### 4. HTTP API Layer
 
-### Build from Source
+- **Purpose**: Provides RESTful access to all system capabilities
+- **Technology**: Gin web framework with JSON APIs
+- **Features**:
+  - Health monitoring and status endpoints
+  - P2P connection management
+  - LLM chat interface
+  - MCP tool invocation
+  - A2A card serving
 
-```bash
-git clone https://github.com/prxs-ai/praxis-go-sdk.git
-cd praxis-go-sdk
-./build-docker.sh
-docker-compose up -d
-docker ps
-```
+### Communication Flow
 
-### Usage
+1. **Agent Initialization**: Each agent starts with its own HTTP API, P2P node, MCP bridge, and LLM agent
+2. **Peer Discovery**: Agents discover each other through HTTP info exchange or P2P discovery
+3. **Connection Establishment**: Secure P2P connections are established using libp2p with Noise encryption
+4. **Card Exchange**: Agents exchange A2A-compliant capability cards via P2P protocols
+5. **Tool Discovery**: Available tools from remote agents are discovered and cached via MCP bridge
+6. **Intelligent Orchestration**: LLM agent orchestrates local and remote tool execution based on natural language requests
+7. **Cross-Agent Execution**: Tools are executed on remote agents through P2P MCP bridge communication
 
-### Basic Agent
-
-```go
-package main
-
-import (
-    "log"
-    // Import the SDK
-)
-
-func main() {
-    // Initialize and run your agent
-    // See examples/mcp-server.go for a complete example
-}
-```
-
-### Configuration
-
-The SDK uses YAML configuration files for MCP server settings. Example configurations are provided in the `config/` directory:
-
-- `mcp_config_sse_node1.yaml` - Configuration for node 1
-- `mcp_config_sse_node2.yaml` - Configuration for node 2
-
-### Docker Deployment
-
-```bash
-# Using docker-compose
-docker-compose up
-
-# Build and run manually
-docker build -f Dockerfile.fast -t praxis-agent .
-docker run -p 8000:8000 praxis-agent
-```
-
-## API Endpoints
-
-The agent exposes several HTTP endpoints:
-
-- `GET /` - Health check endpoint
-- `GET /agent/card` - Get agent capabilities card
-- `GET /peers` - List connected peers
-- `POST /connect` - Connect to a peer
-- `GET /mcp/servers` - List MCP servers
-- `POST /mcp/server` - Add MCP server
-- `DELETE /mcp/server/:name` - Remove MCP server
-- `POST /mcp/call` - Call MCP tool
-- `GET /mcp/sse` - SSE endpoint for real-time updates
-
-## Development
-
-### Project Structure
-
-```
-praxis-go-sdk/
-├── main.go                 # Main application entry point
-├── mcp_client.go          # MCP client implementation
-├── mcp_protocol.go        # MCP protocol definitions
-├── mcp_types.go           # MCP type definitions
-├── mcp_bridge.go          # P2P-MCP bridge
-├── mcp_server_manager.go  # MCP server management
-├── mcp_sse_server.go      # SSE server implementation
-├── config/                # Configuration files
-├── examples/              # Example implementations
-├── go.mod                 # Go module dependencies
-└── go.sum                 # Dependency checksums
-```
-
-### Testing
-
-Run tests with:
-
-```bash
-go test ./...
-```
-
-### Contributing
-
-Contributions are welcome! Please ensure your code follows Go best practices and includes appropriate tests.
-
-## License
-
-This project is part of the Praxis AI ecosystem. Please refer to the project license for usage terms.
-
-## Support
-
-For issues, questions, or contributions, please visit the [GitHub repository](https://github.com/prxs-ai/praxis-go-sdk).
+---
