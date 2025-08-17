@@ -84,6 +84,7 @@ type P2PAgent struct {
 	mcpEnabled  bool
 	llmAgent    *LLMAgentImpl
 	llmEnabled  bool
+	discovery   *PeerDiscovery
 }
 
 func NewP2PAgent() (*P2PAgent, error) {
@@ -364,8 +365,21 @@ func (a *P2PAgent) StartP2P() error {
 	}
 	
 	a.host = h
+	a.logger.Info("✅ [P2P Agent] LibP2P host created successfully")
 	
 	a.host.SetStreamHandler(CardProtocol, a.handleCardRequest)
+	a.logger.Info("✅ [P2P Agent] Stream handler registered for card protocol")
+	
+	rendezvous := "praxis-agents"
+	
+	a.logger.Infof("🔍 [P2P Agent] Initializing peer discovery with rendezvous: %s", rendezvous)
+	a.discovery = NewPeerDiscovery(h, a.logger, rendezvous)
+	if err := a.discovery.Start(); err != nil {
+		a.logger.Errorf("❌ [P2P Agent] Failed to start peer discovery: %v", err)
+	} else {
+		a.logger.Infof("✅ [P2P Agent] Peer discovery started with rendezvous: %s", rendezvous)
+		a.logger.Infof("🔍 [P2P Agent] Discovery service status: %d peers discovered", a.discovery.GetPeerCount())
+	}
 	
 	if err := a.StartMCP(); err != nil {
 		a.logger.Errorf("❌ [P2P Agent] Failed to start MCP bridge: %v", err)
@@ -416,100 +430,29 @@ func (a *P2PAgent) ConnectToPeer(peerName string) error {
 		return fmt.Errorf("P2P host not initialized")
 	}
 	
-	a.logger.Infof("Attempting to connect to peer: %s", peerName)
-	
-	httpURL := fmt.Sprintf("http://%s:8000/p2p/info", peerName)
-	
-	var peerInfo struct {
-		PeerID    string   `json:"peer_id"`
-		Addresses []string `json:"addresses"`
+	if a.discovery == nil {
+		return fmt.Errorf("peer discovery not initialized")
 	}
 	
-	for attempts := 0; attempts < 5; attempts++ {
-		resp, err := http.Get(httpURL)
-		if err != nil {
-			a.logger.Warnf("Attempt %d: Failed to get peer info from %s: %v", attempts+1, httpURL, err)
-			time.Sleep(time.Duration(attempts+1) * time.Second)
-			continue
-		}
-		
-		if resp.StatusCode != http.StatusOK {
-			resp.Body.Close()
-			a.logger.Warnf("Attempt %d: HTTP error %d from %s", attempts+1, resp.StatusCode, httpURL)
-			time.Sleep(time.Duration(attempts+1) * time.Second)
-			continue
-		}
-		
-		body, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		if err != nil {
-			a.logger.Warnf("Attempt %d: Failed to read response: %v", attempts+1, err)
-			time.Sleep(time.Duration(attempts+1) * time.Second)
-			continue
-		}
-		
-		err = json.Unmarshal(body, &peerInfo)
-		if err != nil {
-			a.logger.Warnf("Attempt %d: Failed to unmarshal peer info: %v", attempts+1, err)
-			time.Sleep(time.Duration(attempts+1) * time.Second)
-			continue
-		}
-		
-		break
-	}
+	a.logger.Infof("🔍 [P2P Discovery] Attempting to connect to peer: %s", peerName)
 	
-	if peerInfo.PeerID == "" {
-		return fmt.Errorf("failed to get peer info for %s", peerName)
-	}
-	
-	peerID, err := peer.Decode(peerInfo.PeerID)
+	err := a.discovery.ConnectToPeerByName(peerName)
 	if err != nil {
-		return fmt.Errorf("failed to decode peer ID: %w", err)
+		return fmt.Errorf("failed to connect via discovery: %w", err)
 	}
 	
-	for _, addrStr := range peerInfo.Addresses {
-		_, err := multiaddr.NewMultiaddr(addrStr)
-		if err != nil {
-			a.logger.Warnf("Failed to parse address %s: %v", addrStr, err)
-			continue
-		}
-		
-		peerAddr, err := multiaddr.NewMultiaddr(fmt.Sprintf("%s/p2p/%s", addrStr, peerInfo.PeerID))
-		if err != nil {
-			a.logger.Warnf("Failed to create peer address: %v", err)
-			continue
-		}
-		
-	
-		addrInfo, err := peer.AddrInfoFromP2pAddr(peerAddr)
-		if err != nil {
-			a.logger.Warnf("Failed to get addr info: %v", err)
-			continue
-		}
-		
-		
-		ctx, cancel := context.WithTimeout(a.ctx, 10*time.Second)
-		err = a.host.Connect(ctx, *addrInfo)
-		cancel()
-		
-		if err != nil {
-			a.logger.Warnf("Failed to connect to %s: %v", peerAddr, err)
-			continue
-		}
-		
-		a.logger.Infof("Successfully connected to peer %s (%s)", peerName, peerID)
-		
-	
-		a.mu.Lock()
-		a.connections[peerName] = peerID
-		a.mu.Unlock()
-		
-		return nil
+	peerID, err := a.discovery.ResolvePeerName(peerName)
+	if err != nil {
+		return fmt.Errorf("failed to resolve peer name: %w", err)
 	}
 	
-	return fmt.Errorf("failed to connect to any address for peer %s", peerName)
+	a.mu.Lock()
+	a.connections[peerName] = peerID
+	a.mu.Unlock()
+	
+	a.logger.Infof("✅ [P2P Discovery] Successfully connected to peer: %s (%s)", peerName, peerID)
+	return nil
 }
-
 
 
 func (a *P2PAgent) ConnectToPeerDirect(peerName string, peerID peer.ID) error {
@@ -1377,6 +1320,12 @@ func (a *P2PAgent) Shutdown() error {
 	a.logger.Info("Shutting down P2P agent...")
 	
 	a.cancel()
+	
+	if a.discovery != nil {
+		if err := a.discovery.Shutdown(); err != nil {
+			a.logger.Errorf("Failed to shutdown peer discovery: %v", err)
+		}
+	}
 	
 	if a.llmAgent != nil {
 		a.logger.Info("🤖 [P2P Agent] Shutting down LLM agent...")
