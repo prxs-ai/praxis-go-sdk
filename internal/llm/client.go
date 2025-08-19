@@ -80,8 +80,8 @@ func (c *OpenAIClient) ProcessRequest(ctx context.Context, req *Request) (*Respo
 	if c.cache != nil {
 		if cachedResp := c.cache.Get(req.UserInput); cachedResp != nil {
 			c.logger.Infof("[LLM] Cache hit for request: %s", req.ID)
-			cachedResp.ID = req.ID // Update ID to match request
-			cachedResp.ProcessTime = time.Since(startTime)
+			cachedResp.ID = req.ID              // Update ID to match request
+			cachedResp.ProcessTime = time.Now() // Update process time to current time
 			return cachedResp, nil
 		}
 	}
