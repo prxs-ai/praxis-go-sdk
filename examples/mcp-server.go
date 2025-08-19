@@ -141,13 +141,13 @@ func NewMCPServer() *MCPServer {
 		},
 		resources: []Resource{
 			{
-				URI:         "context:
+				URI:         "context:",
 				Name:        "Server Information",
 				Description: "Information about this MCP server",
 				MimeType:    "application/json",
 			},
 			{
-				URI:         "context:
+				URI:         "context:",
 				Name:        "Available Tools",
 				Description: "List of all available tools",
 				MimeType:    "application/json",

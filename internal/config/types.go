@@ -1,0 +1,179 @@
+package config
+
+import (
+	"time"
+)
+
+// AppConfig is the main configuration structure for the application
+type AppConfig struct {
+	Agent    AgentConfig    `yaml:"agent" json:"agent"`
+	P2P      P2PConfig      `yaml:"p2p" json:"p2p"`
+	HTTP     HTTPConfig     `yaml:"http" json:"http"`
+	MCP      MCPBridgeConfig `yaml:"mcp" json:"mcp"`
+	LLM      LLMConfig      `yaml:"llm" json:"llm"`
+	Logging  LogConfig      `yaml:"logging" json:"logging"`
+}
+
+// AgentConfig contains basic agent information
+type AgentConfig struct {
+	Name        string `yaml:"name" json:"name"`
+	Version     string `yaml:"version" json:"version"`
+	Description string `yaml:"description" json:"description"`
+	URL         string `yaml:"url" json:"url"`
+}
+
+// P2PConfig contains libp2p configuration
+type P2PConfig struct {
+	Enabled     bool   `yaml:"enabled" json:"enabled"`
+	Port        int    `yaml:"port" json:"port"`
+	Secure      bool   `yaml:"secure" json:"secure"`
+	Rendezvous  string `yaml:"rendezvous" json:"rendezvous"`
+	EnableMDNS  bool   `yaml:"enable_mdns" json:"enable_mdns"`
+	EnableDHT   bool   `yaml:"enable_dht" json:"enable_dht"`
+	BootstrapNodes []string `yaml:"bootstrap_nodes" json:"bootstrap_nodes"`
+}
+
+// HTTPConfig contains HTTP server configuration
+type HTTPConfig struct {
+	Enabled bool   `yaml:"enabled" json:"enabled"`
+	Port    int    `yaml:"port" json:"port"`
+	Host    string `yaml:"host" json:"host"`
+}
+
+// MCPBridgeConfig contains MCP bridge configuration
+type MCPBridgeConfig struct {
+	Enabled   bool              `yaml:"enabled" json:"enabled"`
+	Servers   []MCPServerConfig `yaml:"servers" json:"servers"`
+	Limits    MCPLimits         `yaml:"limits" json:"limits"`
+	LogLevel  string            `yaml:"log_level" json:"log_level"`
+}
+
+// MCPServerConfig defines a single MCP server configuration
+type MCPServerConfig struct {
+	Name      string            `yaml:"name" json:"name"`
+	Transport string            `yaml:"transport" json:"transport"`
+	Command   string            `yaml:"command" json:"command,omitempty"`
+	Args      []string          `yaml:"args" json:"args,omitempty"`
+	Env       map[string]string `yaml:"env" json:"env,omitempty"`
+	URL       string            `yaml:"url" json:"url,omitempty"`
+	WorkDir   string            `yaml:"workdir" json:"workdir,omitempty"`
+	Timeout   time.Duration     `yaml:"timeout" json:"timeout,omitempty"`
+	Enabled   bool              `yaml:"enabled" json:"enabled"`
+}
+
+// MCPLimits defines resource limits for the MCP bridge
+type MCPLimits struct {
+	MaxConcurrentRequests  int           `yaml:"max_concurrent_requests" json:"max_concurrent_requests"`
+	RequestTimeoutMs       int           `yaml:"request_timeout_ms" json:"request_timeout_ms"`
+	MaxResponseSizeBytes   int64         `yaml:"max_response_size_bytes" json:"max_response_size_bytes"`
+	MaxServersPerNode      int           `yaml:"max_servers_per_node" json:"max_servers_per_node"`
+	ConnectionPoolSize     int           `yaml:"connection_pool_size" json:"connection_pool_size"`
+	RetryAttempts          int           `yaml:"retry_attempts" json:"retry_attempts"`
+	RetryBackoffMs         int           `yaml:"retry_backoff_ms" json:"retry_backoff_ms"`
+}
+
+// LLMConfig contains LLM integration configuration
+type LLMConfig struct {
+	Enabled      bool          `yaml:"enabled" json:"enabled"`
+	Provider     string        `yaml:"provider" json:"provider"`
+	APIKey       string        `yaml:"api_key" json:"api_key"`
+	Model        string        `yaml:"model" json:"model"`
+	MaxTokens    int           `yaml:"max_tokens" json:"max_tokens"`
+	Temperature  float32       `yaml:"temperature" json:"temperature"`
+	Timeout      time.Duration `yaml:"timeout" json:"timeout"`
+	
+	FunctionCalling LLMFunctionConfig `yaml:"function_calling" json:"function_calling"`
+	Caching         LLMCacheConfig    `yaml:"caching" json:"caching"`
+	RateLimiting    LLMRateConfig     `yaml:"rate_limiting" json:"rate_limiting"`
+}
+
+// LLMFunctionConfig contains function calling configuration
+type LLMFunctionConfig struct {
+	StrictMode        bool          `yaml:"strict_mode" json:"strict_mode"`
+	MaxParallelCalls  int           `yaml:"max_parallel_calls" json:"max_parallel_calls"`
+	ToolTimeout       time.Duration `yaml:"tool_timeout" json:"tool_timeout"`
+}
+
+// LLMCacheConfig contains LLM caching configuration
+type LLMCacheConfig struct {
+	Enabled bool          `yaml:"enabled" json:"enabled"`
+	TTL     time.Duration `yaml:"ttl" json:"ttl"`
+	MaxSize int           `yaml:"max_size" json:"max_size"`
+}
+
+// LLMRateConfig contains LLM rate limiting configuration
+type LLMRateConfig struct {
+	RequestsPerMinute int `yaml:"requests_per_minute" json:"requests_per_minute"`
+	TokensPerMinute   int `yaml:"tokens_per_minute" json:"tokens_per_minute"`
+}
+
+// LogConfig contains logging configuration
+type LogConfig struct {
+	Level  string `yaml:"level" json:"level"`
+	Format string `yaml:"format" json:"format"`
+	File   string `yaml:"file" json:"file"`
+}
+
+// DefaultConfig returns the default configuration
+func DefaultConfig() *AppConfig {
+	return &AppConfig{
+		Agent: AgentConfig{
+			Name:        "go-agent",
+			Version:     "1.0.0",
+			Description: "Go P2P Agent",
+			URL:         "http://localhost:8000",
+		},
+		P2P: P2PConfig{
+			Enabled:     true,
+			Port:        0, // Random port
+			Secure:      true,
+			Rendezvous:  "praxis-agents",
+			EnableMDNS:  true,
+			EnableDHT:   true,
+		},
+		HTTP: HTTPConfig{
+			Enabled: true,
+			Port:    8000,
+			Host:    "0.0.0.0",
+		},
+		MCP: MCPBridgeConfig{
+			Enabled: true,
+			Limits: MCPLimits{
+				MaxConcurrentRequests:  100,
+				RequestTimeoutMs:       30000,
+				MaxResponseSizeBytes:   10485760,
+				MaxServersPerNode:      10,
+				ConnectionPoolSize:     5,
+				RetryAttempts:          3,
+				RetryBackoffMs:         1000,
+			},
+			LogLevel: "info",
+		},
+		LLM: LLMConfig{
+			Enabled:     true,
+			Provider:    "openai",
+			Model:       "gpt-4o-mini",
+			MaxTokens:   4096,
+			Temperature: 0.1,
+			Timeout:     30 * time.Second,
+			FunctionCalling: LLMFunctionConfig{
+				StrictMode:       true,
+				MaxParallelCalls: 5,
+				ToolTimeout:      15 * time.Second,
+			},
+			Caching: LLMCacheConfig{
+				Enabled: true,
+				TTL:     300 * time.Second,
+				MaxSize: 1000,
+			},
+			RateLimiting: LLMRateConfig{
+				RequestsPerMinute: 60,
+				TokensPerMinute:   100000,
+			},
+		},
+		Logging: LogConfig{
+			Level:  "info",
+			Format: "text",
+		},
+	}
+}
