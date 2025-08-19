@@ -11,16 +11,16 @@ import (
 type Client interface {
 	// ProcessRequest processes an LLM request
 	ProcessRequest(ctx context.Context, req *Request) (*Response, error)
-	
+
 	// RegisterTool registers a tool with the LLM
 	RegisterTool(tool FunctionDef) error
-	
+
 	// GetAvailableTools returns the list of available tools
 	GetAvailableTools() []FunctionDef
-	
+
 	// Health checks the health of the LLM connection
 	Health() error
-	
+
 	// GetMetrics returns metrics about the LLM client
 	GetMetrics() Metrics
 }
@@ -29,36 +29,36 @@ type Client interface {
 type ToolExecutor interface {
 	// ExecuteTool executes a local tool
 	ExecuteTool(ctx context.Context, toolName string, params map[string]interface{}) (interface{}, error)
-	
+
 	// ExecuteRemoteTool executes a tool on a remote peer
 	ExecuteRemoteTool(ctx context.Context, peerName, toolName string, params map[string]interface{}) (interface{}, error)
-	
+
 	// GetLocalTools returns the list of local tools
 	GetLocalTools() map[string]mcp.MCPTool
-	
+
 	// GetRemoteTools returns the list of tools available on a remote peer
 	GetRemoteTools(peerName string) (map[string]mcp.MCPTool, error)
 }
 
 // Request represents a request to the LLM
 type Request struct {
-	ID           string                 `json:"id"`
-	UserInput    string                 `json:"user_input"`
-	Context      map[string]interface{} `json:"context,omitempty"`
-	Tools        []string               `json:"tools,omitempty"`
-	MaxTokens    int                    `json:"max_tokens,omitempty"`
-	Temperature  float32                `json:"temperature,omitempty"`
+	ID          string                 `json:"id"`
+	UserInput   string                 `json:"user_input"`
+	Context     map[string]interface{} `json:"context,omitempty"`
+	Tools       []string               `json:"tools,omitempty"`
+	MaxTokens   int                    `json:"max_tokens,omitempty"`
+	Temperature float32                `json:"temperature,omitempty"`
 }
 
 // Response represents a response from the LLM
 type Response struct {
-	ID           string          `json:"id"`
-	Response     string          `json:"response"`
-	ToolCalls    []ToolExecution `json:"tool_calls,omitempty"`
-	TokensUsed   int             `json:"tokens_used"`
-	ProcessTime  time.Duration   `json:"process_time"`
-	Success      bool            `json:"success"`
-	Error        string          `json:"error,omitempty"`
+	ID          string          `json:"id"`
+	Response    string          `json:"response"`
+	ToolCalls   []ToolExecution `json:"tool_calls,omitempty"`
+	TokensUsed  int             `json:"tokens_used"`
+	ProcessTime time.Time       `json:"process_time"`
+	Success     bool            `json:"success"`
+	Error       string          `json:"error,omitempty"`
 }
 
 // ToolExecution represents the execution of a tool

@@ -228,7 +228,7 @@ func (c *OpenAIClient) ProcessRequest(ctx context.Context, req *Request) (*Respo
 		ID:          req.ID,
 		Response:    choice.Message.Content,
 		TokensUsed:  openAIResp.Usage.TotalTokens,
-		ProcessTime: processTime,
+		ProcessTime: time.Now(),
 		Success:     true,
 	}
 
