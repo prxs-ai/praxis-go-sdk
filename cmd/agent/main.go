@@ -30,7 +30,7 @@ func main() {
 	if level == "" {
 		level = utils.GetEnv("LOG_LEVEL", "info")
 	}
-	
+
 	logLevelValue, err := logrus.ParseLevel(level)
 	if err != nil {
 		logger.Warnf("Invalid log level: %s, using 'info'", level)
@@ -59,20 +59,20 @@ func main() {
 
 	// Create agent
 	logger.Info("Creating agent...")
-	agent, err := agent.NewAgent(agentConfig, logger)
+	agentInstance, err := agent.NewAgent(agentConfig, logger)
 	if err != nil {
 		logger.Fatalf("Failed to create agent: %v", err)
 	}
 
 	// Start agent
 	logger.Info("Starting agent...")
-	if err := agent.Start(); err != nil {
+	if err := agentInstance.Start(); err != nil {
 		logger.Fatalf("Failed to start agent: %v", err)
 	}
 
 	// Create API server
 	logger.Info("Creating API server...")
-	apiServer := agent.NewAPIServer(agent, &appConfig.HTTP, logger)
+	apiServer := agent.NewAPIServer(agentInstance, &appConfig.HTTP, logger)
 
 	// Start API server
 	logger.Info("Starting API server...")
@@ -94,7 +94,7 @@ func main() {
 
 	// Shutdown agent
 	logger.Info("Shutting down agent...")
-	if err := agent.Shutdown(); err != nil {
+	if err := agentInstance.Shutdown(); err != nil {
 		logger.Errorf("Agent shutdown error: %v", err)
 	}
 

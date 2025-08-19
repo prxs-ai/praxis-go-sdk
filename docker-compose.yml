@@ -1,6 +1,6 @@
 services:
   go-agent-1:
-    image: go-agent:v9-multiformat
+    image: go-agent:latest
     container_name: go-agent-1
     hostname: go-agent-1
     environment:
@@ -13,7 +13,7 @@ services:
       - LLM_ENABLED=true
       - MCP_CONFIG_PATH=config/mcp_config_sse_node1.yaml
       - LLM_CONFIG_PATH=config/llm_config.yaml
-      - ***REMOVED***
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
       - INSECURE_P2P=false
     ports:
       - "8000:8000"  # Main API
@@ -34,7 +34,7 @@ services:
       start_period: 30s
 
   go-agent-2:
-    image: go-agent:v9-multiformat
+    image: go-agent:latest
     container_name: go-agent-2
     hostname: go-agent-2
     environment:
@@ -47,7 +47,7 @@ services:
       - LLM_ENABLED=true  
       - MCP_CONFIG_PATH=config/mcp_config_sse_node2.yaml
       - LLM_CONFIG_PATH=config/llm_config.yaml
-      - ***REMOVED***
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
       - INSECURE_P2P=false
     ports:
       - "8001:8001"  # Main API

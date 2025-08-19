@@ -141,13 +141,13 @@ func NewMCPServer() *MCPServer {
 		},
 		resources: []Resource{
 			{
-				URI:         "context:",
+				URI:         "context://server-info",
 				Name:        "Server Information",
 				Description: "Information about this MCP server",
 				MimeType:    "application/json",
 			},
 			{
-				URI:         "context:",
+				URI:         "context://available-tools",
 				Name:        "Available Tools",
 				Description: "List of all available tools",
 				MimeType:    "application/json",
@@ -483,7 +483,7 @@ func (s *MCPServer) handleReadResource(req *JSONRPCRequest) *JSONRPCResponse {
 	var contents []map[string]interface{}
 	
 	switch uri {
-	case "context:
+	case "context://server-info":
 		contents = []map[string]interface{}{
 			{
 				"uri":      uri,
@@ -492,7 +492,7 @@ func (s *MCPServer) handleReadResource(req *JSONRPCRequest) *JSONRPCResponse {
 					s.name, s.version, len(s.tools), len(s.resources), time.Since(time.Now().Add(-time.Hour))),
 			},
 		}
-	case "context:
+	case "context://available-tools":
 		toolsJSON, _ := json.Marshal(s.tools)
 		contents = []map[string]interface{}{
 			{
