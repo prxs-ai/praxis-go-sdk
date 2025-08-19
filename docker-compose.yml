@@ -11,8 +11,6 @@ services:
       - P2P_PORT=4001
       - MCP_ENABLED=true
       - LLM_ENABLED=true
-      - MCP_CONFIG_PATH=config/mcp_config_sse_node1.yaml
-      - LLM_CONFIG_PATH=config/llm_config.yaml
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - INSECURE_P2P=false
     ports:
@@ -25,7 +23,7 @@ services:
       - node1-data:/data
     networks:
       - mcp-network
-    command: ["./go-agent"]
+    command: ["./go-agent", "--config", "config/node1.yaml"]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 10s
@@ -45,8 +43,6 @@ services:
       - P2P_PORT=4002
       - MCP_ENABLED=true
       - LLM_ENABLED=true  
-      - MCP_CONFIG_PATH=config/mcp_config_sse_node2.yaml
-      - LLM_CONFIG_PATH=config/llm_config.yaml
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - INSECURE_P2P=false
     ports:
@@ -59,7 +55,7 @@ services:
       - node2-data:/data
     networks:
       - mcp-network
-    command: ["./go-agent"]
+    command: ["./go-agent", "--config", "config/node2.yaml"]
     depends_on:
       go-agent-1:
         condition: service_healthy
