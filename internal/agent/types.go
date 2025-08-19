@@ -3,7 +3,6 @@ package agent
 import (
 	"context"
 
-	"github.com/sirupsen/logrus"
 	"go-p2p-agent/internal/config"
 	"go-p2p-agent/internal/llm"
 	"go-p2p-agent/internal/mcp"
@@ -39,10 +38,6 @@ type Agent interface {
 
 	// ProcessLLMRequest processes an LLM request
 	ProcessLLMRequest(ctx context.Context, req *llm.Request) (*llm.Response, error)
-}
-
-func (a Agent) NewAPIServer(agent Agent, config *config.HTTPConfig, logger *logrus.Logger) any {
-	panic("unimplemented")
 }
 
 // Config contains the agent configuration
