@@ -1,4 +1,24 @@
-mcp_bridge:
+agent:
+  name: "node1-agent"
+  version: "1.0.0"
+  description: "Go P2P Agent Node 1"
+  url: "http://localhost:8001"
+
+p2p:
+  enabled: true
+  port: 9001
+  secure: true
+  rendezvous: "praxis-agents"
+  enable_mdns: true
+  enable_dht: true
+  bootstrap_nodes: []
+
+http:
+  enabled: true
+  port: 8001
+  host: "0.0.0.0"
+
+mcp:
   enabled: true
   log_level: info
   servers:
@@ -36,3 +56,30 @@ mcp_bridge:
     connection_pool_size: 3
     retry_attempts: 2
     retry_backoff_ms: 500
+
+llm:
+  enabled: true
+  provider: "openai"
+  api_key: "${OPENAI_API_KEY}"
+  model: "gpt-4o-mini"
+  max_tokens: 4096
+  temperature: 0.1
+  timeout: 30s
+  
+  function_calling:
+    strict_mode: true
+    max_parallel_calls: 5
+    tool_timeout: 15s
+    
+  caching:
+    enabled: true
+    ttl: 300s
+    max_size: 1000
+    
+  rate_limiting:
+    requests_per_minute: 60
+    tokens_per_minute: 100000
+
+logging:
+  level: "info"
+  format: "json"

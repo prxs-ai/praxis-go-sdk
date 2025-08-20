@@ -17,7 +17,7 @@ RUN go mod download
 COPY . .
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o go-agent .
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o go-agent cmd/agent/main.go
 
 # Build MCP server example
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o examples/mcp-server examples/mcp-server.go
