@@ -1,132 +1,136 @@
-# Praxis Go SDK
+# Go P2P Agent
 
-A Go implementation of the Praxis SDK for building P2P AI agents with Model Context Protocol (MCP) support.
-
-## Overview
-
-The Praxis Go SDK provides a framework for creating decentralized AI agents that can communicate via peer-to-peer networks and integrate with MCP servers. This SDK enables developers to build autonomous agents that can discover, connect, and collaborate with other agents in a distributed network.
+A Go-based peer-to-peer agent with LLM integration and MCP (Machine Capability Protocol) support.
 
 ## Features
 
-- **P2P Communication**: Built on libp2p for robust peer-to-peer networking
-- **MCP Integration**: Full support for Model Context Protocol servers
-- **Agent Discovery**: Automatic discovery and connection to other agents
-- **RESTful API**: HTTP interface for agent interaction and management
-- **SSE Support**: Server-Sent Events for real-time updates
-- **Docker Support**: Ready-to-use Docker configuration for containerized deployment
+- Peer-to-peer communication using libp2p
+- LLM integration with OpenAI
+- MCP bridge for tool execution
+- HTTP API for agent control
+- Agent card standard support
 
 ## Architecture
 
-The SDK consists of several core components:
+The project has been refactored with a modular structure:
 
-- **P2P Layer**: Handles peer-to-peer communication using libp2p
-- **MCP Client**: Manages connections to MCP servers
-- **MCP Bridge**: Bridges P2P and MCP protocols
-- **MCP Server Manager**: Manages multiple MCP server instances
-- **SSE Server**: Provides real-time updates via Server-Sent Events
+```
+go-p2p-agent/
+├── cmd/
+│   └── agent/              # Application entry point
+├── internal/
+│   ├── agent/              # P2P agent core functionality
+│   ├── config/             # Configuration management
+│   ├── llm/                # LLM integration
+│   ├── mcp/                # MCP bridge
+│   └── p2p/                # P2P networking
+├── pkg/
+│   ├── agentcard/          # Agent card format
+│   └── utils/              # Utility functions
+```
 
-## Installation
+## Getting Started
 
 ### Prerequisites
 
-- Go 1.23.4 or higher
-- Docker (optional, for containerized deployment)
+- Go 1.19 or higher
+- OpenAI API key (for LLM functionality)
 
-### Build from Source
+### Installation
 
-```bash
-git clone https://github.com/prxs-ai/praxis-go-sdk.git
-cd praxis-go-sdk
-./build-docker.sh
-docker-compose up -d
-docker ps
-```
+1. Clone the repository:
+   ```
+   git clone https://github.com/yourusername/go-p2p-agent.git
+   cd go-p2p-agent
+   ```
 
-### Usage
-
-### Basic Agent
-
-```go
-package main
-
-import (
-    "log"
-    // Import the SDK
-)
-
-func main() {
-    // Initialize and run your agent
-    // See examples/mcp-server.go for a complete example
-}
-```
+2. Build the application:
+   ```
+   go build -o agent ./cmd/agent
+   ```
 
 ### Configuration
 
-The SDK uses YAML configuration files for MCP server settings. Example configurations are provided in the `config/` directory:
+Create a configuration file at `config/config.yaml`:
 
-- `mcp_config_sse_node1.yaml` - Configuration for node 1
-- `mcp_config_sse_node2.yaml` - Configuration for node 2
+```yaml
+agent:
+  name: "go-agent"
+  version: "1.0.0"
+  description: "Go P2P Agent"
+  url: "http://localhost:8000"
 
-### Docker Deployment
+p2p:
+  enabled: true
+  port: 4001
+  secure: true
+  rendezvous: "praxis-agents"
+  enable_mdns: true
+  enable_dht: true
 
-```bash
-# Using docker-compose
-docker-compose up
+http:
+  enabled: true
+  port: 8000
+  host: "0.0.0.0"
 
-# Build and run manually
-docker build -f Dockerfile.fast -t praxis-agent .
-docker run -p 8000:8000 praxis-agent
+mcp:
+  enabled: true
+  servers:
+    - name: "local"
+      transport: "stdio"
+      command: "python"
+      args: ["./scripts/mcp_server.py"]
+      enabled: true
+
+llm:
+  enabled: true
+  provider: "openai"
+  api_key: "${OPENAI_API_KEY}"
+  model: "gpt-4o-mini"
+  max_tokens: 4096
+  temperature: 0.1
+
+logging:
+  level: "info"
+  format: "text"
 ```
+
+### Running
+
+1. Set your OpenAI API key:
+   ```
+   export OPENAI_API_KEY=your-api-key
+   ```
+
+2. Run the agent:
+   ```
+   ./agent
+   ```
 
 ## API Endpoints
 
-The agent exposes several HTTP endpoints:
+The agent exposes the following HTTP endpoints:
 
-- `GET /` - Health check endpoint
-- `GET /agent/card` - Get agent capabilities card
-- `GET /peers` - List connected peers
-- `POST /connect` - Connect to a peer
-- `GET /mcp/servers` - List MCP servers
-- `POST /mcp/server` - Add MCP server
-- `DELETE /mcp/server/:name` - Remove MCP server
-- `POST /mcp/call` - Call MCP tool
-- `GET /mcp/sse` - SSE endpoint for real-time updates
+- `/card` - Get agent card
+- `/health` - Health check
+- `/p2p/info` - P2P information
+- `/p2p/connect/:peer_name` - Connect to peer
+- `/mcp/tools` - List MCP tools
+- `/llm/chat` - Process LLM request
 
-## Development
+## Docker
 
-### Project Structure
+A Dockerfile is provided to run the agent in a container:
 
 ```
-praxis-go-sdk/
-├── main.go                 # Main application entry point
-├── mcp_client.go          # MCP client implementation
-├── mcp_protocol.go        # MCP protocol definitions
-├── mcp_types.go           # MCP type definitions
-├── mcp_bridge.go          # P2P-MCP bridge
-├── mcp_server_manager.go  # MCP server management
-├── mcp_sse_server.go      # SSE server implementation
-├── config/                # Configuration files
-├── examples/              # Example implementations
-├── go.mod                 # Go module dependencies
-└── go.sum                 # Dependency checksums
+docker build -t go-p2p-agent .
+docker run -p 8000:8000 -e OPENAI_API_KEY=your-api-key go-p2p-agent
 ```
 
-### Testing
+## Contributing
 
-Run tests with:
-
-```bash
-go test ./...
-```
-
-### Contributing
-
-Contributions are welcome! Please ensure your code follows Go best practices and includes appropriate tests.
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-This project is part of the Praxis AI ecosystem. Please refer to the project license for usage terms.
-
-## Support
-
-For issues, questions, or contributions, please visit the [GitHub repository](https://github.com/prxs-ai/praxis-go-sdk).
+This project is licensed under the MIT License - see the LICENSE file for details.

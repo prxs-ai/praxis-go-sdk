@@ -7,7 +7,7 @@ echo "=================================================="
 
 echo "📦 Step 1: Building Linux binaries..."
 echo "Building main application..."
-GOOS=linux GOARCH=amd64 go build -o go-agent .
+GOOS=linux GOARCH=amd64 go build -o go-agent cmd/agent/main.go
 
 echo "Building MCP server..."
 GOOS=linux GOARCH=amd64 go build -o examples/mcp-server ./examples/mcp-server.go
