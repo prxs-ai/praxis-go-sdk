@@ -1,0 +1,12 @@
+mcp_bridge:
+  enabled: true
+  log_level: info
+  servers: []  # No external servers needed for local tools
+  limits:
+    max_concurrent_requests: 50
+    request_timeout_ms: 30000
+    max_response_size_bytes: 5242880
+    max_servers_per_node: 5
+    connection_pool_size: 3
+    retry_attempts: 2
+    retry_backoff_ms: 500
