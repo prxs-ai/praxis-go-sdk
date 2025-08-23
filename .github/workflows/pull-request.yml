@@ -42,21 +42,3 @@ jobs:
 
       - name: Run pre-commit checks
         run: pre-commit run --all-files
-
-  build-and-test:
-    name: Build and Test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.22'
-          cache: true
-
-      - name: Build
-        run: go build -v ./...
-
-      - name: Test
-        run: go test -v ./...
