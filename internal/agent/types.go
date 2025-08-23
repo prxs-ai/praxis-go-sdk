@@ -3,11 +3,11 @@ package agent
 import (
 	"context"
 
-	"go-p2p-agent/internal/config"
-	"go-p2p-agent/internal/llm"
-	"go-p2p-agent/internal/mcp"
-	"go-p2p-agent/internal/p2p"
-	"go-p2p-agent/pkg/agentcard"
+	"praxis-go-sdk/internal/config"
+	"praxis-go-sdk/internal/llm"
+	"praxis-go-sdk/internal/mcp"
+	"praxis-go-sdk/internal/p2p"
+	"praxis-go-sdk/pkg/agentcard"
 )
 
 // Agent defines the interface for the P2P agent

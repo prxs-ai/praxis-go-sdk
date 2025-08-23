@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Ask a Question
+    url: https://github.com/prxs-ai/praxis-go-sdk/discussions/categories/q-a
+    about: Ask any question about the Praxis Golang SDK.

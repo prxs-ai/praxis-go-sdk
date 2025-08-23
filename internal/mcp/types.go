@@ -8,7 +8,7 @@ import (
 	mcp "github.com/metoro-io/mcp-golang"
 	"github.com/sirupsen/logrus"
 
-	"go-p2p-agent/internal/config"
+	"praxis-go-sdk/internal/config"
 )
 
 // MCPTool describes a tool provided by an MCP server
@@ -19,12 +19,12 @@ type MCPResource = mcp.ResourceSchema
 
 // MCPCapability contains information about a server's tools and resources
 type MCPCapability struct {
-        ServerName string
-        Transport  string
-        Tools      []MCPTool
-        Resources  []MCPResource
-        Status     string
-        LastSeen   time.Time
+	ServerName string
+	Transport  string
+	Tools      []MCPTool
+	Resources  []MCPResource
+	Status     string
+	LastSeen   time.Time
 }
 
 // Bridge is the interface for the MCP bridge

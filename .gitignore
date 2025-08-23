@@ -5,6 +5,11 @@
 *.so
 *.dylib
 
+# Files without extensions
+*
+!*/
+!*.*
+
 # Test binary, built with `go test -c`
 *.test
 

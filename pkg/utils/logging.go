@@ -26,14 +26,14 @@ func DefaultLogConfig() LogConfig {
 // ConfigureLogger sets up a logrus logger based on configuration
 func ConfigureLogger(config LogConfig) *logrus.Logger {
 	logger := logrus.New()
-	
+
 	// Configure log level
 	level, err := logrus.ParseLevel(config.Level)
 	if err != nil {
 		level = logrus.InfoLevel
 	}
 	logger.SetLevel(level)
-	
+
 	// Configure output format
 	if config.Format == "json" {
 		logger.SetFormatter(&logrus.JSONFormatter{})
@@ -42,7 +42,7 @@ func ConfigureLogger(config LogConfig) *logrus.Logger {
 			FullTimestamp: true,
 		})
 	}
-	
+
 	// Configure output destination
 	if config.OutputPath != "" {
 		file, err := os.OpenFile(config.OutputPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
@@ -52,6 +52,6 @@ func ConfigureLogger(config LogConfig) *logrus.Logger {
 			logger.SetOutput(mw)
 		}
 	}
-	
+
 	return logger
 }

@@ -8,7 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 
-	"go-p2p-agent/pkg/utils"
+	"praxis-go-sdk/pkg/utils"
 )
 
 // LoadConfig loads configuration from a YAML file
@@ -76,12 +76,12 @@ func validateConfig(config *AppConfig) error {
 	if config.Agent.Name == "" {
 		return fmt.Errorf("agent name cannot be empty")
 	}
-	
+
 	// P2P validation
 	if config.P2P.Enabled && config.P2P.Rendezvous == "" {
 		return fmt.Errorf("rendezvous string cannot be empty when P2P is enabled")
 	}
-	
+
 	// LLM validation
 	if config.LLM.Enabled {
 		if config.LLM.Provider == "" {
@@ -91,7 +91,7 @@ func validateConfig(config *AppConfig) error {
 			return fmt.Errorf("OpenAI API key cannot be empty when using OpenAI provider")
 		}
 	}
-	
+
 	// MCP validation
 	if config.MCP.Enabled {
 		for _, server := range config.MCP.Servers {
@@ -100,7 +100,7 @@ func validateConfig(config *AppConfig) error {
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -109,19 +109,19 @@ func validateMCPServer(server *MCPServerConfig) error {
 	if server.Name == "" {
 		return fmt.Errorf("MCP server name cannot be empty")
 	}
-	
+
 	if server.Transport != "stdio" && server.Transport != "sse" {
 		return fmt.Errorf("MCP server transport must be 'stdio' or 'sse', got '%s'", server.Transport)
 	}
-	
+
 	if server.Transport == "stdio" && server.Command == "" {
 		return fmt.Errorf("command is required for stdio transport in MCP server '%s'", server.Name)
 	}
-	
+
 	if server.Transport == "sse" && server.URL == "" {
 		return fmt.Errorf("URL is required for sse transport in MCP server '%s'", server.Name)
 	}
-	
+
 	return nil
 }
 
@@ -140,7 +140,7 @@ func applyEnvironmentOverrides(config *AppConfig) {
 	if url := os.Getenv("AGENT_URL"); url != "" {
 		config.Agent.URL = url
 	}
-	
+
 	// P2P overrides
 	config.P2P.Enabled = utils.BoolFromEnv("P2P_ENABLED", config.P2P.Enabled)
 	if portStr := os.Getenv("P2P_PORT"); portStr != "" {
@@ -150,7 +150,7 @@ func applyEnvironmentOverrides(config *AppConfig) {
 		}
 	}
 	config.P2P.Secure = !utils.BoolFromEnv("INSECURE_P2P", !config.P2P.Secure)
-	
+
 	// HTTP overrides
 	config.HTTP.Enabled = utils.BoolFromEnv("HTTP_ENABLED", config.HTTP.Enabled)
 	if portStr := os.Getenv("HTTP_PORT"); portStr != "" {
@@ -158,10 +158,10 @@ func applyEnvironmentOverrides(config *AppConfig) {
 			logrus.Warnf("Invalid HTTP_PORT: %s", portStr)
 		}
 	}
-	
+
 	// MCP overrides
 	config.MCP.Enabled = utils.BoolFromEnv("MCP_ENABLED", config.MCP.Enabled)
-	
+
 	// LLM overrides
 	config.LLM.Enabled = utils.BoolFromEnv("LLM_ENABLED", config.LLM.Enabled)
 	if apiKey := os.Getenv("OPENAI_API_KEY"); apiKey != "" {
@@ -170,7 +170,7 @@ func applyEnvironmentOverrides(config *AppConfig) {
 	if model := os.Getenv("LLM_MODEL"); model != "" {
 		config.LLM.Model = model
 	}
-	
+
 	// Logging overrides
 	if level := os.Getenv("LOG_LEVEL"); level != "" {
 		config.Logging.Level = level

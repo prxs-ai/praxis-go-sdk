@@ -6,12 +6,12 @@ import (
 
 // AppConfig is the main configuration structure for the application
 type AppConfig struct {
-	Agent    AgentConfig    `yaml:"agent" json:"agent"`
-	P2P      P2PConfig      `yaml:"p2p" json:"p2p"`
-	HTTP     HTTPConfig     `yaml:"http" json:"http"`
-	MCP      MCPBridgeConfig `yaml:"mcp" json:"mcp"`
-	LLM      LLMConfig      `yaml:"llm" json:"llm"`
-	Logging  LogConfig      `yaml:"logging" json:"logging"`
+	Agent   AgentConfig     `yaml:"agent" json:"agent"`
+	P2P     P2PConfig       `yaml:"p2p" json:"p2p"`
+	HTTP    HTTPConfig      `yaml:"http" json:"http"`
+	MCP     MCPBridgeConfig `yaml:"mcp" json:"mcp"`
+	LLM     LLMConfig       `yaml:"llm" json:"llm"`
+	Logging LogConfig       `yaml:"logging" json:"logging"`
 }
 
 // AgentConfig contains basic agent information
@@ -24,12 +24,12 @@ type AgentConfig struct {
 
 // P2PConfig contains libp2p configuration
 type P2PConfig struct {
-	Enabled     bool   `yaml:"enabled" json:"enabled"`
-	Port        int    `yaml:"port" json:"port"`
-	Secure      bool   `yaml:"secure" json:"secure"`
-	Rendezvous  string `yaml:"rendezvous" json:"rendezvous"`
-	EnableMDNS  bool   `yaml:"enable_mdns" json:"enable_mdns"`
-	EnableDHT   bool   `yaml:"enable_dht" json:"enable_dht"`
+	Enabled        bool     `yaml:"enabled" json:"enabled"`
+	Port           int      `yaml:"port" json:"port"`
+	Secure         bool     `yaml:"secure" json:"secure"`
+	Rendezvous     string   `yaml:"rendezvous" json:"rendezvous"`
+	EnableMDNS     bool     `yaml:"enable_mdns" json:"enable_mdns"`
+	EnableDHT      bool     `yaml:"enable_dht" json:"enable_dht"`
 	BootstrapNodes []string `yaml:"bootstrap_nodes" json:"bootstrap_nodes"`
 }
 
@@ -42,10 +42,10 @@ type HTTPConfig struct {
 
 // MCPBridgeConfig contains MCP bridge configuration
 type MCPBridgeConfig struct {
-	Enabled   bool              `yaml:"enabled" json:"enabled"`
-	Servers   []MCPServerConfig `yaml:"servers" json:"servers"`
-	Limits    MCPLimits         `yaml:"limits" json:"limits"`
-	LogLevel  string            `yaml:"log_level" json:"log_level"`
+	Enabled  bool              `yaml:"enabled" json:"enabled"`
+	Servers  []MCPServerConfig `yaml:"servers" json:"servers"`
+	Limits   MCPLimits         `yaml:"limits" json:"limits"`
+	LogLevel string            `yaml:"log_level" json:"log_level"`
 }
 
 // MCPServerConfig defines a single MCP server configuration
@@ -63,25 +63,25 @@ type MCPServerConfig struct {
 
 // MCPLimits defines resource limits for the MCP bridge
 type MCPLimits struct {
-	MaxConcurrentRequests  int           `yaml:"max_concurrent_requests" json:"max_concurrent_requests"`
-	RequestTimeoutMs       int           `yaml:"request_timeout_ms" json:"request_timeout_ms"`
-	MaxResponseSizeBytes   int64         `yaml:"max_response_size_bytes" json:"max_response_size_bytes"`
-	MaxServersPerNode      int           `yaml:"max_servers_per_node" json:"max_servers_per_node"`
-	ConnectionPoolSize     int           `yaml:"connection_pool_size" json:"connection_pool_size"`
-	RetryAttempts          int           `yaml:"retry_attempts" json:"retry_attempts"`
-	RetryBackoffMs         int           `yaml:"retry_backoff_ms" json:"retry_backoff_ms"`
+	MaxConcurrentRequests int   `yaml:"max_concurrent_requests" json:"max_concurrent_requests"`
+	RequestTimeoutMs      int   `yaml:"request_timeout_ms" json:"request_timeout_ms"`
+	MaxResponseSizeBytes  int64 `yaml:"max_response_size_bytes" json:"max_response_size_bytes"`
+	MaxServersPerNode     int   `yaml:"max_servers_per_node" json:"max_servers_per_node"`
+	ConnectionPoolSize    int   `yaml:"connection_pool_size" json:"connection_pool_size"`
+	RetryAttempts         int   `yaml:"retry_attempts" json:"retry_attempts"`
+	RetryBackoffMs        int   `yaml:"retry_backoff_ms" json:"retry_backoff_ms"`
 }
 
 // LLMConfig contains LLM integration configuration
 type LLMConfig struct {
-	Enabled      bool          `yaml:"enabled" json:"enabled"`
-	Provider     string        `yaml:"provider" json:"provider"`
-	APIKey       string        `yaml:"api_key" json:"api_key"`
-	Model        string        `yaml:"model" json:"model"`
-	MaxTokens    int           `yaml:"max_tokens" json:"max_tokens"`
-	Temperature  float32       `yaml:"temperature" json:"temperature"`
-	Timeout      time.Duration `yaml:"timeout" json:"timeout"`
-	
+	Enabled     bool          `yaml:"enabled" json:"enabled"`
+	Provider    string        `yaml:"provider" json:"provider"`
+	APIKey      string        `yaml:"api_key" json:"api_key"`
+	Model       string        `yaml:"model" json:"model"`
+	MaxTokens   int           `yaml:"max_tokens" json:"max_tokens"`
+	Temperature float32       `yaml:"temperature" json:"temperature"`
+	Timeout     time.Duration `yaml:"timeout" json:"timeout"`
+
 	FunctionCalling LLMFunctionConfig `yaml:"function_calling" json:"function_calling"`
 	Caching         LLMCacheConfig    `yaml:"caching" json:"caching"`
 	RateLimiting    LLMRateConfig     `yaml:"rate_limiting" json:"rate_limiting"`
@@ -89,9 +89,9 @@ type LLMConfig struct {
 
 // LLMFunctionConfig contains function calling configuration
 type LLMFunctionConfig struct {
-	StrictMode        bool          `yaml:"strict_mode" json:"strict_mode"`
-	MaxParallelCalls  int           `yaml:"max_parallel_calls" json:"max_parallel_calls"`
-	ToolTimeout       time.Duration `yaml:"tool_timeout" json:"tool_timeout"`
+	StrictMode       bool          `yaml:"strict_mode" json:"strict_mode"`
+	MaxParallelCalls int           `yaml:"max_parallel_calls" json:"max_parallel_calls"`
+	ToolTimeout      time.Duration `yaml:"tool_timeout" json:"tool_timeout"`
 }
 
 // LLMCacheConfig contains LLM caching configuration
@@ -124,12 +124,12 @@ func DefaultConfig() *AppConfig {
 			URL:         "http://localhost:8000",
 		},
 		P2P: P2PConfig{
-			Enabled:     true,
-			Port:        0, // Random port
-			Secure:      true,
-			Rendezvous:  "praxis-agents",
-			EnableMDNS:  true,
-			EnableDHT:   true,
+			Enabled:    true,
+			Port:       0, // Random port
+			Secure:     true,
+			Rendezvous: "praxis-agents",
+			EnableMDNS: true,
+			EnableDHT:  true,
 		},
 		HTTP: HTTPConfig{
 			Enabled: true,
@@ -139,13 +139,13 @@ func DefaultConfig() *AppConfig {
 		MCP: MCPBridgeConfig{
 			Enabled: true,
 			Limits: MCPLimits{
-				MaxConcurrentRequests:  100,
-				RequestTimeoutMs:       30000,
-				MaxResponseSizeBytes:   10485760,
-				MaxServersPerNode:      10,
-				ConnectionPoolSize:     5,
-				RetryAttempts:          3,
-				RetryBackoffMs:         1000,
+				MaxConcurrentRequests: 100,
+				RequestTimeoutMs:      30000,
+				MaxResponseSizeBytes:  10485760,
+				MaxServersPerNode:     10,
+				ConnectionPoolSize:    5,
+				RetryAttempts:         3,
+				RetryBackoffMs:        1000,
 			},
 			LogLevel: "info",
 		},
