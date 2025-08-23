@@ -244,21 +244,33 @@ func (a *P2PAgent) updateMCPCapabilities() {
 	for i, cap := range capabilities {
 		tools := make([]agentcard.MCPTool, len(cap.Tools))
 		for j, tool := range cap.Tools {
+			var desc string
+			if tool.Description != nil {
+				desc = *tool.Description
+			}
+			inputSchema, _ := tool.InputSchema.(map[string]interface{})
 			tools[j] = agentcard.MCPTool{
 				Name:         tool.Name,
-				Description:  tool.Description,
-				InputSchema:  tool.InputSchema,
-				OutputSchema: tool.OutputSchema,
+				Description:  desc,
+				InputSchema:  inputSchema,
+				OutputSchema: nil,
 			}
 		}
 
 		resources := make([]agentcard.MCPResource, len(cap.Resources))
 		for j, res := range cap.Resources {
+			var desc, mime string
+			if res.Description != nil {
+				desc = *res.Description
+			}
+			if res.MimeType != nil {
+				mime = *res.MimeType
+			}
 			resources[j] = agentcard.MCPResource{
-				URI:         res.URI,
+				URI:         res.Uri,
 				Name:        res.Name,
-				Description: res.Description,
-				MimeType:    res.MimeType,
+				Description: desc,
+				MimeType:    mime,
 			}
 		}
 
