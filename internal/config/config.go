@@ -8,7 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 
-	"go-p2p-agent/pkg/utils"
+	"praxis-go-sdk/pkg/utils"
 )
 
 // LoadConfig loads configuration from a YAML file

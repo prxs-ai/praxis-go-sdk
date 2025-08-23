@@ -8,9 +8,9 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"go-p2p-agent/internal/agent"
-	"go-p2p-agent/internal/config"
-	"go-p2p-agent/pkg/utils"
+	"praxis-go-sdk/internal/agent"
+	"praxis-go-sdk/internal/config"
+	"praxis-go-sdk/pkg/utils"
 )
 
 func main() {

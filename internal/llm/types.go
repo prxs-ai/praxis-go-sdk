@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"go-p2p-agent/internal/mcp"
+	"praxis-go-sdk/internal/mcp"
 )
 
 // Client defines the interface for an LLM client

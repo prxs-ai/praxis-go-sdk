@@ -8,7 +8,7 @@ import (
 	mcp "github.com/metoro-io/mcp-golang"
 	"github.com/sirupsen/logrus"
 
-	"go-p2p-agent/internal/config"
+	"praxis-go-sdk/internal/config"
 )
 
 // MCPTool describes a tool provided by an MCP server

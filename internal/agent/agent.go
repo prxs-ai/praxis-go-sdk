@@ -8,10 +8,10 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"go-p2p-agent/internal/llm"
-	"go-p2p-agent/internal/mcp"
-	"go-p2p-agent/internal/p2p"
-	"go-p2p-agent/pkg/agentcard"
+	"praxis-go-sdk/internal/llm"
+	"praxis-go-sdk/internal/mcp"
+	"praxis-go-sdk/internal/p2p"
+	"praxis-go-sdk/pkg/agentcard"
 )
 
 // P2PAgent implements the Agent interface

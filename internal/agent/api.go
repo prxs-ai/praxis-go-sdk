@@ -9,8 +9,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"go-p2p-agent/internal/config"
-	"go-p2p-agent/internal/llm"
+	"praxis-go-sdk/internal/config"
+	"praxis-go-sdk/internal/llm"
 )
 
 // APIServer provides HTTP API for the agent

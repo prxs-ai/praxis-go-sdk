@@ -11,7 +11,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/sirupsen/logrus"
 
-	"go-p2p-agent/internal/mcp"
+	"praxis-go-sdk/internal/mcp"
 )
 
 // ToolRegistry manages the registration and execution of tools

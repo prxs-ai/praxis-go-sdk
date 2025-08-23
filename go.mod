@@ -1,4 +1,4 @@
-module go-p2p-agent
+module praxis-go-sdk
 
 go 1.23.10
 

@@ -1,6 +1,6 @@
-# Go P2P Agent
+# Praxis Go SDK
 
-A Go-based peer-to-peer agent with LLM integration and MCP (Machine Capability Protocol) support.
+A Go-based peer-to-peer agent with LLM integration and A2A/MCP support.
 
 ## Features
 
@@ -8,14 +8,14 @@ A Go-based peer-to-peer agent with LLM integration and MCP (Machine Capability P
 - LLM integration with OpenAI
 - MCP bridge for tool execution
 - HTTP API for agent control
-- Agent card standard support
+- A2A card standard support
 
 ## Architecture
 
-The project has been refactored with a modular structure:
+The project has the following modular structure:
 
 ```
-go-p2p-agent/
+praxis-go-sdk/
 ├── cmd/
 │   └── agent/              # Application entry point
 ├── internal/
@@ -25,7 +25,7 @@ go-p2p-agent/
 │   ├── mcp/                # MCP bridge
 │   └── p2p/                # P2P networking
 ├── pkg/
-│   ├── agentcard/          # Agent card format
+│   ├── agentcard/          # A2A Agent card format
 │   └── utils/              # Utility functions
 ```
 
@@ -40,8 +40,8 @@ go-p2p-agent/
 
 1. Clone the repository:
    ```
-   git clone https://github.com/yourusername/go-p2p-agent.git
-   cd go-p2p-agent
+   git clone https://github.com/yourusername/praxis-go-sdk.git
+   cd praxis-go-sdk
    ```
 
 2. Build the application:
@@ -55,7 +55,7 @@ Create a configuration file at `config/config.yaml`:
 
 ```yaml
 agent:
-  name: "go-agent"
+  name: "praxis-go-agent"
   version: "1.0.0"
   description: "Go P2P Agent"
   url: "http://localhost:8000"
@@ -123,8 +123,8 @@ The agent exposes the following HTTP endpoints:
 A Dockerfile is provided to run the agent in a container:
 
 ```
-docker build -t go-p2p-agent .
-docker run -p 8000:8000 -e OPENAI_API_KEY=your-api-key go-p2p-agent
+docker build -t praxis-go-agent:latest .
+docker run -p 8000:8000 -e OPENAI_API_KEY=your-api-key praxis-go-agent:latest
 ```
 
 ## Contributing

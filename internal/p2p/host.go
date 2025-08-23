@@ -19,9 +19,9 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/sirupsen/logrus"
 
-	"go-p2p-agent/internal/config"
-	"go-p2p-agent/pkg/agentcard"
-	"go-p2p-agent/pkg/utils"
+	"praxis-go-sdk/internal/config"
+	"praxis-go-sdk/pkg/agentcard"
+	"praxis-go-sdk/pkg/utils"
 )
 
 // P2PHost implements the Host interface

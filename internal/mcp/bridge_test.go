@@ -11,7 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 
-	"go-p2p-agent/internal/config"
+	"praxis-go-sdk/internal/config"
 )
 
 func TestMCPBridge_StartAndInvokeEchoTool(t *testing.T) {
