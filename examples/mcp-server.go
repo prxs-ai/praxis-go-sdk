@@ -48,15 +48,15 @@ type Resource struct {
 }
 
 type MCPServer struct {
-	name    string
-	version string
-	tools   []Tool
+	name      string
+	version   string
+	tools     []Tool
 	resources []Resource
 }
 
 func NewMCPServer() *MCPServer {
 	serverName := getEnv("MCP_SERVER_NAME", "context-server")
-	
+
 	return &MCPServer{
 		name:    serverName,
 		version: "1.0.0",
@@ -68,14 +68,14 @@ func NewMCPServer() *MCPServer {
 					"type": "object",
 					"properties": map[string]interface{}{
 						"name": map[string]interface{}{
-							"type": "string",
+							"type":        "string",
 							"description": "Name to greet",
 						},
 						"style": map[string]interface{}{
-							"type": "string",
-							"enum": []string{"formal", "casual", "enthusiastic"},
+							"type":        "string",
+							"enum":        []string{"formal", "casual", "enthusiastic"},
 							"description": "Greeting style",
-							"default": "casual",
+							"default":     "casual",
 						},
 					},
 					"required": []string{"name"},
@@ -88,16 +88,16 @@ func NewMCPServer() *MCPServer {
 					"type": "object",
 					"properties": map[string]interface{}{
 						"operation": map[string]interface{}{
-							"type": "string",
-							"enum": []string{"add", "subtract", "multiply", "divide"},
+							"type":        "string",
+							"enum":        []string{"add", "subtract", "multiply", "divide"},
 							"description": "Mathematical operation to perform",
 						},
 						"a": map[string]interface{}{
-							"type": "number",
+							"type":        "number",
 							"description": "First number",
 						},
 						"b": map[string]interface{}{
-							"type": "number",
+							"type":        "number",
 							"description": "Second number",
 						},
 					},
@@ -111,9 +111,9 @@ func NewMCPServer() *MCPServer {
 					"type": "object",
 					"properties": map[string]interface{}{
 						"format": map[string]interface{}{
-							"type": "string",
-							"enum": []string{"iso", "unix", "human"},
-							"default": "iso",
+							"type":        "string",
+							"enum":        []string{"iso", "unix", "human"},
+							"default":     "iso",
 							"description": "Time format to return",
 						},
 					},
@@ -126,12 +126,12 @@ func NewMCPServer() *MCPServer {
 					"type": "object",
 					"properties": map[string]interface{}{
 						"query": map[string]interface{}{
-							"type": "string",
+							"type":        "string",
 							"description": "Search query",
 						},
 						"limit": map[string]interface{}{
-							"type": "integer",
-							"default": 10,
+							"type":        "integer",
+							"default":     10,
 							"description": "Maximum number of results",
 						},
 					},
@@ -194,7 +194,7 @@ func (s *MCPServer) handleInitialize(req *JSONRPCRequest) *JSONRPCResponse {
 			"version": s.version,
 		},
 	}
-	
+
 	return &JSONRPCResponse{
 		JSONRPC: "2.0",
 		ID:      req.ID,
@@ -206,7 +206,7 @@ func (s *MCPServer) handleListTools(req *JSONRPCRequest) *JSONRPCResponse {
 	result := map[string]interface{}{
 		"tools": s.tools,
 	}
-	
+
 	return &JSONRPCResponse{
 		JSONRPC: "2.0",
 		ID:      req.ID,
@@ -226,7 +226,7 @@ func (s *MCPServer) handleToolCall(req *JSONRPCRequest) *JSONRPCResponse {
 			},
 		}
 	}
-	
+
 	toolName, ok := params["name"].(string)
 	if !ok {
 		return &JSONRPCResponse{
@@ -238,14 +238,14 @@ func (s *MCPServer) handleToolCall(req *JSONRPCRequest) *JSONRPCResponse {
 			},
 		}
 	}
-	
+
 	arguments, ok := params["arguments"].(map[string]interface{})
 	if !ok {
 		arguments = make(map[string]interface{})
 	}
-	
+
 	result := s.executeTool(toolName, arguments)
-	
+
 	return &JSONRPCResponse{
 		JSONRPC: "2.0",
 		ID:      req.ID,
@@ -275,12 +275,12 @@ func (s *MCPServer) executeGreet(args map[string]interface{}) interface{} {
 	if !ok {
 		return map[string]interface{}{"error": "Name is required"}
 	}
-	
+
 	style, ok := args["style"].(string)
 	if !ok {
 		style = "casual"
 	}
-	
+
 	var greeting string
 	switch style {
 	case "formal":
@@ -290,7 +290,7 @@ func (s *MCPServer) executeGreet(args map[string]interface{}) interface{} {
 	default:
 		greeting = fmt.Sprintf("Hello, %s! Nice to meet you.", name)
 	}
-	
+
 	return map[string]interface{}{
 		"content": []map[string]interface{}{
 			{
@@ -307,20 +307,20 @@ func (s *MCPServer) executeCalculate(args map[string]interface{}) interface{} {
 	if !ok {
 		return map[string]interface{}{"error": "Operation is required"}
 	}
-	
+
 	a, ok := args["a"].(float64)
 	if !ok {
 		return map[string]interface{}{"error": "First number (a) is required"}
 	}
-	
+
 	b, ok := args["b"].(float64)
 	if !ok {
 		return map[string]interface{}{"error": "Second number (b) is required"}
 	}
-	
+
 	var result float64
 	var opSymbol string
-	
+
 	switch operation {
 	case "add":
 		result = a + b
@@ -340,7 +340,7 @@ func (s *MCPServer) executeCalculate(args map[string]interface{}) interface{} {
 	default:
 		return map[string]interface{}{"error": "Unknown operation"}
 	}
-	
+
 	return map[string]interface{}{
 		"content": []map[string]interface{}{
 			{
@@ -358,10 +358,10 @@ func (s *MCPServer) executeGetTime(args map[string]interface{}) interface{} {
 	if !ok {
 		format = "iso"
 	}
-	
+
 	now := time.Now()
 	var timeStr string
-	
+
 	switch format {
 	case "unix":
 		timeStr = fmt.Sprintf("%d", now.Unix())
@@ -370,7 +370,7 @@ func (s *MCPServer) executeGetTime(args map[string]interface{}) interface{} {
 	default:
 		timeStr = now.Format(time.RFC3339)
 	}
-	
+
 	return map[string]interface{}{
 		"content": []map[string]interface{}{
 			{
@@ -378,9 +378,9 @@ func (s *MCPServer) executeGetTime(args map[string]interface{}) interface{} {
 				"text": fmt.Sprintf("Current server time (%s): %s", format, timeStr),
 			},
 		},
-		"isError": false,
+		"isError":   false,
 		"timestamp": now.Unix(),
-		"format": format,
+		"format":    format,
 	}
 }
 
@@ -389,46 +389,46 @@ func (s *MCPServer) executeContextSearch(args map[string]interface{}) interface{
 	if !ok {
 		return map[string]interface{}{"error": "Query is required"}
 	}
-	
+
 	limit, ok := args["limit"].(float64)
 	if !ok {
 		limit = 10
 	}
-	
+
 	results := []map[string]interface{}{
 		{
-			"id":    "ctx-1",
-			"title": fmt.Sprintf("Context result for: %s", query),
-			"content": fmt.Sprintf("This is a simulated context search result for the query '%s'. In a real implementation, this would search through available context data.", query),
+			"id":        "ctx-1",
+			"title":     fmt.Sprintf("Context result for: %s", query),
+			"content":   fmt.Sprintf("This is a simulated context search result for the query '%s'. In a real implementation, this would search through available context data.", query),
 			"relevance": 0.95,
-			"source": s.name,
+			"source":    s.name,
 		},
 	}
-	
+
 	if strings.Contains(strings.ToLower(query), "libp2p") {
 		results = append(results, map[string]interface{}{
-			"id":    "ctx-libp2p",
-			"title": "libp2p Information",
-			"content": "libp2p is a modular system of protocols, specifications and libraries that enable the development of peer-to-peer network applications.",
+			"id":        "ctx-libp2p",
+			"title":     "libp2p Information",
+			"content":   "libp2p is a modular system of protocols, specifications and libraries that enable the development of peer-to-peer network applications.",
 			"relevance": 0.90,
-			"source": s.name,
+			"source":    s.name,
 		})
 	}
-	
+
 	if strings.Contains(strings.ToLower(query), "mcp") {
 		results = append(results, map[string]interface{}{
-			"id":    "ctx-mcp",
-			"title": "Model Context Protocol Information",
-			"content": "MCP (Model Context Protocol) enables AI assistants to connect with external data sources and tools in a standardized way.",
+			"id":        "ctx-mcp",
+			"title":     "Model Context Protocol Information",
+			"content":   "MCP (Model Context Protocol) enables AI assistants to connect with external data sources and tools in a standardized way.",
 			"relevance": 0.88,
-			"source": s.name,
+			"source":    s.name,
 		})
 	}
-	
+
 	if int(limit) < len(results) {
 		results = results[:int(limit)]
 	}
-	
+
 	return map[string]interface{}{
 		"content": []map[string]interface{}{
 			{
@@ -438,8 +438,8 @@ func (s *MCPServer) executeContextSearch(args map[string]interface{}) interface{
 		},
 		"isError": false,
 		"results": results,
-		"query": query,
-		"total": len(results),
+		"query":   query,
+		"total":   len(results),
 	}
 }
 
@@ -447,7 +447,7 @@ func (s *MCPServer) handleListResources(req *JSONRPCRequest) *JSONRPCResponse {
 	result := map[string]interface{}{
 		"resources": s.resources,
 	}
-	
+
 	return &JSONRPCResponse{
 		JSONRPC: "2.0",
 		ID:      req.ID,
@@ -467,7 +467,7 @@ func (s *MCPServer) handleReadResource(req *JSONRPCRequest) *JSONRPCResponse {
 			},
 		}
 	}
-	
+
 	uri, ok := params["uri"].(string)
 	if !ok {
 		return &JSONRPCResponse{
@@ -479,9 +479,9 @@ func (s *MCPServer) handleReadResource(req *JSONRPCRequest) *JSONRPCResponse {
 			},
 		}
 	}
-	
+
 	var contents []map[string]interface{}
-	
+
 	switch uri {
 	case "context://server-info":
 		contents = []map[string]interface{}{
@@ -511,11 +511,11 @@ func (s *MCPServer) handleReadResource(req *JSONRPCRequest) *JSONRPCResponse {
 			},
 		}
 	}
-	
+
 	result := map[string]interface{}{
 		"contents": contents,
 	}
-	
+
 	return &JSONRPCResponse{
 		JSONRPC: "2.0",
 		ID:      req.ID,
@@ -529,7 +529,7 @@ func (s *MCPServer) handlePing(req *JSONRPCRequest) *JSONRPCResponse {
 		"server":    s.name,
 		"timestamp": time.Now().Unix(),
 	}
-	
+
 	return &JSONRPCResponse{
 		JSONRPC: "2.0",
 		ID:      req.ID,
@@ -547,13 +547,13 @@ func getEnv(key, defaultVal string) string {
 func main() {
 	server := NewMCPServer()
 	scanner := bufio.NewScanner(os.Stdin)
-	
+
 	for scanner.Scan() {
 		line := scanner.Text()
 		if line == "" {
 			continue
 		}
-		
+
 		var req JSONRPCRequest
 		if err := json.Unmarshal([]byte(line), &req); err != nil {
 			errorResp := &JSONRPCResponse{
@@ -569,7 +569,7 @@ func main() {
 			fmt.Println(string(respJSON))
 			continue
 		}
-		
+
 		response := server.handleRequest(&req)
 		respJSON, err := json.Marshal(response)
 		if err != nil {
@@ -584,7 +584,7 @@ func main() {
 			}
 			respJSON, _ = json.Marshal(errorResp)
 		}
-		
+
 		fmt.Println(string(respJSON))
 	}
 }

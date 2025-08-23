@@ -11,8 +11,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"go-p2p-agent/internal/config"
-	"go-p2p-agent/internal/mcp"
+	"praxis-go-sdk/internal/config"
+	"praxis-go-sdk/internal/mcp"
 )
 
 // OpenAIClient implements the Client interface for OpenAI

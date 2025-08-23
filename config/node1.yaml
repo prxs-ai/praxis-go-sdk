@@ -27,7 +27,7 @@ mcp:
       transport: "sse"
       url: "http://localhost:8090"
       timeout: "30s"
-    
+
     - name: "memory-server-1"
       enabled: true
       transport: "stdio"
@@ -65,17 +65,17 @@ llm:
   max_tokens: 4096
   temperature: 0.1
   timeout: 30s
-  
+
   function_calling:
     strict_mode: true
     max_parallel_calls: 5
     tool_timeout: 15s
-    
+
   caching:
     enabled: true
     ttl: 300s
     max_size: 1000
-    
+
   rate_limiting:
     requests_per_minute: 60
     tokens_per_minute: 100000

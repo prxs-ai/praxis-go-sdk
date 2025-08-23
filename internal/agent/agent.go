@@ -8,23 +8,23 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"go-p2p-agent/internal/llm"
-	"go-p2p-agent/internal/mcp"
-	"go-p2p-agent/internal/p2p"
-	"go-p2p-agent/pkg/agentcard"
+	"praxis-go-sdk/internal/llm"
+	"praxis-go-sdk/internal/mcp"
+	"praxis-go-sdk/internal/p2p"
+	"praxis-go-sdk/pkg/agentcard"
 )
 
 // P2PAgent implements the Agent interface
 type P2PAgent struct {
-	config      *Config
-	host        p2p.Host
-	mcpBridge   mcp.Bridge
-	llmClient   llm.Client
-	logger      *logrus.Logger
-	ctx         context.Context
-	cancel      context.CancelFunc
-	started     bool
-	mu          sync.RWMutex
+	config    *Config
+	host      p2p.Host
+	mcpBridge mcp.Bridge
+	llmClient llm.Client
+	logger    *logrus.Logger
+	ctx       context.Context
+	cancel    context.CancelFunc
+	started   bool
+	mu        sync.RWMutex
 }
 
 // NewAgent creates a new P2P agent
@@ -83,7 +83,7 @@ func (a *P2PAgent) Start() error {
 				a.logger.Warnf("Failed to start MCP bridge: %v", err)
 			} else {
 				a.logger.Info("MCP bridge started successfully")
-				
+
 				// Update agent card with MCP capabilities
 				a.updateMCPCapabilities()
 			}
@@ -101,7 +101,7 @@ func (a *P2PAgent) Start() error {
 		} else {
 			a.llmClient = client
 			a.logger.Info("LLM client started successfully")
-			
+
 			// Test LLM health
 			if err := a.llmClient.Health(); err != nil {
 				a.logger.Warnf("LLM health check failed: %v", err)
@@ -238,7 +238,7 @@ func (a *P2PAgent) updateMCPCapabilities() {
 	}
 
 	capabilities := a.mcpBridge.GetCapabilities()
-	
+
 	// Convert to agentcard.MCPCapability
 	mcpServers := make([]agentcard.MCPCapability, len(capabilities))
 	for i, cap := range capabilities {

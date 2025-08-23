@@ -1,6 +1,6 @@
 services:
   go-agent-1:
-    image: go-agent:latest
+    image: praxis-go-agent:latest
     container_name: go-agent-1
     hostname: go-agent-1
     environment:
@@ -32,7 +32,7 @@ services:
       start_period: 30s
 
   go-agent-2:
-    image: go-agent:latest
+    image: praxis-go-agent:latest
     container_name: go-agent-2
     hostname: go-agent-2
     environment:
@@ -42,7 +42,7 @@ services:
       - HTTP_PORT=8001
       - P2P_PORT=4002
       - MCP_ENABLED=true
-      - LLM_ENABLED=true  
+      - LLM_ENABLED=true
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - INSECURE_P2P=false
     ports:
