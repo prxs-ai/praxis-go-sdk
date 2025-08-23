@@ -42,7 +42,7 @@ services:
       - HTTP_PORT=8001
       - P2P_PORT=4002
       - MCP_ENABLED=true
-      - LLM_ENABLED=true  
+      - LLM_ENABLED=true
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - INSECURE_P2P=false
     ports:

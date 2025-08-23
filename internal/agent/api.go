@@ -15,11 +15,11 @@ import (
 
 // APIServer provides HTTP API for the agent
 type APIServer struct {
-	agent       Agent
-	config      *config.HTTPConfig
-	httpServer  *http.Server
-	router      *gin.Engine
-	logger      *logrus.Logger
+	agent      Agent
+	config     *config.HTTPConfig
+	httpServer *http.Server
+	router     *gin.Engine
+	logger     *logrus.Logger
 }
 
 // NewAPIServer creates a new API server
@@ -145,7 +145,7 @@ func (s *APIServer) getHealth(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"status": "healthy",
+		"status":    "healthy",
 		"timestamp": time.Now().Unix(),
 		"services": gin.H{
 			"p2p": p2pStatus,

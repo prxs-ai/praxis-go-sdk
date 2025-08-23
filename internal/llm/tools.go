@@ -16,40 +16,40 @@ import (
 
 // ToolRegistry manages the registration and execution of tools
 type ToolRegistry struct {
-	localTools   map[string]*LocalTool
-	remoteTools  map[string]*RemoteTool
-	cache        *ToolCache
-	mcpBridge    mcp.Bridge
-	logger       *logrus.Logger
-	mu           sync.RWMutex
-	lastUpdated  time.Time
+	localTools  map[string]*LocalTool
+	remoteTools map[string]*RemoteTool
+	cache       *ToolCache
+	mcpBridge   mcp.Bridge
+	logger      *logrus.Logger
+	mu          sync.RWMutex
+	lastUpdated time.Time
 }
 
 // LocalTool represents a tool available locally
 type LocalTool struct {
-	ServerName   string
-	Tool         mcp.MCPTool
-	Status       string
-	LastUsed     time.Time
+	ServerName string
+	Tool       mcp.MCPTool
+	Status     string
+	LastUsed   time.Time
 }
 
 // RemoteTool represents a tool available on a remote peer
 type RemoteTool struct {
-	PeerName     string
-	PeerID       peer.ID
-	ServerName   string
-	Tool         mcp.MCPTool
-	Latency      time.Duration
-	LastSeen     time.Time
-	Status       string
+	PeerName   string
+	PeerID     peer.ID
+	ServerName string
+	Tool       mcp.MCPTool
+	Latency    time.Duration
+	LastSeen   time.Time
+	Status     string
 }
 
 // ToolCache provides caching for tool executions
 type ToolCache struct {
-	entries    map[string]*ToolCacheEntry
-	maxSize    int
-	ttl        time.Duration
-	mu         sync.RWMutex
+	entries map[string]*ToolCacheEntry
+	maxSize int
+	ttl     time.Duration
+	mu      sync.RWMutex
 }
 
 // ToolCacheEntry represents a cached tool execution
@@ -117,7 +117,7 @@ func (r *ToolRegistry) ExecuteTool(ctx context.Context, toolName string, params 
 
 	// Execute the tool
 	r.logger.Infof("Executing local tool: %s on server: %s", toolName, localTool.ServerName)
-	
+
 	// Update last used timestamp
 	r.mu.Lock()
 	localTool.LastUsed = time.Now()

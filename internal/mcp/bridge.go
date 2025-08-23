@@ -15,8 +15,6 @@ import (
 	"go-p2p-agent/internal/config"
 )
 
-
-
 // NewMCPBridge creates a new bridge using the provided configuration file
 func NewMCPBridge(_ interface{}, configPath string, logger *logrus.Logger) (Bridge, error) {
 	cfg, err := loadConfig(configPath)
@@ -73,7 +71,6 @@ func (b *mcpBridge) Start() error {
 			return fmt.Errorf("failed to get stdout pipe for %s: %w", srv.Name, err)
 		}
 
-
 		if err := cmd.Start(); err != nil {
 			return fmt.Errorf("failed to start server %s: %w", srv.Name, err)
 		}
@@ -89,7 +86,7 @@ func (b *mcpBridge) Start() error {
 		b.processes[srv.Name] = cmd
 	}
 
-	// 
+	//
 	b.updateCapabilities()
 	return nil
 }
@@ -194,14 +191,14 @@ func (b *mcpBridge) updateCapabilities() {
 				}
 			}
 		}
-        caps = append(caps, MCPCapability{
-            ServerName: name,
-            Transport:  "stdio",
-            Tools:      toolsResp.Tools,
-            Resources:  resources,
-            Status:     "active",
-            LastSeen:   time.Now(),
-        })
+		caps = append(caps, MCPCapability{
+			ServerName: name,
+			Transport:  "stdio",
+			Tools:      toolsResp.Tools,
+			Resources:  resources,
+			Status:     "active",
+			LastSeen:   time.Now(),
+		})
 	}
 
 	b.capabilities = caps

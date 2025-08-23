@@ -18,13 +18,13 @@ func GetEnv(key, defaultVal string) string {
 // Similar to os.ExpandEnv but with additional logging for sensitive values
 func ExpandEnvVars(s string) string {
 	expanded := os.ExpandEnv(s)
-	
+
 	// Special case for API keys to avoid logging full key
 	if strings.Contains(s, "${OPENAI_API_KEY}") {
 		originalKey := "${OPENAI_API_KEY}"
 		envKey := os.Getenv("OPENAI_API_KEY")
 		if len(envKey) > 0 {
-			log.Printf("🔑 [DEBUG] API Key substitution: %s -> %s (first 20 chars)", 
+			log.Printf("🔑 [DEBUG] API Key substitution: %s -> %s (first 20 chars)",
 				originalKey, envKey[:Min(20, len(envKey))])
 		}
 	}
@@ -47,7 +47,7 @@ func BoolFromEnv(key string, defaultVal bool) bool {
 	if val == "" {
 		return defaultVal
 	}
-	
+
 	val = strings.ToLower(val)
 	return val == "true" || val == "yes" || val == "1" || val == "on"
 }

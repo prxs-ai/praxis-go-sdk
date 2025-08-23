@@ -19,12 +19,12 @@ type MCPResource = mcp.ResourceSchema
 
 // MCPCapability contains information about a server's tools and resources
 type MCPCapability struct {
-        ServerName string
-        Transport  string
-        Tools      []MCPTool
-        Resources  []MCPResource
-        Status     string
-        LastSeen   time.Time
+	ServerName string
+	Transport  string
+	Tools      []MCPTool
+	Resources  []MCPResource
+	Status     string
+	LastSeen   time.Time
 }
 
 // Bridge is the interface for the MCP bridge
