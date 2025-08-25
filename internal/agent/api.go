@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	mcp "github.com/metoro-io/mcp-golang"
+	mcphttp "github.com/metoro-io/mcp-golang/transport/http"
 	"github.com/sirupsen/logrus"
 
 	"praxis-go-sdk/internal/config"
@@ -117,6 +119,9 @@ func (s *APIServer) registerRoutes() {
 	s.router.GET("/llm/tools", s.getLLMTools)
 	s.router.GET("/llm/status", s.getLLMStatus)
 	s.router.GET("/llm/health", s.getLLMHealth)
+
+	// Agent registry
+	s.router.POST("/find_agent", s.findAgent)
 
 	// Echo route for testing
 	s.router.POST("/echo", s.echo)
@@ -373,6 +378,35 @@ func (s *APIServer) getLLMHealth(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"status": "healthy",
 	})
+}
+
+// findAgent calls the AI registry MCP server to locate agents by goal
+func (s *APIServer) findAgent(c *gin.Context) {
+	var input struct {
+		Goal string `json:"goal"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil || input.Goal == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "goal is required"})
+		return
+	}
+
+	transport := mcphttp.NewHTTPClientTransport("/llm/mcp/")
+	transport.WithBaseURL("http://ai-registry.prxs.ai:8000")
+
+	client := mcp.NewClient(transport)
+	ctx := context.Background()
+	if _, err := client.Initialize(ctx); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	resp, err := client.CallTool(ctx, "find_agent", map[string]interface{}{"goal": input.Goal})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, resp)
 }
 
 // echo echoes the input message
