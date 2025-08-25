@@ -1,0 +1,32 @@
+@startuml
+title File Creation via Remote Agent
+
+actor User
+participant "Agent 1" as A1
+participant "P2P Network" as Net
+participant "Agent 2" as A2
+participant "Filesystem" as FS
+
+User -> A1: Create report.txt
+activate A1
+A1 -> A1: Check local tools
+note right: No filesystem tools
+A1 -> A1: Find peer with write_file
+note right: Agent-2 has it
+A1 -> Net: InvokeTool write_file
+activate Net
+Net -> A2: Tool Request
+activate A2
+A2 -> A2: Process Request
+A2 -> FS: Write /shared/report.txt
+activate FS
+FS --> A2: Success
+deactivate FS
+A2 --> Net: Tool Response
+deactivate A2
+Net --> A1: Result
+deactivate Net
+A1 --> User: File created
+deactivate A1
+
+@enduml

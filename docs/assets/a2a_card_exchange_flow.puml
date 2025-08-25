@@ -1,0 +1,20 @@
+@startuml
+!theme plain
+
+participant "Agent 1" as A1
+participant "P2P Stream" as Stream
+participant "Agent 2" as A2
+
+A1 -> Stream: Open /praxis/card/1.0.0
+A1 -> Stream: Send Own Card
+Stream -> A2: Agent 1 Card
+A2 -> A2: Store Card
+A2 -> Stream: Send Own Card
+Stream -> A1: Agent 2 Card
+A1 -> A1: Store Card
+A1 -> A1: Update Tool Registry
+A2 -> A2: Update Tool Registry
+
+note over A1,A2: Both agents now know\neach other's capabilities
+
+@enduml

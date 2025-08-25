@@ -1,70 +1,73 @@
 services:
-  go-agent-1:
-    image: praxis-go-agent:latest
-    container_name: go-agent-1
-    hostname: go-agent-1
+  praxis-agent-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: praxis-agent-1
+    hostname: praxis-agent-1
     environment:
-      - AGENT_NAME=go-agent-1
+      - AGENT_NAME=praxis-agent-1
       - AGENT_VERSION=1.0.0
-      - AGENT_DESCRIPTION=Go P2P Agent Node 1 with SSE
       - HTTP_PORT=8000
       - P2P_PORT=4001
+      - SSE_PORT=8090
       - MCP_ENABLED=true
-      - LLM_ENABLED=true
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - INSECURE_P2P=false
+      - LOG_LEVEL=info
+      # - OPENAI_API_KEY=${OPENAI_API_KEY}  # Add your OpenAI API key for LLM features
     ports:
       - "8000:8000"  # Main API
       - "4001:4001"  # P2P
-      - "8090:8090"  # SSE Server
+      - "8090:8090"  # MCP SSE Server
+      - "9100:9000"  # WebSocket Gateway
     volumes:
-      - ./config:/app/config:ro
-      - ./examples:/app/examples:ro
       - node1-data:/data
+      - ./shared:/shared  # Shared volume for file operations
     networks:
       - mcp-network
-    command: ["./go-agent", "--config", "config/node1.yaml"]
+    command: ["./praxis-agent"]
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 10s
-      timeout: 5s
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
       retries: 3
-      start_period: 30s
+      start_period: 40s
 
-  go-agent-2:
-    image: praxis-go-agent:latest
-    container_name: go-agent-2
-    hostname: go-agent-2
+  praxis-agent-2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: praxis-agent-2
+    hostname: praxis-agent-2
     environment:
-      - AGENT_NAME=go-agent-2
+      - AGENT_NAME=praxis-agent-2
       - AGENT_VERSION=1.0.0
-      - AGENT_DESCRIPTION=Go P2P Agent Node 2 with SSE
       - HTTP_PORT=8001
       - P2P_PORT=4002
+      - SSE_PORT=8091
       - MCP_ENABLED=true
-      - LLM_ENABLED=true
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - INSECURE_P2P=false
+      - LOG_LEVEL=info
+      - BOOTSTRAP_PEERS=/ip4/praxis-agent-1/tcp/4001
+      # - OPENAI_API_KEY=${OPENAI_API_KEY}  # Not needed for P2P/MCP operations
     ports:
       - "8001:8001"  # Main API
       - "4002:4002"  # P2P
-      - "8091:8091"  # SSE Server
+      - "8091:8091"  # MCP SSE Server
+      - "9102:9000"  # WebSocket Gateway
     volumes:
-      - ./config:/app/config:ro
-      - ./examples:/app/examples:ro
       - node2-data:/data
+      - ./shared:/shared  # Shared volume for file operations
     networks:
       - mcp-network
-    command: ["./go-agent", "--config", "config/node2.yaml"]
+    command: ["./praxis-agent"]
     depends_on:
-      go-agent-1:
+      praxis-agent-1:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
-      interval: 10s
-      timeout: 5s
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
       retries: 3
-      start_period: 30s
+      start_period: 40s
 
 networks:
   mcp-network:
@@ -77,4 +80,6 @@ volumes:
   node1-data:
     driver: local
   node2-data:
+    driver: local
+  shared:
     driver: local

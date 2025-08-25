@@ -1,409 +1,320 @@
 package llm
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
-	"sync"
+	"os"
+	"strings"
 	"time"
 
+	"github.com/praxis/praxis-go-sdk/internal/p2p"
+	"github.com/sashabaranov/go-openai"
 	"github.com/sirupsen/logrus"
-
-	"praxis-go-sdk/internal/config"
-	"praxis-go-sdk/internal/mcp"
 )
 
-// OpenAIClient implements the Client interface for OpenAI
-type OpenAIClient struct {
-	config       *config.LLMConfig
-	httpClient   *http.Client
-	toolRegistry *ToolRegistry
-	functions    map[string]FunctionDef
-	metrics      Metrics
-	cache        *Cache
-	rateLimiter  *RateLimiter
+// NetworkContext represents the current state of P2P network capabilities
+type NetworkContext struct {
+	Agents map[string]*AgentCapability `json:"agents"`
+	Tools  map[string][]string         `json:"tools"`  // tool_name -> peer_ids
+	Timestamp time.Time                `json:"timestamp"`
+}
+
+// AgentCapability represents what an agent can do with full tool specifications
+type AgentCapability struct {
+	PeerID       string         `json:"peer_id"`
+	Name         string         `json:"name"`
+	Tools        []p2p.ToolSpec `json:"tools"`       // Changed from []string to []p2p.ToolSpec
+	Capabilities []string       `json:"capabilities"`
+	LastSeen     time.Time      `json:"last_seen"`
+}
+
+// WorkflowPlan represents an LLM-generated workflow plan
+type WorkflowPlan struct {
+	ID          string         `json:"id"`
+	Description string         `json:"description"`
+	Nodes       []WorkflowNode `json:"nodes"`
+	Edges       []WorkflowEdge `json:"edges"`
+	Metadata    PlanMetadata   `json:"metadata"`
+}
+
+// WorkflowNode represents a single step in workflow
+type WorkflowNode struct {
+	ID        string            `json:"id"`
+	Type      string            `json:"type"` // "agent", "tool", "orchestrator"
+	AgentID   string            `json:"agent_id,omitempty"`
+	ToolName  string            `json:"tool_name,omitempty"`
+	Args      map[string]string `json:"args,omitempty"`
+	DependsOn []string          `json:"depends_on,omitempty"`
+	Position  map[string]int    `json:"position"`
+}
+
+// WorkflowEdge represents connection between nodes
+type WorkflowEdge struct {
+	ID     string `json:"id"`
+	From   string `json:"from"`
+	To     string `json:"to"`
+	Type   string `json:"type"` // "data", "control"
+	Weight int    `json:"weight,omitempty"`
+}
+
+// PlanMetadata contains optimization info
+type PlanMetadata struct {
+	EstimatedDuration string   `json:"estimated_duration"` // String like "5s" or "30s"
+	ParallelismFactor int      `json:"parallelism_factor"`
+	CriticalPath      []string `json:"critical_path"`
+	Complexity        string   `json:"complexity"` // "simple", "medium", "complex"
+}
+
+// LLMClient handles OpenAI interactions for workflow planning
+type LLMClient struct {
+	openaiClient *openai.Client
 	logger       *logrus.Logger
-	mu           sync.RWMutex
+	enabled      bool
 }
 
-// NewClient creates a new LLM client
-func NewClient(cfg *config.LLMConfig, mcpBridge mcp.Bridge, logger *logrus.Logger) (Client, error) {
-	if !cfg.Enabled {
-		return nil, fmt.Errorf("LLM is disabled in configuration")
+// NewLLMClient creates a new LLM client with fallback safety
+func NewLLMClient(logger *logrus.Logger) *LLMClient {
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	
+	client := &LLMClient{
+		logger:  logger,
+		enabled: apiKey != "",
 	}
-
-	// Create HTTP client with timeout
-	httpClient := &http.Client{
-		Timeout: cfg.Timeout,
-	}
-
-	// Initialize tool registry
-	toolRegistry := NewToolRegistry(mcpBridge, logger)
-
-	// Initialize cache if enabled
-	var cache *Cache
-	if cfg.Caching.Enabled {
-		cache = NewCache(cfg.Caching.MaxSize, cfg.Caching.TTL)
-	}
-
-	// Initialize rate limiter
-	rateLimiter := NewRateLimiter(cfg.RateLimiting.RequestsPerMinute, cfg.RateLimiting.TokensPerMinute)
-
-	client := &OpenAIClient{
-		config:       cfg,
-		httpClient:   httpClient,
-		toolRegistry: toolRegistry,
-		functions:    make(map[string]FunctionDef),
-		cache:        cache,
-		rateLimiter:  rateLimiter,
-		logger:       logger,
-	}
-
-	// Register built-in tools
-	client.registerBuiltInTools()
-
-	return client, nil
-}
-
-// ProcessRequest processes an LLM request
-func (c *OpenAIClient) ProcessRequest(ctx context.Context, req *Request) (*Response, error) {
-	startTime := time.Now()
-
-	// Generate request ID if not provided
-	if req.ID == "" {
-		req.ID = fmt.Sprintf("llm_%d", time.Now().UnixNano())
-	}
-
-	// Check cache if enabled
-	if c.cache != nil {
-		if cachedResp := c.cache.Get(req.UserInput); cachedResp != nil {
-			c.logger.Infof("[LLM] Cache hit for request: %s", req.ID)
-			cachedResp.ID = req.ID              // Update ID to match request
-			cachedResp.ProcessTime = time.Now() // Update process time to current time
-			return cachedResp, nil
-		}
-	}
-
-	// Check rate limits
-	if !c.rateLimiter.Allow() {
-		return nil, &LLMError{
-			Code:    ErrorRateLimit,
-			Message: "rate limit exceeded",
-			Type:    "rate_limit_error",
-		}
-	}
-
-	// Apply configuration defaults if not specified in request
-	maxTokens := req.MaxTokens
-	if maxTokens == 0 {
-		maxTokens = c.config.MaxTokens
-	}
-
-	temperature := req.Temperature
-	if temperature == 0 {
-		temperature = c.config.Temperature
-	}
-
-	// Prepare tools
-	tools := c.prepareTools(req.Tools)
-
-	// Prepare messages
-	messages := []Message{
-		{
-			Role:    "user",
-			Content: req.UserInput,
-		},
-	}
-
-	// Create OpenAI request
-	openAIReq := struct {
-		Model       string    `json:"model"`
-		Messages    []Message `json:"messages"`
-		Tools       []Tool    `json:"tools,omitempty"`
-		ToolChoice  string    `json:"tool_choice,omitempty"`
-		MaxTokens   int       `json:"max_tokens,omitempty"`
-		Temperature float32   `json:"temperature,omitempty"`
-	}{
-		Model:       c.config.Model,
-		Messages:    messages,
-		Tools:       tools,
-		MaxTokens:   maxTokens,
-		Temperature: temperature,
-	}
-
-	// Set tool_choice if tools are available
-	if len(tools) > 0 {
-		openAIReq.ToolChoice = "auto"
-	}
-
-	// Marshal request
-	reqBody, err := json.Marshal(openAIReq)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
-	}
-
-	// Create HTTP request
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", "https://api.openai.com/v1/chat/completions", bytes.NewReader(reqBody))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
-	}
-
-	// Set headers
-	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", "Bearer "+c.config.APIKey)
-
-	// Send request
-	c.logger.Infof("[LLM] Sending request to OpenAI: %s", req.ID)
-	httpResp, err := c.httpClient.Do(httpReq)
-	if err != nil {
-		c.metrics.RequestsError++
-		return nil, fmt.Errorf("failed to send request: %w", err)
-	}
-	defer httpResp.Body.Close()
-
-	// Check status code
-	if httpResp.StatusCode != http.StatusOK {
-		c.metrics.RequestsError++
-		var errResp struct {
-			Error struct {
-				Message string `json:"message"`
-				Type    string `json:"type"`
-				Code    string `json:"code"`
-			} `json:"error"`
-		}
-		if err := json.NewDecoder(httpResp.Body).Decode(&errResp); err != nil {
-			return nil, fmt.Errorf("HTTP error %d", httpResp.StatusCode)
-		}
-		return nil, &LLMError{
-			Code:    httpResp.StatusCode,
-			Message: errResp.Error.Message,
-			Type:    errResp.Error.Type,
-		}
-	}
-
-	// Parse response
-	var openAIResp struct {
-		ID      string `json:"id"`
-		Choices []struct {
-			Message      Message `json:"message"`
-			FinishReason string  `json:"finish_reason"`
-		} `json:"choices"`
-		Usage struct {
-			PromptTokens     int `json:"prompt_tokens"`
-			CompletionTokens int `json:"completion_tokens"`
-			TotalTokens      int `json:"total_tokens"`
-		} `json:"usage"`
-	}
-	if err := json.NewDecoder(httpResp.Body).Decode(&openAIResp); err != nil {
-		c.metrics.RequestsError++
-		return nil, fmt.Errorf("failed to parse response: %w", err)
-	}
-
-	// Update metrics
-	c.mu.Lock()
-	c.metrics.RequestsTotal++
-	c.metrics.RequestsSuccess++
-	c.metrics.TokensUsed += int64(openAIResp.Usage.TotalTokens)
-	c.metrics.LastRequest = time.Now()
-	processTime := time.Since(startTime)
-	if c.metrics.AvgResponseTime == 0 {
-		c.metrics.AvgResponseTime = processTime
+	
+	if apiKey != "" {
+		client.openaiClient = openai.NewClient(apiKey)
+		logger.Info("LLM client initialized with OpenAI")
 	} else {
-		c.metrics.AvgResponseTime = (c.metrics.AvgResponseTime + processTime) / 2
+		logger.Warn("OPENAI_API_KEY not found - LLM features disabled, falling back to traditional DSL")
 	}
-	c.mu.Unlock()
+	
+	return client
+}
 
-	// Check if we have a response
-	if len(openAIResp.Choices) == 0 {
+// IsEnabled returns whether LLM features are available
+func (c *LLMClient) IsEnabled() bool {
+	return c.enabled
+}
+
+// GenerateWorkflowFromNaturalLanguage converts natural language to executable workflow
+func (c *LLMClient) GenerateWorkflowFromNaturalLanguage(ctx context.Context, userRequest string, networkContext *NetworkContext) (*WorkflowPlan, error) {
+	if !c.enabled {
+		return nil, fmt.Errorf("LLM client not enabled - missing OPENAI_API_KEY")
+	}
+	
+	c.logger.Infof("Generating workflow from natural language: %s", userRequest)
+	
+	// Build intelligent system prompt with network context
+	systemPrompt := c.buildSystemPrompt(networkContext)
+	
+	// Create the request
+	resp, err := c.openaiClient.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
+		Model: openai.GPT4o,
+		ResponseFormat: &openai.ChatCompletionResponseFormat{
+			Type: openai.ChatCompletionResponseFormatTypeJSONObject,
+		},
+		Messages: []openai.ChatCompletionMessage{
+			{
+				Role:    openai.ChatMessageRoleSystem,
+				Content: systemPrompt,
+			},
+			{
+				Role:    openai.ChatMessageRoleUser,
+				Content: userRequest,
+			},
+		},
+		MaxTokens:   4000,
+		Temperature: 0.1, // Low temperature for consistent results
+		TopP:        0.9,
+	})
+	
+	if err != nil {
+		return nil, fmt.Errorf("OpenAI API call failed: %w", err)
+	}
+	
+	if len(resp.Choices) == 0 {
 		return nil, fmt.Errorf("no response from OpenAI")
 	}
-
-	// Get the first choice
-	choice := openAIResp.Choices[0]
-
-	// Create response
-	resp := &Response{
-		ID:          req.ID,
-		Response:    choice.Message.Content,
-		TokensUsed:  openAIResp.Usage.TotalTokens,
-		ProcessTime: time.Now(),
-		Success:     true,
+	
+	// Parse the JSON response
+	var plan WorkflowPlan
+	content := resp.Choices[0].Message.Content
+	if err := json.Unmarshal([]byte(content), &plan); err != nil {
+		return nil, fmt.Errorf("failed to parse workflow plan: %w, content: %s", err, content)
 	}
-
-	// Handle tool calls
-	if len(choice.Message.ToolCalls) > 0 {
-		resp.ToolCalls = make([]ToolExecution, 0, len(choice.Message.ToolCalls))
-		c.mu.Lock()
-		c.metrics.ToolCallsTotal += int64(len(choice.Message.ToolCalls))
-		c.mu.Unlock()
-
-		for _, toolCall := range choice.Message.ToolCalls {
-			execution, err := c.executeToolCall(ctx, toolCall)
-			if err != nil {
-				c.mu.Lock()
-				c.metrics.ToolCallsError++
-				c.mu.Unlock()
-				execution.Error = err.Error()
-			} else {
-				c.mu.Lock()
-				c.metrics.ToolCallsSuccess++
-				c.mu.Unlock()
-			}
-			resp.ToolCalls = append(resp.ToolCalls, execution)
-		}
+	
+	// Generate unique ID and add metadata
+	plan.ID = fmt.Sprintf("workflow_%d", time.Now().UnixNano())
+	if plan.Metadata.Complexity == "" {
+		plan.Metadata.Complexity = c.assessComplexity(&plan)
 	}
-
-	// Cache response if enabled
-	if c.cache != nil {
-		c.cache.Set(req.UserInput, resp)
-	}
-
-	return resp, nil
+	
+	c.logger.Infof("Generated workflow plan %s with %d nodes and %d edges", plan.ID, len(plan.Nodes), len(plan.Edges))
+	
+	return &plan, nil
 }
 
-// RegisterTool registers a tool with the LLM
-func (c *OpenAIClient) RegisterTool(tool FunctionDef) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if _, exists := c.functions[tool.Name]; exists {
-		return fmt.Errorf("tool already registered: %s", tool.Name)
+// buildSystemPrompt creates an intelligent system prompt based on network capabilities
+func (c *LLMClient) buildSystemPrompt(ctx *NetworkContext) string {
+	// Dynamically build the tools documentation section
+	var toolsDocumentation strings.Builder
+	toolsDocumentation.WriteString("### AVAILABLE TOOLS (API)\n")
+	toolsDocumentation.WriteString("=====================================\n")
+	
+	// Build detailed tool specifications from agents
+	for _, agent := range ctx.Agents {
+		if len(agent.Tools) > 0 {
+			toolsDocumentation.WriteString(fmt.Sprintf("\n#### Agent: %s (`%s`)\n", agent.Name, agent.PeerID))
+			for _, tool := range agent.Tools {
+				toolsDocumentation.WriteString(fmt.Sprintf("- **Tool:** `%s`\n", tool.Name))
+				toolsDocumentation.WriteString(fmt.Sprintf("  - **Description:** %s\n", tool.Description))
+				if len(tool.Parameters) > 0 {
+					toolsDocumentation.WriteString("  - **Parameters:**\n")
+					for _, param := range tool.Parameters {
+						req := ""
+						if param.Required {
+							req = "(REQUIRED)"
+						}
+						toolsDocumentation.WriteString(fmt.Sprintf("    - `%s` (%s) %s: %s\n", 
+							param.Name, param.Type, req, param.Description))
+					}
+				}
+			}
+		}
 	}
+	
+	return fmt.Sprintf(`You are the brain and main orchestrator of a distributed P2P network of agents.
 
-	c.functions[tool.Name] = tool
-	c.logger.Infof("[LLM] Registered tool: %s", tool.Name)
+### YOUR MISSION:
+Analyze user requests and available API tools. Your task is to select the most suitable tool on the most appropriate agent and generate a JSON execution plan.
+
+%s
+
+### CRITICALLY IMPORTANT INSTRUCTIONS:
+1. **ANALYZE REQUEST:** Understand what the user wants based on any formulation
+2. **SELECT TOOL:** Review documentation for all available tools and choose the one that best solves the task
+3. **SELECT AGENT:** Choose the agent that has this tool (use peer_id from documentation)
+4. **FORM ARGUMENTS:** Extract all necessary parameter values from the user request
+5. **RETURN JSON:** Your response is ALWAYS and ONLY valid JSON in the specified format
+6. **STRICT PARAMETER MATCHING:** Parameter names in the "args" object must EXACTLY match parameter names from tool documentation, including case sensitivity. Do not invent new names.
+
+### RESPONSE FORMAT (STRICT JSON):
+{
+  "description": "Brief plan description",
+  "nodes": [
+    {
+      "id": "node_1",
+      "type": "tool",
+      "agent_id": "peer_id_from_documentation",
+      "tool_name": "tool_name_from_documentation",
+      "args": {
+        "parameter_name_1": "value_from_user_request",
+        "parameter_name_2": "value_from_user_request"
+      },
+      "depends_on": [],
+      "position": {"x": 250, "y": 100}
+    }
+  ],
+  "edges": [],
+  "metadata": {"complexity": "simple", "parallelism_factor": 1, "estimated_duration": "5s"}
+}
+
+### UNIVERSAL UNDERSTANDING:
+You must understand ANY requests and find suitable tools:
+- If user mentions files → look for tools with "file" in name or description
+- If user wants analysis → look for tools with "analyze" or similar words
+- If user wants to create something → look for creation tools
+- For ANY other request → carefully read descriptions of all tools
+
+### CRITICAL REQUIREMENTS:
+- Use ONLY tools from the documentation above
+- Parameter names in args must EXACTLY match documentation (case-sensitive)
+- agent_id must be a real peer_id from documentation
+- All REQUIRED parameters must be present in args
+- If no suitable tool exists, try to solve the task with available means`, toolsDocumentation.String())
+}
+
+// assessComplexity determines workflow complexity based on structure
+func (c *LLMClient) assessComplexity(plan *WorkflowPlan) string {
+	nodeCount := len(plan.Nodes)
+	edgeCount := len(plan.Edges)
+	
+	// Simple heuristics for complexity assessment
+	if nodeCount <= 2 && edgeCount <= 1 {
+		return "simple"
+	} else if nodeCount <= 5 && edgeCount <= 4 {
+		return "medium"  
+	}
+	return "complex"
+}
+
+// ValidateWorkflowPlan checks if the generated plan is executable given current network state
+func (c *LLMClient) ValidateWorkflowPlan(plan *WorkflowPlan, ctx *NetworkContext) error {
+	for _, node := range plan.Nodes {
+		if node.Type == "tool" {
+			// Check if the specified agent actually has the tool
+			if node.AgentID != "" && node.ToolName != "" {
+				agent, exists := ctx.Agents[node.AgentID]
+				if !exists {
+					return fmt.Errorf("node %s references non-existent agent %s", node.ID, node.AgentID)
+				}
+				
+				hasTools := false
+				for _, toolSpec := range agent.Tools {
+					if toolSpec.Name == node.ToolName {
+						hasTools = true
+						break
+					}
+				}
+				if !hasTools {
+					return fmt.Errorf("node %s: agent %s does not have tool %s", node.ID, node.AgentID, node.ToolName)
+				}
+			}
+		}
+	}
+	
 	return nil
 }
 
-// GetAvailableTools returns the list of available tools
-func (c *OpenAIClient) GetAvailableTools() []FunctionDef {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	tools := make([]FunctionDef, 0, len(c.functions))
-	for _, tool := range c.functions {
-		tools = append(tools, tool)
-	}
-	return tools
-}
-
-// Health checks the health of the LLM connection
-func (c *OpenAIClient) Health() error {
-	// Create a simple request to test the connection
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	req := &Request{
-		ID:        "health_check",
-		UserInput: "ping",
-	}
-
-	_, err := c.ProcessRequest(ctx, req)
-	return err
-}
-
-// GetMetrics returns metrics about the LLM client
-func (c *OpenAIClient) GetMetrics() Metrics {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	// Create a copy to avoid race conditions
-	metrics := Metrics{
-		RequestsTotal:    c.metrics.RequestsTotal,
-		RequestsSuccess:  c.metrics.RequestsSuccess,
-		RequestsError:    c.metrics.RequestsError,
-		AvgResponseTime:  c.metrics.AvgResponseTime,
-		TokensUsed:       c.metrics.TokensUsed,
-		ToolCallsTotal:   c.metrics.ToolCallsTotal,
-		ToolCallsSuccess: c.metrics.ToolCallsSuccess,
-		ToolCallsError:   c.metrics.ToolCallsError,
-		LastRequest:      c.metrics.LastRequest,
-	}
-
-	return metrics
-}
-
-// prepareTools prepares the tools for the request
-func (c *OpenAIClient) prepareTools(requestedTools []string) []Tool {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	// If no tools requested, return empty list
-	if len(requestedTools) == 0 {
-		return nil
-	}
-
-	tools := make([]Tool, 0)
-
-	// If "*" is requested, return all tools
-	if len(requestedTools) == 1 && requestedTools[0] == "*" {
-		for _, fn := range c.functions {
-			tools = append(tools, Tool{
-				Type:     "function",
-				Function: fn,
-			})
-		}
-		return tools
-	}
-
-	// Otherwise, return only requested tools
-	for _, name := range requestedTools {
-		if fn, exists := c.functions[name]; exists {
-			tools = append(tools, Tool{
-				Type:     "function",
-				Function: fn,
-			})
+// ConvertPlanToDSLCommands converts workflow plan to executable DSL commands
+func (c *LLMClient) ConvertPlanToDSLCommands(plan *WorkflowPlan) []string {
+	commands := make([]string, 0, len(plan.Nodes))
+	
+	for _, node := range plan.Nodes {
+		switch node.Type {
+		case "tool":
+			if node.ToolName != "" {
+				cmd := fmt.Sprintf("CALL %s", node.ToolName)
+				
+				// Add arguments in correct order for common tools
+				switch node.ToolName {
+				case "write_file":
+					if filename, ok := node.Args["filename"]; ok {
+						if content, ok := node.Args["content"]; ok {
+							cmd = fmt.Sprintf("CALL write_file %s \"%s\"", filename, content)
+						}
+					}
+				case "read_file":
+					if filename, ok := node.Args["filename"]; ok {
+						cmd = fmt.Sprintf("CALL read_file %s", filename)
+					}
+				case "list_files":
+					cmd = "CALL list_files"
+				default:
+					// Generic argument handling
+					for _, value := range node.Args {
+						cmd += fmt.Sprintf(" %s", value)
+					}
+				}
+				
+				commands = append(commands, cmd)
+			}
+		case "orchestrator":
+			// Orchestrator nodes don't generate DSL directly
+			continue
 		}
 	}
-
-	return tools
-}
-
-// executeToolCall executes a tool call
-func (c *OpenAIClient) executeToolCall(ctx context.Context, toolCall ToolCall) (ToolExecution, error) {
-	execution := ToolExecution{
-		ToolName: toolCall.Function.Name,
-	}
-	startTime := time.Now()
-
-	// Parse arguments
-	var params map[string]interface{}
-	if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &params); err != nil {
-		return execution, fmt.Errorf("failed to parse arguments: %w", err)
-	}
-	execution.Parameters = params
-
-	// Execute tool
-	result, err := c.toolRegistry.ExecuteTool(ctx, toolCall.Function.Name, params)
-	execution.Duration = time.Since(startTime)
-
-	if err != nil {
-		return execution, err
-	}
-
-	execution.Result = result
-	return execution, nil
-}
-
-// registerBuiltInTools registers built-in tools
-func (c *OpenAIClient) registerBuiltInTools() {
-	// Echo tool
-	c.RegisterTool(FunctionDef{
-		Name:        "echo",
-		Description: "Echoes the input message",
-		Parameters: map[string]interface{}{
-			"type": "object",
-			"properties": map[string]interface{}{
-				"message": map[string]interface{}{
-					"type":        "string",
-					"description": "The message to echo",
-				},
-			},
-			"required": []string{"message"},
-		},
-	})
-
-	// Other built-in tools can be added here
+	
+	return commands
 }

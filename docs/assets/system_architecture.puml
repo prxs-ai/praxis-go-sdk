@@ -1,0 +1,36 @@
+@startuml
+!theme plain
+
+package "Agent 1" {
+  [HTTP API] as API1
+  [DSL Analyzer] as DSL1
+  [Agent Core] as Core1
+  [P2P Protocol] as P2P1
+  [MCP Server] as MCP1
+  [Tool Registry] as Tools1
+}
+
+package "Agent 2" {
+  [HTTP API] as API2
+  [DSL Analyzer] as DSL2
+  [Agent Core] as Core2
+  [P2P Protocol] as P2P2
+  [MCP Server] as MCP2
+  [Tool Registry] as Tools2
+  [Filesystem Tools] as FS2
+}
+
+cloud "libp2p Network" as Network
+
+API1 --> DSL1 : DSL Request
+DSL1 --> Core1 : Parsed Command
+Core1 --> P2P1 : Remote Tool Call
+P2P1 <--> Network : P2P Communication
+Network <--> P2P2 : P2P Communication
+P2P2 --> Core2 : Tool Request
+Core2 --> MCP2 : Execute Tool
+MCP2 --> Tools2 : Find Handler
+Tools2 --> FS2 : write_file
+FS2 --> [Shared Volume] : Create File
+
+@enduml

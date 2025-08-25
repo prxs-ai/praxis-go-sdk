@@ -2,371 +2,281 @@ package p2p
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
 
-	dht "github.com/libp2p/go-libp2p-kad-dht"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/discovery/mdns"
+	"github.com/multiformats/go-multiaddr"
 	"github.com/sirupsen/logrus"
 )
 
-// PeerDiscovery implements the Discovery interface
-type PeerDiscovery struct {
-	host            host.Host
-	dht             *dht.IpfsDHT
-	pubsub          *pubsub.PubSub
-	config          DiscoveryConfig
-	logger          *logrus.Logger
-	ctx             context.Context
-	cancel          context.CancelFunc
-	peerMap         map[string]peer.ID
-	peerMapLock     sync.RWMutex
-	discoveredPeers map[peer.ID]string
+const (
+	DiscoveryServiceTag = "praxis-p2p-mcp"
+	DiscoveryInterval   = time.Second * 10
+)
+
+type Discovery struct {
+	host           host.Host
+	mdnsService    mdns.Service
+	foundPeers     map[peer.ID]*PeerInfo
+	peerHandlers   []PeerHandler
+	protocolHandler *P2PProtocolHandler // Reference for automatic card exchange
+	logger         *logrus.Logger
+	ctx            context.Context
+	cancel         context.CancelFunc
+	mu             sync.RWMutex
 }
 
-// NewDiscovery creates a new peer discovery service
-func NewDiscovery(host host.Host, config DiscoveryConfig, logger *logrus.Logger) (Discovery, error) {
-	if !config.Enabled {
-		logger.Info("Peer discovery is disabled")
-		return nil, errors.New("peer discovery is disabled")
-	}
+type PeerInfo struct {
+	ID          peer.ID
+	Addrs       []multiaddr.Multiaddr
+	FoundAt     time.Time
+	LastSeen    time.Time
+	AgentCard   interface{}
+	IsConnected bool
+}
 
+type PeerHandler func(peerInfo *PeerInfo)
+
+func NewDiscovery(host host.Host, logger *logrus.Logger) (*Discovery, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	discovery := &PeerDiscovery{
-		host:            host,
-		config:          config,
-		logger:          logger,
-		ctx:             ctx,
-		cancel:          cancel,
-		peerMap:         make(map[string]peer.ID),
-		discoveredPeers: make(map[peer.ID]string),
+	if logger == nil {
+		logger = logrus.New()
+	}
+
+	discovery := &Discovery{
+		host:         host,
+		foundPeers:   make(map[peer.ID]*PeerInfo),
+		peerHandlers: make([]PeerHandler, 0),
+		logger:       logger,
+		ctx:          ctx,
+		cancel:       cancel,
 	}
 
 	return discovery, nil
 }
 
-// Start initializes and starts the discovery service
-func (d *PeerDiscovery) Start() error {
-	d.logger.Info("Starting peer discovery...")
+func (d *Discovery) Start() error {
+	d.logger.Info("Starting P2P discovery service")
 
-	// Set up mDNS discovery if enabled
-	if d.config.EnableMDNS {
-		if err := d.setupMDNS(); err != nil {
-			d.logger.Warnf("Failed to setup mDNS: %v", err)
-		}
+	notifee := &discoveryNotifee{
+		discovery: d,
 	}
 
-	// Set up DHT discovery if enabled
-	if d.config.EnableDHT {
-		if err := d.setupDHT(); err != nil {
-			d.logger.Warnf("Failed to setup DHT: %v", err)
-		}
-	}
-
-	// Set up pubsub for peer discovery
-	if err := d.setupPubSub(); err != nil {
-		d.logger.Warnf("Failed to setup pubsub: %v", err)
-	}
-
-	// Register this peer with a name
-	// TODO: Replace with proper name from config
-	name := fmt.Sprintf("peer-%s", d.host.ID().String()[:8])
-	if err := d.RegisterPeer(name); err != nil {
-		d.logger.Warnf("Failed to register peer: %v", err)
-	}
-
-	return nil
-}
-
-// Shutdown stops the discovery service and cleans up resources
-func (d *PeerDiscovery) Shutdown() error {
-	d.logger.Info("Shutting down peer discovery...")
-	d.cancel()
-	return nil
-}
-
-// GetPeerCount returns the number of discovered peers
-func (d *PeerDiscovery) GetPeerCount() int {
-	d.peerMapLock.RLock()
-	defer d.peerMapLock.RUnlock()
-	return len(d.peerMap)
-}
-
-// ConnectToPeerByName attempts to connect to a peer by name
-func (d *PeerDiscovery) ConnectToPeerByName(peerName string) error {
-	d.logger.Infof("Looking for peer: %s", peerName)
-
-	// Check if we already know this peer
-	d.peerMapLock.RLock()
-	peerID, exists := d.peerMap[peerName]
-	d.peerMapLock.RUnlock()
-
-	if exists {
-		d.logger.Infof("Found peer %s in local map with ID: %s", peerName, peerID)
-		return nil
-	}
-
-	// If not found, try to discover it
-	d.logger.Infof("Peer %s not found in local map, trying discovery...", peerName)
-
-	// Wait for discovery to find the peer
-	timeout := time.After(30 * time.Second)
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			// Check if we've discovered the peer
-			d.peerMapLock.RLock()
-			peerID, exists = d.peerMap[peerName]
-			d.peerMapLock.RUnlock()
-
-			if exists {
-				d.logger.Infof("Discovered peer %s with ID: %s", peerName, peerID)
-				return nil
-			}
-
-			// Try active discovery
-			d.advertiseAndFind()
-
-		case <-timeout:
-			return fmt.Errorf("timeout while trying to discover peer: %s", peerName)
-
-		case <-d.ctx.Done():
-			return fmt.Errorf("discovery service shutting down")
-		}
-	}
-}
-
-// ResolvePeerName resolves a peer name to a peer ID
-func (d *PeerDiscovery) ResolvePeerName(peerName string) (peer.ID, error) {
-	d.peerMapLock.RLock()
-	peerID, exists := d.peerMap[peerName]
-	d.peerMapLock.RUnlock()
-
-	if !exists {
-		return "", fmt.Errorf("peer name not found: %s", peerName)
-	}
-
-	return peerID, nil
-}
-
-// RegisterPeer registers this peer with the discovery service
-func (d *PeerDiscovery) RegisterPeer(name string) error {
-	// Store the peer name for this host
-	d.peerMapLock.Lock()
-	d.peerMap[name] = d.host.ID()
-	d.discoveredPeers[d.host.ID()] = name
-	d.peerMapLock.Unlock()
-
-	d.logger.Infof("Registered peer name '%s' for ID: %s", name, d.host.ID())
-
-	// Advertise the peer name via pubsub
-	if d.pubsub != nil {
-		go d.advertisePeerInfo(name)
-	}
-
-	return nil
-}
-
-// setupMDNS initializes multicast DNS discovery
-func (d *PeerDiscovery) setupMDNS() error {
-	d.logger.Info("Setting up mDNS discovery...")
-
-	// Create a new mDNS service
-	service := mdns.NewMdnsService(d.host, d.config.Rendezvous, d)
-	if err := service.Start(); err != nil {
+	mdnsService := mdns.NewMdnsService(d.host, DiscoveryServiceTag, notifee)
+	if err := mdnsService.Start(); err != nil {
 		return fmt.Errorf("failed to start mDNS service: %w", err)
 	}
 
-	d.logger.Info("mDNS discovery started")
+	d.mdnsService = mdnsService
+
+	go d.runDiscoveryLoop()
+
+	d.logger.Info("P2P discovery service started")
+
 	return nil
 }
 
-// setupDHT initializes the DHT for peer discovery
-func (d *PeerDiscovery) setupDHT() error {
-	d.logger.Info("Setting up DHT discovery...")
+func (d *Discovery) Stop() error {
+	d.logger.Info("Stopping P2P discovery service")
 
-	// Create a new DHT
-	var err error
-	d.dht, err = dht.New(d.ctx, d.host)
-	if err != nil {
-		return fmt.Errorf("failed to create DHT: %w", err)
-	}
+	d.cancel()
 
-	// Bootstrap the DHT
-	if err := d.dht.Bootstrap(d.ctx); err != nil {
-		return fmt.Errorf("failed to bootstrap DHT: %w", err)
-	}
-
-	// Connect to bootstrap nodes
-	for _, addr := range d.config.BootstrapNodes {
-		d.logger.Infof("Connecting to bootstrap node: %s", addr)
-		// Parse the multiaddress
-		// ... (implementation omitted for brevity)
-	}
-
-	d.logger.Info("DHT discovery started")
-	return nil
-}
-
-// setupPubSub initializes the pubsub system for peer discovery
-func (d *PeerDiscovery) setupPubSub() error {
-	d.logger.Info("Setting up pubsub discovery...")
-
-	// Create a new pubsub service
-	var err error
-	d.pubsub, err = pubsub.NewGossipSub(d.ctx, d.host)
-	if err != nil {
-		return fmt.Errorf("failed to create pubsub: %w", err)
-	}
-
-	// Subscribe to the discovery topic
-	topic, err := d.pubsub.Join(fmt.Sprintf("%s-discovery", d.config.Rendezvous))
-	if err != nil {
-		return fmt.Errorf("failed to join pubsub topic: %w", err)
-	}
-
-	// Subscribe to messages
-	subscription, err := topic.Subscribe()
-	if err != nil {
-		return fmt.Errorf("failed to subscribe to topic: %w", err)
-	}
-
-	// Handle incoming messages
-	go d.handlePubSubMessages(subscription)
-
-	d.logger.Info("Pubsub discovery started")
-	return nil
-}
-
-// handlePubSubMessages processes incoming pubsub messages
-func (d *PeerDiscovery) handlePubSubMessages(subscription *pubsub.Subscription) {
-	for {
-		msg, err := subscription.Next(d.ctx)
-		if err != nil {
-			if d.ctx.Err() != nil {
-				// Context cancelled, shutting down
-				return
-			}
-			d.logger.Errorf("Error getting next pubsub message: %v", err)
-			continue
+	if d.mdnsService != nil {
+		if err := d.mdnsService.Close(); err != nil {
+			d.logger.Errorf("Failed to close mDNS service: %v", err)
 		}
-
-		// Skip messages from ourselves
-		if msg.ReceivedFrom == d.host.ID() {
-			continue
-		}
-
-		// Process the message (e.g., extract peer name)
-		peerName := string(msg.Data)
-		d.logger.Infof("Received pubsub announcement from %s: %s", msg.ReceivedFrom, peerName)
-
-		// Store the peer name
-		d.peerMapLock.Lock()
-		d.peerMap[peerName] = msg.ReceivedFrom
-		d.discoveredPeers[msg.ReceivedFrom] = peerName
-		d.peerMapLock.Unlock()
 	}
+
+	return nil
 }
 
-// advertisePeerInfo periodically advertises peer information
-func (d *PeerDiscovery) advertisePeerInfo(name string) {
-	topic, err := d.pubsub.Join(fmt.Sprintf("%s-discovery", d.config.Rendezvous))
-	if err != nil {
-		d.logger.Errorf("Failed to join pubsub topic for advertising: %v", err)
-		return
-	}
-
-	// Advertise periodically
-	ticker := time.NewTicker(1 * time.Minute)
+func (d *Discovery) runDiscoveryLoop() {
+	ticker := time.NewTicker(DiscoveryInterval)
 	defer ticker.Stop()
-
-	// Initial advertisement
-	if err := topic.Publish(d.ctx, []byte(name)); err != nil {
-		d.logger.Errorf("Failed to publish peer info: %v", err)
-	}
 
 	for {
 		select {
-		case <-ticker.C:
-			if err := topic.Publish(d.ctx, []byte(name)); err != nil {
-				d.logger.Errorf("Failed to publish peer info: %v", err)
-			}
 		case <-d.ctx.Done():
 			return
+		case <-ticker.C:
+			d.checkPeerConnections()
 		}
 	}
 }
 
-// advertiseAndFind actively tries to discover peers
-func (d *PeerDiscovery) advertiseAndFind() {
-	// Use DHT to find peers if available
-	if d.dht != nil {
-		// Refresh the DHT
-		if err := d.dht.Bootstrap(d.ctx); err != nil {
-			d.logger.Errorf("Failed to bootstrap DHT: %v", err)
-		}
+func (d *Discovery) checkPeerConnections() {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 
-		// Find providers for our rendezvous key
-		// This is just a simple approach, a more sophisticated one would use a proper
-		// peer routing system
-	}
+	for peerID, peerInfo := range d.foundPeers {
+		isConnected := d.host.Network().Connectedness(peerID) == 2
 
-	// Re-advertise on pubsub
-	if d.pubsub != nil {
-		topic, err := d.pubsub.Join(fmt.Sprintf("%s-discovery", d.config.Rendezvous))
-		if err != nil {
-			d.logger.Errorf("Failed to join pubsub topic for advertising: %v", err)
-			return
-		}
-
-		// Get our peer name
-		var peerName string
-		d.peerMapLock.RLock()
-		peerName = d.discoveredPeers[d.host.ID()]
-		d.peerMapLock.RUnlock()
-
-		if peerName != "" {
-			if err := topic.Publish(d.ctx, []byte(peerName)); err != nil {
-				d.logger.Errorf("Failed to publish peer info: %v", err)
+		if isConnected != peerInfo.IsConnected {
+			peerInfo.IsConnected = isConnected
+			if isConnected {
+				d.logger.Infof("Peer %s connected", peerID)
+			} else {
+				d.logger.Infof("Peer %s disconnected", peerID)
 			}
 		}
+
+		if isConnected {
+			peerInfo.LastSeen = time.Now()
+		}
+	}
+
+	for peerID, peerInfo := range d.foundPeers {
+		if time.Since(peerInfo.LastSeen) > time.Minute*5 {
+			d.logger.Infof("Removing stale peer: %s", peerID)
+			delete(d.foundPeers, peerID)
+		}
 	}
 }
 
-// HandlePeerFound implements the mdns.Notifee interface
-func (d *PeerDiscovery) HandlePeerFound(pi peer.AddrInfo) {
-	// Skip ourselves
+func (d *Discovery) HandlePeerFound(pi peer.AddrInfo) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
 	if pi.ID == d.host.ID() {
 		return
 	}
 
-	d.logger.Infof("Found peer via mDNS: %s", pi.ID)
+	peerInfo, exists := d.foundPeers[pi.ID]
+	if !exists {
+		peerInfo = &PeerInfo{
+			ID:       pi.ID,
+			Addrs:    pi.Addrs,
+			FoundAt:  time.Now(),
+			LastSeen: time.Now(),
+		}
+		d.foundPeers[pi.ID] = peerInfo
 
-	// Try to connect to the peer
-	ctx, cancel := context.WithTimeout(d.ctx, 10*time.Second)
+		d.logger.Infof("Discovered new peer: %s", pi.ID)
+
+		go d.connectToPeer(pi)
+	} else {
+		peerInfo.LastSeen = time.Now()
+		peerInfo.Addrs = pi.Addrs
+	}
+
+	for _, handler := range d.peerHandlers {
+		go handler(peerInfo)
+	}
+}
+
+func (d *Discovery) connectToPeer(pi peer.AddrInfo) {
+	ctx, cancel := context.WithTimeout(d.ctx, time.Second*30)
 	defer cancel()
 
 	if err := d.host.Connect(ctx, pi); err != nil {
-		d.logger.Warnf("Failed to connect to discovered peer %s: %v", pi.ID, err)
+		d.logger.Errorf("Failed to connect to peer %s: %v", pi.ID, err)
 		return
 	}
 
-	d.logger.Infof("Connected to discovered peer: %s", pi.ID)
+	d.logger.Infof("Successfully connected to peer: %s", pi.ID)
 
-	// For now, just store with a generic name
-	// In a real system, we would exchange peer names after connecting
-	tempName := fmt.Sprintf("mdns-peer-%s", pi.ID.String()[:8])
-	d.peerMapLock.Lock()
-	d.peerMap[tempName] = pi.ID
-	d.discoveredPeers[pi.ID] = tempName
-	d.peerMapLock.Unlock()
+	d.mu.Lock()
+	if peerInfo, exists := d.foundPeers[pi.ID]; exists {
+		peerInfo.IsConnected = true
+	}
+	d.mu.Unlock()
+	
+	// Automatically exchange cards with the new peer
+	if d.protocolHandler != nil {
+		go func() {
+			time.Sleep(1 * time.Second) // Small delay to ensure connection is stable
+			card, err := d.protocolHandler.RequestCard(context.Background(), pi.ID)
+			if err != nil {
+				d.logger.Errorf("Failed to exchange cards with %s: %v", pi.ID, err)
+			} else {
+				d.logger.Infof("✅ Automatically exchanged cards with %s", pi.ID)
+				// Update peer info with card
+				d.mu.Lock()
+				if peerInfo, exists := d.foundPeers[pi.ID]; exists {
+					peerInfo.AgentCard = card
+				}
+				d.mu.Unlock()
+			}
+		}()
+	}
+}
+
+// SetProtocolHandler sets the protocol handler for automatic card exchange
+func (d *Discovery) SetProtocolHandler(handler *P2PProtocolHandler) {
+	d.protocolHandler = handler
+}
+
+func (d *Discovery) RegisterPeerHandler(handler PeerHandler) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.peerHandlers = append(d.peerHandlers, handler)
+}
+
+func (d *Discovery) GetPeers() []*PeerInfo {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+
+	peers := make([]*PeerInfo, 0, len(d.foundPeers))
+	for _, peerInfo := range d.foundPeers {
+		peers = append(peers, peerInfo)
+	}
+
+	return peers
+}
+
+func (d *Discovery) GetConnectedPeers() []*PeerInfo {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+
+	peers := make([]*PeerInfo, 0)
+	for _, peerInfo := range d.foundPeers {
+		if peerInfo.IsConnected {
+			peers = append(peers, peerInfo)
+		}
+	}
+
+	return peers
+}
+
+func (d *Discovery) GetPeerInfo(peerID peer.ID) (*PeerInfo, bool) {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+
+	peerInfo, exists := d.foundPeers[peerID]
+	return peerInfo, exists
+}
+
+func (d *Discovery) ConnectToBootstrapPeers(bootstrapPeers []string) error {
+	for _, peerAddr := range bootstrapPeers {
+		addr, err := multiaddr.NewMultiaddr(peerAddr)
+		if err != nil {
+			d.logger.Errorf("Invalid bootstrap peer address %s: %v", peerAddr, err)
+			continue
+		}
+
+		peerInfo, err := peer.AddrInfoFromP2pAddr(addr)
+		if err != nil {
+			d.logger.Errorf("Failed to parse peer info from %s: %v", peerAddr, err)
+			continue
+		}
+
+		d.logger.Infof("Connecting to bootstrap peer: %s", peerInfo.ID)
+
+		go d.connectToPeer(*peerInfo)
+	}
+
+	return nil
+}
+
+type discoveryNotifee struct {
+	discovery *Discovery
+}
+
+func (n *discoveryNotifee) HandlePeerFound(pi peer.AddrInfo) {
+	n.discovery.HandlePeerFound(pi)
 }
