@@ -34,7 +34,7 @@ func main() {
 
 	// Convert AppConfig to agent.Config
 	agentConfig := agent.AdaptAppConfigToAgentConfig(appConfig)
-	
+
 	logger.Infof("Configuration loaded from %s: %+v", *configFile, agentConfig)
 
 	praxisAgent, err := agent.NewPraxisAgent(agentConfig)

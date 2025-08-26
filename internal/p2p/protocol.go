@@ -24,13 +24,13 @@ const (
 
 // P2PProtocolHandler handles P2P protocol messages
 type P2PProtocolHandler struct {
-	host       host.Host
-	logger     *logrus.Logger
-	handlers   map[protocol.ID]StreamHandler
-	peerCards  map[peer.ID]*AgentCard
-	ourCard    *AgentCard    // Our own agent card
-	mcpBridge  *P2PMCPBridge // Reference to MCP bridge for tool execution
-	mu         sync.RWMutex
+	host      host.Host
+	logger    *logrus.Logger
+	handlers  map[protocol.ID]StreamHandler
+	peerCards map[peer.ID]*AgentCard
+	ourCard   *AgentCard    // Our own agent card
+	mcpBridge *P2PMCPBridge // Reference to MCP bridge for tool execution
+	mu        sync.RWMutex
 }
 
 // StreamHandler handles incoming streams
@@ -63,12 +63,12 @@ type AgentCard struct {
 
 // P2PMessage represents a P2P message
 type P2PMessage struct {
-	Type    string      `json:"type"`
-	ID      string      `json:"id"`
-	Method  string      `json:"method"`
-	Params  interface{} `json:"params"`
-	Result  interface{} `json:"result,omitempty"`
-	Error   *P2PError   `json:"error,omitempty"`
+	Type   string      `json:"type"`
+	ID     string      `json:"id"`
+	Method string      `json:"method"`
+	Params interface{} `json:"params"`
+	Result interface{} `json:"result,omitempty"`
+	Error  *P2PError   `json:"error,omitempty"`
 }
 
 // P2PError represents an error in P2P communication
@@ -164,7 +164,7 @@ func (h *P2PProtocolHandler) handleCardStream(stream network.Stream) {
 	h.peerCards[peerID] = &peerCard
 	h.mu.Unlock()
 
-	h.logger.Infof("✅ Card exchange complete with %s: %s v%s", 
+	h.logger.Infof("✅ Card exchange complete with %s: %s v%s",
 		peerID.ShortString(), peerCard.Name, peerCard.Version)
 }
 
@@ -240,7 +240,7 @@ func (h *P2PProtocolHandler) RequestCard(ctx context.Context, peerID peer.ID) (*
 	h.peerCards[peerID] = &peerCard
 	h.mu.Unlock()
 
-	h.logger.Infof("✅ Received card from %s: %s v%s", 
+	h.logger.Infof("✅ Received card from %s: %s v%s",
 		peerID.ShortString(), peerCard.Name, peerCard.Version)
 
 	return &peerCard, nil
@@ -278,7 +278,7 @@ func (h *P2PProtocolHandler) InvokeTool(ctx context.Context, peerID peer.ID, too
 		return nil, fmt.Errorf("failed to receive tool response: %w", err)
 	}
 
-	h.logger.Infof("✅ Tool '%s' executed successfully on peer %s", 
+	h.logger.Infof("✅ Tool '%s' executed successfully on peer %s",
 		toolName, peerID.ShortString())
 
 	return &response, nil
@@ -398,7 +398,7 @@ func (h *P2PProtocolHandler) processTool(request ToolRequest) interface{} {
 
 		// Process through MCP bridge
 		response := h.mcpBridge.ProcessMCPRequest(mcpRequest)
-		
+
 		// Check for errors
 		if response.Error != nil {
 			return map[string]interface{}{
@@ -441,11 +441,11 @@ func (h *P2PProtocolHandler) SetAgentCard(card interface{}) {
 func (h *P2PProtocolHandler) getOurCard() AgentCard {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	
+
 	if h.ourCard != nil {
 		return *h.ourCard
 	}
-	
+
 	// Default card if not set
 	return AgentCard{
 		Name:    "praxis-agent",

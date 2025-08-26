@@ -18,19 +18,19 @@ import (
 )
 
 const (
-	MCPProtocolID = protocol.ID("/mcp/1.0.0")
+	MCPProtocolID  = protocol.ID("/mcp/1.0.0")
 	CardProtocolID = protocol.ID("/ai-agent/card/1.0.0")
 )
 
 type P2PMCPBridge struct {
-	host            host.Host
-	mcpServer       *mcp.MCPServerWrapper
-	transportMgr    *mcp.TransportManager
-	peerClients     map[peer.ID]*mcp.MCPClientWrapper
-	logger          *logrus.Logger
-	ctx             context.Context
-	cancel          context.CancelFunc
-	mu              sync.RWMutex
+	host         host.Host
+	mcpServer    *mcp.MCPServerWrapper
+	transportMgr *mcp.TransportManager
+	peerClients  map[peer.ID]*mcp.MCPClientWrapper
+	logger       *logrus.Logger
+	ctx          context.Context
+	cancel       context.CancelFunc
+	mu           sync.RWMutex
 }
 
 func NewP2PMCPBridge(host host.Host, mcpServer *mcp.MCPServerWrapper, logger *logrus.Logger) *P2PMCPBridge {
@@ -77,7 +77,7 @@ func (b *P2PMCPBridge) handleMCPStream(stream network.Stream) {
 		}
 
 		response := b.ProcessMCPRequest(request)
-		
+
 		if err := encoder.Encode(response); err != nil {
 			b.logger.Errorf("Failed to encode MCP response: %v", err)
 			break
@@ -92,7 +92,7 @@ func (b *P2PMCPBridge) handleCardStream(stream network.Stream) {
 	b.logger.Infof("Handling card stream from peer: %s", peerID)
 
 	encoder := json.NewEncoder(stream)
-	
+
 	card := b.getAgentCard()
 	if err := encoder.Encode(card); err != nil {
 		b.logger.Errorf("Failed to send agent card: %v", err)
@@ -123,9 +123,9 @@ func (b *P2PMCPBridge) ProcessMCPRequest(request MCPRequest) MCPResponse {
 
 func (b *P2PMCPBridge) handleListTools(ctx context.Context) MCPResponse {
 	b.logger.Debug("Listing tools for remote peer")
-	
+
 	tools := []mcpTypes.Tool{}
-	
+
 	return MCPResponse{
 		ID: 0,
 		Result: map[string]interface{}{
@@ -169,8 +169,8 @@ func (b *P2PMCPBridge) handleCallTool(ctx context.Context, request MCPRequest) M
 	// Create MCP request for the tool
 	mcpReq := mcpTypes.CallToolRequest{
 		Params: struct {
-			Name      string      `json:"name"`
-			Arguments interface{} `json:"arguments,omitempty"`
+			Name      string         `json:"name"`
+			Arguments interface{}    `json:"arguments,omitempty"`
 			Meta      *mcpTypes.Meta `json:"_meta,omitempty"`
 		}{
 			Name:      toolName,
@@ -201,7 +201,7 @@ func (b *P2PMCPBridge) handleCallTool(ctx context.Context, request MCPRequest) M
 			}
 		}
 	}
-	
+
 	// Fallback if content extraction fails
 	if len(responseContent) == 0 {
 		responseContent = []interface{}{
@@ -213,7 +213,7 @@ func (b *P2PMCPBridge) handleCallTool(ctx context.Context, request MCPRequest) M
 	}
 
 	b.logger.Infof("Tool %s executed successfully via P2P", toolName)
-	
+
 	return MCPResponse{
 		ID: request.ID,
 		Result: map[string]interface{}{
@@ -225,7 +225,7 @@ func (b *P2PMCPBridge) handleCallTool(ctx context.Context, request MCPRequest) M
 
 func (b *P2PMCPBridge) handleListResources(ctx context.Context) MCPResponse {
 	b.logger.Debug("Listing resources for remote peer")
-	
+
 	resources := []mcpTypes.Resource{
 		{
 			URI:         "agent://card",
@@ -234,7 +234,7 @@ func (b *P2PMCPBridge) handleListResources(ctx context.Context) MCPResponse {
 			MIMEType:    "application/json",
 		},
 	}
-	
+
 	return MCPResponse{
 		ID: 0,
 		Result: map[string]interface{}{
@@ -255,7 +255,7 @@ func (b *P2PMCPBridge) handleReadResource(ctx context.Context, request MCPReques
 	if uri == "agent://card" {
 		card := b.getAgentCard()
 		cardJSON, _ := json.Marshal(card)
-		
+
 		return MCPResponse{
 			ID: request.ID,
 			Result: map[string]interface{}{
@@ -344,11 +344,11 @@ func (b *P2PMCPBridge) CallPeerTool(ctx context.Context, peerID peer.ID, toolNam
 func (b *P2PMCPBridge) ListPeers(ctx context.Context) ([]string, error) {
 	peers := b.host.Network().Peers()
 	peerList := make([]string, len(peers))
-	
+
 	for i, p := range peers {
 		peerList[i] = p.String()
 	}
-	
+
 	return peerList, nil
 }
 
@@ -378,7 +378,7 @@ func (b *P2PMCPBridge) GetAgentCard(peerID peer.ID) (interface{}, error) {
 	defer stream.Close()
 
 	decoder := json.NewDecoder(stream)
-	
+
 	var card interface{}
 	if err := decoder.Decode(&card); err != nil {
 		return nil, fmt.Errorf("failed to decode agent card: %w", err)
@@ -453,15 +453,15 @@ func (t *P2PStreamTransport) Close() error {
 }
 
 type MCPRequest struct {
-	ID      int                    `json:"id"`
-	Method  string                 `json:"method"`
-	Params  map[string]interface{} `json:"params,omitempty"`
+	ID     int                    `json:"id"`
+	Method string                 `json:"method"`
+	Params map[string]interface{} `json:"params,omitempty"`
 }
 
 type MCPResponse struct {
-	ID     int                    `json:"id"`
-	Result interface{}            `json:"result,omitempty"`
-	Error  *MCPError              `json:"error,omitempty"`
+	ID     int         `json:"id"`
+	Result interface{} `json:"result,omitempty"`
+	Error  *MCPError   `json:"error,omitempty"`
 }
 
 type MCPError struct {

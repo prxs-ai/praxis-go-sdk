@@ -28,7 +28,7 @@ func NewAnalyzer(logger *logrus.Logger) *Analyzer {
 	if logger == nil {
 		logger = logrus.New()
 	}
-	
+
 	return &Analyzer{
 		logger: logger,
 		cache:  llm.NewToolCache(1000, 5*time.Minute), // 1000 entries, 5 minute TTL
@@ -40,7 +40,7 @@ func NewAnalyzerWithAgent(logger *logrus.Logger, agent AgentInterface) *Analyzer
 	if logger == nil {
 		logger = logrus.New()
 	}
-	
+
 	return &Analyzer{
 		logger: logger,
 		agent:  agent,
@@ -76,7 +76,7 @@ func (a *Analyzer) AnalyzeDSL(ctx context.Context, dsl string) (interface{}, err
 
 func (a *Analyzer) tokenize(dsl string) []Token {
 	var tokens []Token
-	
+
 	lines := strings.Split(dsl, "\n")
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
@@ -103,19 +103,19 @@ func (a *Analyzer) parseQuotedFields(line string) []string {
 	var current strings.Builder
 	inQuotes := false
 	escaped := false
-	
+
 	for i, r := range line {
 		if escaped {
 			current.WriteRune(r)
 			escaped = false
 			continue
 		}
-		
+
 		if r == '\\' {
 			escaped = true
 			continue
 		}
-		
+
 		if r == '"' {
 			if inQuotes {
 				// End of quoted string
@@ -136,7 +136,7 @@ func (a *Analyzer) parseQuotedFields(line string) []string {
 			}
 			continue
 		}
-		
+
 		if !inQuotes && r == ' ' {
 			if current.Len() > 0 {
 				fields = append(fields, current.String())
@@ -150,12 +150,12 @@ func (a *Analyzer) parseQuotedFields(line string) []string {
 			current.WriteRune(r)
 		}
 	}
-	
+
 	// Add any remaining content
 	if current.Len() > 0 {
 		fields = append(fields, current.String())
 	}
-	
+
 	return fields
 }
 
@@ -168,12 +168,12 @@ func (a *Analyzer) parse(tokens []Token) (*AST, error) {
 		// Convert []string args to map[string]interface{} for traditional DSL
 		argsMap := make(map[string]interface{})
 		toolName := ""
-		
+
 		if token.Value == "CALL" && len(token.Args) > 0 {
 			toolName = token.Args[0]
 			// Debug logging
 			a.logger.Infof("🔍 Debug tokenization: toolName=%s, args=%v", toolName, token.Args)
-			
+
 			// Convert positional args to named args for known tools
 			switch toolName {
 			case "write_file":
@@ -381,7 +381,7 @@ func (a *Analyzer) executeCall(ctx context.Context, node ASTNode) (interface{}, 
 			// Don't cache error results
 			return errorResult, nil
 		}
-		
+
 		successResult := map[string]interface{}{
 			"type":   "call",
 			"tool":   toolName,
@@ -389,7 +389,7 @@ func (a *Analyzer) executeCall(ctx context.Context, node ASTNode) (interface{}, 
 			"status": "executed",
 			"result": result,
 		}
-		
+
 		// Cache successful result
 		a.cache.Set(cacheKey, successResult)
 		return successResult, nil
@@ -426,14 +426,14 @@ func (a *Analyzer) executeCall(ctx context.Context, node ASTNode) (interface{}, 
 	}
 
 	successResult := map[string]interface{}{
-		"type":       "call",
-		"tool":       toolName,
-		"args":       argsMap,
-		"status":     "executed",
-		"result":     result,
+		"type":        "call",
+		"tool":        toolName,
+		"args":        argsMap,
+		"status":      "executed",
+		"result":      result,
 		"executed_by": peerID,
 	}
-	
+
 	// Cache successful result
 	a.cache.Set(cacheKey, successResult)
 	return successResult, nil

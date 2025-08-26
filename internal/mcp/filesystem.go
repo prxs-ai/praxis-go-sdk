@@ -19,14 +19,14 @@ func NewFilesystemTools(logger *logrus.Logger, baseDir string) *FilesystemTools 
 	if logger == nil {
 		logger = logrus.New()
 	}
-	
+
 	if baseDir == "" {
 		baseDir = "/shared"
 	}
-	
+
 	// Ensure base directory exists
 	os.MkdirAll(baseDir, 0755)
-	
+
 	return &FilesystemTools{
 		logger:  logger,
 		baseDir: baseDir,
@@ -41,7 +41,7 @@ func (f *FilesystemTools) GetWriteFileTool() mcpTypes.Tool {
 			mcpTypes.Description("Name of the file to create/write"),
 		),
 		mcpTypes.WithString("content",
-			mcpTypes.Required(), 
+			mcpTypes.Required(),
 			mcpTypes.Description("Content to write to the file"),
 		),
 	)
@@ -73,7 +73,7 @@ func (f *FilesystemTools) WriteFileHandler(ctx context.Context, req mcpTypes.Cal
 	}
 
 	f.logger.Infof("Successfully wrote file: %s (%d bytes)", fullPath, len(content))
-	
+
 	return mcpTypes.NewToolResultText(fmt.Sprintf("Successfully wrote %d bytes to %s", len(content), filename)), nil
 }
 
@@ -108,7 +108,7 @@ func (f *FilesystemTools) ReadFileHandler(ctx context.Context, req mcpTypes.Call
 	}
 
 	f.logger.Infof("Successfully read file: %s (%d bytes)", fullPath, len(content))
-	
+
 	return mcpTypes.NewToolResultText(string(content)), nil
 }
 
@@ -144,7 +144,7 @@ func (f *FilesystemTools) ListFilesHandler(ctx context.Context, req mcpTypes.Cal
 	}
 
 	f.logger.Infof("Found %d files in %s", len(files), f.baseDir)
-	
+
 	return mcpTypes.NewToolResultText(result), nil
 }
 
@@ -184,6 +184,6 @@ func (f *FilesystemTools) DeleteFileHandler(ctx context.Context, req mcpTypes.Ca
 	}
 
 	f.logger.Infof("Successfully deleted file: %s", fullPath)
-	
+
 	return mcpTypes.NewToolResultText(fmt.Sprintf("Successfully deleted file: %s", filename)), nil
 }

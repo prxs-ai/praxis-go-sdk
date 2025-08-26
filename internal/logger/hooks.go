@@ -63,7 +63,15 @@ func (h *WebSocketLogHook) Fire(entry *logrus.Entry) error {
 
 	// Format message
 	message := entry.Message
-	
+
+	// Skip EventBus internal messages to prevent infinite loops - do this early
+	if strings.Contains(strings.ToLower(message), "event published") ||
+		strings.Contains(strings.ToLower(message), "handler subscribed") ||
+		strings.Contains(strings.ToLower(message), "eventbus") ||
+		strings.Contains(strings.ToLower(message), "event channel full") {
+		return nil
+	}
+
 	// Add field data to message if present
 	var fieldParts []string
 	for key, value := range entry.Data {

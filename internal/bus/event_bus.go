@@ -2,6 +2,7 @@ package bus
 
 import (
 	"sync"
+
 	"github.com/sirupsen/logrus"
 )
 
@@ -10,13 +11,13 @@ type EventType string
 const (
 	EventDSLProgress EventType = "dslProgress"
 	EventDSLResult   EventType = "dslResult"
-	
+
 	EventWorkflowStart    EventType = "workflowStart"
 	EventNodeStatusUpdate EventType = "nodeStatusUpdate"
 	EventWorkflowLog      EventType = "workflowLog"
 	EventWorkflowComplete EventType = "workflowComplete"
 	EventWorkflowError    EventType = "workflowError"
-	
+
 	EventChatMessage EventType = "chatMessage"
 )
 
@@ -42,16 +43,16 @@ func NewEventBus(logger *logrus.Logger) *EventBus {
 		eventChan: make(chan Event, 100),
 		stopChan:  make(chan struct{}),
 	}
-	
+
 	go eb.processEvents()
-	
+
 	return eb
 }
 
 func (eb *EventBus) Subscribe(eventType EventType, handler EventHandler) {
 	eb.mu.Lock()
 	defer eb.mu.Unlock()
-	
+
 	eb.handlers[eventType] = append(eb.handlers[eventType], handler)
 	eb.logger.Debugf("Handler subscribed to event type: %s", eventType)
 }
@@ -59,7 +60,7 @@ func (eb *EventBus) Subscribe(eventType EventType, handler EventHandler) {
 func (eb *EventBus) SubscribeAll(handler EventHandler) {
 	eb.mu.Lock()
 	defer eb.mu.Unlock()
-	
+
 	eventTypes := []EventType{
 		EventDSLProgress,
 		EventDSLResult,
@@ -70,11 +71,11 @@ func (eb *EventBus) SubscribeAll(handler EventHandler) {
 		EventWorkflowError,
 		EventChatMessage,
 	}
-	
+
 	for _, eventType := range eventTypes {
 		eb.handlers[eventType] = append(eb.handlers[eventType], handler)
 	}
-	
+
 	eb.logger.Debug("Handler subscribed to all event types")
 }
 
@@ -112,7 +113,7 @@ func (eb *EventBus) handleEvent(event Event) {
 	eb.mu.RLock()
 	handlers := eb.handlers[event.Type]
 	eb.mu.RUnlock()
-	
+
 	for _, handler := range handlers {
 		// Run each handler in a goroutine to prevent blocking
 		go func(h EventHandler) {
@@ -130,7 +131,6 @@ func (eb *EventBus) Stop() {
 	close(eb.stopChan)
 	close(eb.eventChan)
 }
-
 
 // PublishDSLProgress publishes a DSL progress event
 func (eb *EventBus) PublishDSLProgress(stage, message string, details map[string]interface{}) {

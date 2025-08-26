@@ -20,7 +20,7 @@ class Agent1Card {
 
 class Agent2Card {
   Name = "praxis-agent-2"
-  Version = "1.0.0"  
+  Version = "1.0.0"
   PeerID = "12D3KooW..."
   Capabilities = ["mcp", "dsl", "p2p", "filesystem"]
   Tools = ["write_file", "read_file", "list_files"]

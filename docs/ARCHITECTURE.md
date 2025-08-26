@@ -208,7 +208,7 @@ Cards are automatically exchanged when:
 
 ```bash
 # Discovery
-"Discovered peer" 
+"Discovered peer"
 "P2P connection established"
 "mDNS discovery started"
 

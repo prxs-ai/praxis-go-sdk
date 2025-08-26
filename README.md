@@ -65,7 +65,7 @@ Create a `.env` file or set these environment variables:
 ### Optional
 - `OPENAI_API_KEY` - OpenAI API key for LLM features (enables natural language workflows)
 - `HTTP_PORT` - HTTP API port (default: 8000/8001)
-- `P2P_PORT` - P2P communication port (default: 4000/4001) 
+- `P2P_PORT` - P2P communication port (default: 4000/4001)
 - `WEBSOCKET_PORT` - WebSocket port for frontend (default: 9100/9102)
 - `LOG_LEVEL` - Logging level: debug, info, warn, error (default: info)
 - `MCP_ENABLED` - Enable MCP server (default: true)
@@ -102,7 +102,7 @@ CALL read_file filename.txt
 CALL list_files
 CALL delete_file filename.txt
 
-# P2P operations  
+# P2P operations
 CALL list_peers
 CALL send_message peer_id "message"
 ```
@@ -110,7 +110,7 @@ CALL send_message peer_id "message"
 ### Natural Language (Requires OpenAI API Key)
 ```bash
 "create a file called data.txt with some JSON content"
-"list all files in the shared directory" 
+"list all files in the shared directory"
 "read the contents of config.txt"
 ```
 
@@ -122,7 +122,7 @@ CALL send_message peer_id "message"
 - `GET /peers` - List connected P2P peers
 - `GET /p2p/cards` - Get peer agent capabilities
 
-### Agent-2 (Filesystem) - Port 8001  
+### Agent-2 (Filesystem) - Port 8001
 - `GET /health` - Health check
 - `GET /peers` - List connected P2P peers
 - MCP tools available via P2P protocol

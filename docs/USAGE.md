@@ -111,18 +111,18 @@ func (t *CustomTool) Handler(ctx context.Context, req mcpTypes.CallToolRequest) 
     args := req.GetArguments()
     input, _ := args["input"].(string)
     verbose, _ := args["verbose"].(bool)
-  
+
     if input == "" {
         return mcpTypes.NewToolResultError("input is required"), nil
     }
-  
+
     // Implement your tool logic here
     result := fmt.Sprintf("Processed: %s", input)
-  
+
     if verbose {
         t.logger.Infof("Custom tool executed: %s", result)
     }
-  
+
     return mcpTypes.NewToolResultText(result), nil
 }
 ```
@@ -134,16 +134,16 @@ Update `internal/agent/agent.go` in the `initializeMCP()` method:
 ```go
 func (a *PraxisAgent) initializeMCP() error {
     // ... existing code ...
-  
+
     // Add custom tool
     customTool := mcp.NewCustomTool(a.logger)
     a.mcpServer.AddTool(
         customTool.GetTool(),
         customTool.Handler,
     )
-  
+
     a.logger.Info("Registered custom tool")
-  
+
     // ... rest of the code ...
 }
 ```
@@ -231,7 +231,7 @@ AGENT_VERSION=1.0.0
 
 # Network ports (from docker-compose.yml)
 HTTP_PORT=8000                # Main HTTP API port
-P2P_PORT=4001                 # P2P communication port  
+P2P_PORT=4001                 # P2P communication port
 SSE_PORT=8090                 # Server-Sent Events port
 WEBSOCKET_PORT=9000           # WebSocket Gateway port
 
@@ -443,7 +443,7 @@ Look for these key log messages:
 
 # Errors to investigate
 "Failed to connect to peer"
-"Tool handler not found" 
+"Tool handler not found"
 "DSL parsing failed"
 "P2P stream error"
 ```

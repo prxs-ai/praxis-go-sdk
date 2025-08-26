@@ -46,7 +46,7 @@ const (
 	MessageDSLCommand      MessageType = "DSL_COMMAND"
 	MessageExecuteWorkflow MessageType = "EXECUTE_WORKFLOW"
 	MessageChatMessage     MessageType = "CHAT_MESSAGE"
-	
+
 	// Server -> Client messages (handled by EventBus)
 )
 
@@ -130,10 +130,10 @@ func (gw *WebSocketGateway) Run() error {
 
 	// Setup HTTP server
 	http.HandleFunc("/ws/workflow", gw.handleWebSocket)
-	
+
 	addr := fmt.Sprintf(":%d", gw.port)
 	gw.logger.Infof("WebSocket Gateway starting on %s", addr)
-	
+
 	return http.ListenAndServe(addr, nil)
 }
 
@@ -300,7 +300,7 @@ func (gw *WebSocketGateway) handleDSLCommand(client *Client, payload map[string]
 	ctx := context.Background()
 	var result interface{}
 	var err error
-	
+
 	if gw.orchestratorAnalyzer != nil {
 		// Use orchestrator analyzer for complex workflows and agent selection
 		gw.logger.Info("Using OrchestratorAnalyzer for DSL command")
@@ -314,7 +314,7 @@ func (gw *WebSocketGateway) handleDSLCommand(client *Client, payload map[string]
 		})
 		result, err = gw.dslAnalyzer.AnalyzeDSL(ctx, command)
 	}
-	
+
 	if err != nil {
 		gw.eventBus.Publish(bus.Event{
 			Type: bus.EventDSLResult,
@@ -334,9 +334,9 @@ func (gw *WebSocketGateway) handleDSLCommand(client *Client, payload map[string]
 	gw.eventBus.Publish(bus.Event{
 		Type: bus.EventDSLResult,
 		Payload: map[string]interface{}{
-			"success":           true,
-			"command":           command,
-			"result":            result,
+			"success":            true,
+			"command":            command,
+			"result":             result,
 			"workflowSuggestion": workflowSuggestion,
 		},
 	})
@@ -383,7 +383,7 @@ func (gw *WebSocketGateway) handleExecuteWorkflow(client *Client, payload map[st
 // handleChatMessage processes chat messages
 func (gw *WebSocketGateway) handleChatMessage(client *Client, payload map[string]interface{}) {
 	content, _ := payload["content"].(string)
-	
+
 	// Echo back as assistant message
 	gw.eventBus.Publish(bus.Event{
 		Type: bus.EventChatMessage,
@@ -399,7 +399,7 @@ func (gw *WebSocketGateway) handleEvent(event bus.Event) {
 	// Serialize access to prevent message batching
 	gw.broadcastMu.Lock()
 	defer gw.broadcastMu.Unlock()
-	
+
 	// Convert event to WebSocket message format
 	wsMessage := map[string]interface{}{
 		"type":    string(event.Type),
@@ -414,7 +414,7 @@ func (gw *WebSocketGateway) handleEvent(event bus.Event) {
 
 	// Broadcast to all connected clients
 	gw.hub.broadcast <- messageBytes
-	
+
 	// Add small delay to ensure message is processed before next one
 	time.Sleep(20 * time.Millisecond)
 }
@@ -436,7 +436,7 @@ func (gw *WebSocketGateway) sendError(client *Client, message string) {
 func (gw *WebSocketGateway) createWorkflowFromDSL(result interface{}) map[string]interface{} {
 	// This is a simplified implementation
 	// In reality, this would parse the DSL result and create appropriate nodes/edges
-	
+
 	nodes := []map[string]interface{}{
 		{
 			"id":   "orchestrator",
@@ -487,15 +487,15 @@ func (gw *WebSocketGateway) simulateWorkflowExecution(workflowID string, nodes [
 			if !ok {
 				continue
 			}
-			
+
 			nodeID, _ := nodeMap["id"].(string)
-			
+
 			// Update status to running
 			gw.eventBus.PublishNodeStatusUpdate(workflowID, nodeID, "running")
-			
+
 			// Simulate processing
 			time.Sleep(2 * time.Second)
-			
+
 			// Send log
 			gw.eventBus.PublishWorkflowLog(
 				workflowID,
@@ -504,13 +504,13 @@ func (gw *WebSocketGateway) simulateWorkflowExecution(workflowID string, nodes [
 				"simulator",
 				nodeID,
 			)
-			
+
 			// Update status to success
 			gw.eventBus.PublishNodeStatusUpdate(workflowID, nodeID, "success")
-			
+
 			time.Sleep(1 * time.Second)
 		}
-		
+
 		// Complete workflow
 		gw.eventBus.PublishWorkflowComplete(workflowID, map[string]interface{}{
 			"message": "Workflow completed successfully",

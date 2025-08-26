@@ -232,16 +232,16 @@ func NewStreamableHTTPClientPool(baseURL string, maxSize int, logger *logrus.Log
 				logger.Errorf("Failed to create client for pool: %v", err)
 				return nil
 			}
-			
+
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
-			
+
 			if err := client.Initialize(ctx); err != nil {
 				logger.Errorf("Failed to initialize client for pool: %v", err)
 				client.Close()
 				return nil
 			}
-			
+
 			return client
 		},
 	}

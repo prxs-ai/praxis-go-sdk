@@ -19,15 +19,15 @@ const (
 )
 
 type Discovery struct {
-	host           host.Host
-	mdnsService    mdns.Service
-	foundPeers     map[peer.ID]*PeerInfo
-	peerHandlers   []PeerHandler
+	host            host.Host
+	mdnsService     mdns.Service
+	foundPeers      map[peer.ID]*PeerInfo
+	peerHandlers    []PeerHandler
 	protocolHandler *P2PProtocolHandler // Reference for automatic card exchange
-	logger         *logrus.Logger
-	ctx            context.Context
-	cancel         context.CancelFunc
-	mu             sync.RWMutex
+	logger          *logrus.Logger
+	ctx             context.Context
+	cancel          context.CancelFunc
+	mu              sync.RWMutex
 }
 
 type PeerInfo struct {
@@ -185,7 +185,7 @@ func (d *Discovery) connectToPeer(pi peer.AddrInfo) {
 		peerInfo.IsConnected = true
 	}
 	d.mu.Unlock()
-	
+
 	// Automatically exchange cards with the new peer
 	if d.protocolHandler != nil {
 		go func() {

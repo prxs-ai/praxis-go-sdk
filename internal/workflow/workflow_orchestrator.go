@@ -48,12 +48,12 @@ type WorkflowGraph struct {
 
 // WorkflowOrchestrator manages workflow execution
 type WorkflowOrchestrator struct {
-	eventBus    *bus.EventBus
-	dslAnalyzer *dsl.Analyzer
+	eventBus       *bus.EventBus
+	dslAnalyzer    *dsl.Analyzer
 	agentInterface AgentInterface
-	logger      *logrus.Logger
-	mu          sync.RWMutex
-	workflows   map[string]*WorkflowExecution
+	logger         *logrus.Logger
+	mu             sync.RWMutex
+	workflows      map[string]*WorkflowExecution
 }
 
 // WorkflowExecution represents an active workflow execution
@@ -93,7 +93,7 @@ func (wo *WorkflowOrchestrator) SetAgentInterface(agent AgentInterface) {
 // ExecuteWorkflow executes a workflow from nodes and edges
 func (wo *WorkflowOrchestrator) ExecuteWorkflow(ctx context.Context, workflowID string, nodes []interface{}, edges []interface{}) error {
 	wo.logger.Infof("Starting workflow execution: %s", workflowID)
-	
+
 	// Build workflow graph
 	graph, err := wo.buildGraph(nodes, edges)
 	if err != nil {
@@ -258,11 +258,11 @@ func (wo *WorkflowOrchestrator) findEntryNodes(graph *WorkflowGraph) []string {
 			entryNodes = append(entryNodes, nodeID)
 		}
 	}
-	
+
 	// Debug logging
 	wo.logger.Infof("🔍 Workflow analysis: %d nodes, %d edges", len(graph.Nodes), len(graph.Edges))
 	wo.logger.Infof("🎯 Found %d entry nodes: %v", len(entryNodes), entryNodes)
-	
+
 	// If no entry nodes found and we have nodes, make first agent node an entry point
 	if len(entryNodes) == 0 && len(graph.Nodes) > 0 {
 		for nodeID, node := range graph.Nodes {
@@ -272,7 +272,7 @@ func (wo *WorkflowOrchestrator) findEntryNodes(graph *WorkflowGraph) []string {
 				break
 			}
 		}
-		
+
 		// If still no entry nodes, just take the first node
 		if len(entryNodes) == 0 {
 			for nodeID := range graph.Nodes {
@@ -370,10 +370,10 @@ func (wo *WorkflowOrchestrator) executeNode(ctx context.Context, execution *Work
 // executeOrchestratorNode executes an orchestrator node
 func (wo *WorkflowOrchestrator) executeOrchestratorNode(ctx context.Context, node *Node) (interface{}, error) {
 	wo.logger.Debugf("Executing orchestrator node: %s", node.ID)
-	
+
 	// Simulate orchestrator work
 	time.Sleep(1 * time.Second)
-	
+
 	return map[string]interface{}{
 		"status": "orchestrated",
 		"nodeId": node.ID,
@@ -383,11 +383,11 @@ func (wo *WorkflowOrchestrator) executeOrchestratorNode(ctx context.Context, nod
 // executeExecutorNode executes an executor node
 func (wo *WorkflowOrchestrator) executeExecutorNode(ctx context.Context, node *Node) (interface{}, error) {
 	wo.logger.Debugf("Executing executor node: %s", node.ID)
-	
+
 	// Extract tool information from node data
 	toolName, _ := node.Data["tool"].(string)
 	args, _ := node.Data["args"].(map[string]interface{})
-	
+
 	if toolName == "" {
 		// Simulate executor work if no tool specified
 		time.Sleep(1 * time.Second)
@@ -396,20 +396,20 @@ func (wo *WorkflowOrchestrator) executeExecutorNode(ctx context.Context, node *N
 			"nodeId": node.ID,
 		}, nil
 	}
-	
+
 	// Execute tool through agent interface if available
 	if wo.agentInterface != nil {
 		if wo.agentInterface.HasLocalTool(toolName) {
 			return wo.agentInterface.ExecuteLocalTool(ctx, toolName, args)
 		}
-		
+
 		// Find and execute on remote agent
 		peerID, err := wo.agentInterface.FindAgentWithTool(toolName)
 		if err == nil {
 			return wo.agentInterface.ExecuteRemoteTool(ctx, peerID, toolName, args)
 		}
 	}
-	
+
 	// Fallback to simulation
 	time.Sleep(2 * time.Second)
 	return map[string]interface{}{
@@ -422,23 +422,23 @@ func (wo *WorkflowOrchestrator) executeExecutorNode(ctx context.Context, node *N
 // executeToolNode executes a tool node
 func (wo *WorkflowOrchestrator) executeToolNode(ctx context.Context, node *Node) (interface{}, error) {
 	wo.logger.Debugf("Executing tool node: %s", node.ID)
-	
+
 	toolName, _ := node.Data["name"].(string)
 	args, _ := node.Data["args"].(map[string]interface{})
-	
+
 	if wo.agentInterface != nil && toolName != "" {
 		// Try local execution first
 		if wo.agentInterface.HasLocalTool(toolName) {
 			return wo.agentInterface.ExecuteLocalTool(ctx, toolName, args)
 		}
-		
+
 		// Try remote execution
 		peerID, err := wo.agentInterface.FindAgentWithTool(toolName)
 		if err == nil {
 			return wo.agentInterface.ExecuteRemoteTool(ctx, peerID, toolName, args)
 		}
 	}
-	
+
 	// Simulate tool execution
 	time.Sleep(1500 * time.Millisecond)
 	return map[string]interface{}{
@@ -451,13 +451,13 @@ func (wo *WorkflowOrchestrator) executeToolNode(ctx context.Context, node *Node)
 // executeAgentNode executes an agent node
 func (wo *WorkflowOrchestrator) executeAgentNode(ctx context.Context, node *Node) (interface{}, error) {
 	wo.logger.Debugf("Executing agent node: %s", node.ID)
-	
+
 	agentName, _ := node.Data["agent"].(string)
 	action, _ := node.Data["action"].(string)
-	
+
 	// Simulate agent execution
 	time.Sleep(1 * time.Second)
-	
+
 	return map[string]interface{}{
 		"status": "agent_executed",
 		"agent":  agentName,
@@ -469,10 +469,10 @@ func (wo *WorkflowOrchestrator) executeAgentNode(ctx context.Context, node *Node
 // executeGenericNode executes a generic node
 func (wo *WorkflowOrchestrator) executeGenericNode(ctx context.Context, node *Node) (interface{}, error) {
 	wo.logger.Debugf("Executing generic node: %s", node.ID)
-	
+
 	// Simulate generic node execution
 	time.Sleep(1 * time.Second)
-	
+
 	return map[string]interface{}{
 		"status": "executed",
 		"nodeId": node.ID,

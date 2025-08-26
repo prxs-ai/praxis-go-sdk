@@ -23,14 +23,14 @@ type MCPServerWrapper struct {
 }
 
 type ServerConfig struct {
-	Name        string
-	Version     string
-	Transport   TransportType
-	Port        string
-	Logger      *logrus.Logger
-	EnableTools bool
+	Name            string
+	Version         string
+	Transport       TransportType
+	Port            string
+	Logger          *logrus.Logger
+	EnableTools     bool
 	EnableResources bool
-	EnablePrompts bool
+	EnablePrompts   bool
 }
 
 type TransportType string
@@ -76,7 +76,7 @@ func NewMCPServer(config ServerConfig) (*MCPServerWrapper, error) {
 
 func (w *MCPServerWrapper) AddTool(tool mcpTypes.Tool, handler server.ToolHandlerFunc) {
 	w.server.AddTool(tool, handler)
-	w.toolHandlers[tool.Name] = handler     // Store the handler for later access
+	w.toolHandlers[tool.Name] = handler                 // Store the handler for later access
 	w.registeredTools = append(w.registeredTools, tool) // Store the tool specification
 	w.logger.Debugf("Added tool: %s", tool.Name)
 }
@@ -111,7 +111,7 @@ func (w *MCPServerWrapper) StartSSE(port string) error {
 	w.sseServer = server.NewSSEServer(w.server)
 
 	w.logger.Infof("Starting SSE server on port %s", port)
-	
+
 	go func() {
 		if err := w.sseServer.Start(port); err != nil && err != http.ErrServerClosed {
 			w.logger.Errorf("SSE server error: %v", err)
@@ -125,7 +125,7 @@ func (w *MCPServerWrapper) StartHTTP(port string) error {
 	w.httpServer = server.NewStreamableHTTPServer(w.server)
 
 	w.logger.Infof("Starting HTTP server on port %s", port)
-	
+
 	go func() {
 		if err := w.httpServer.Start(port); err != nil && err != http.ErrServerClosed {
 			w.logger.Errorf("HTTP server error: %v", err)
@@ -142,7 +142,7 @@ func (w *MCPServerWrapper) StartSTDIO() error {
 
 func (w *MCPServerWrapper) Shutdown(ctx context.Context) error {
 	w.logger.Info("Shutting down MCP server")
-	
+
 	if w.sseServer != nil {
 		if err := w.sseServer.Shutdown(ctx); err != nil {
 			w.logger.Errorf("Failed to shutdown SSE server: %v", err)
@@ -177,7 +177,7 @@ func NewDSLTool(analyzer DSLAnalyzer, logger *logrus.Logger) *DSLTool {
 func (t *DSLTool) GetTool() mcpTypes.Tool {
 	return mcpTypes.NewTool("analyze_dsl",
 		mcpTypes.WithDescription("Analyze DSL query and generate execution plan"),
-		mcpTypes.WithString("query", 
+		mcpTypes.WithString("query",
 			mcpTypes.Required(),
 			mcpTypes.Description("DSL query to analyze"),
 		),

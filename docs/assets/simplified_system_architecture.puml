@@ -7,7 +7,7 @@ package "Agent 1" {
   [Agent Core] as Core1
   [P2P Handler] as P2P1
   [LLM Client] as LLM1
-  
+
   API1 --> DSL1
   DSL1 --> Core1
   DSL1 --> LLM1
@@ -20,7 +20,7 @@ package "Agent 2" {
   [P2P Handler] as P2P2
   [MCP Server] as Bridge2
   [Filesystem Tools] as FS2
-  
+
   P2P2 --> Core2
   Core2 --> Bridge2
   Bridge2 --> FS2

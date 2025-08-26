@@ -68,7 +68,7 @@ type Config struct {
 
 func NewPraxisAgent(config Config) (*PraxisAgent, error) {
 	logger := logrus.New()
-	
+
 	level, err := logrus.ParseLevel(config.LogLevel)
 	if err != nil {
 		level = logrus.InfoLevel
@@ -173,7 +173,7 @@ func (a *PraxisAgent) initializeP2P() error {
 		return fmt.Errorf("failed to create discovery: %w", err)
 	}
 	a.discovery = discovery
-	
+
 	// Connect discovery and protocol handler for automatic card exchange
 	discovery.SetProtocolHandler(a.p2pProtocol)
 
@@ -205,14 +205,14 @@ func (a *PraxisAgent) initializeMCP() error {
 	a.mcpServer = mcpServer
 
 	a.p2pBridge = p2p.NewP2PMCPBridge(a.host, a.mcpServer, a.logger)
-	
+
 	// Connect the MCP bridge to the P2P protocol handler for tool execution
 	if a.p2pProtocol != nil {
 		a.p2pProtocol.SetMCPBridge(a.p2pBridge)
 	}
 
 	a.registerMCPHandlers()
-	
+
 	// Update P2P card with full tool specifications after all tools are registered
 	a.updateP2PCardWithTools()
 
@@ -248,21 +248,21 @@ func (a *PraxisAgent) registerMCPHandlers() {
 		a.mcpServer.AddTool(filesystemTools.GetListFilesTool(), filesystemTools.ListFilesHandler)
 		a.mcpServer.AddTool(filesystemTools.GetDeleteFileTool(), filesystemTools.DeleteFileHandler)
 		a.logger.Info("Registered filesystem tools (write_file, read_file, list_files, delete_file)")
-		
+
 		// Update agent card to include filesystem capabilities
 		a.card.Skills = append(a.card.Skills, AgentSkill{
-			ID:          "filesystem-operations", 
+			ID:          "filesystem-operations",
 			Name:        "Filesystem Operations",
 			Description: "Create, read, and manage files in shared storage",
 			Tags:        []string{"filesystem", "file_operations", "storage"},
 		})
-		
+
 		// Update will be done after all tools are registered
 	}
 
 	executeTool := mcpTypes.NewTool("execute_workflow",
 		mcpTypes.WithDescription("Execute a workflow defined in DSL"),
-		mcpTypes.WithString("dsl", 
+		mcpTypes.WithString("dsl",
 			mcpTypes.Required(),
 			mcpTypes.Description("DSL definition of the workflow"),
 		),
@@ -293,7 +293,7 @@ func (a *PraxisAgent) updateP2PCardWithTools() {
 
 	// Get all registered tools from MCP server
 	registeredTools := a.mcpServer.GetRegisteredTools()
-	
+
 	// Convert MCP tools to P2P ToolSpecs
 	var toolSpecs []p2p.ToolSpec
 	for _, tool := range registeredTools {
@@ -302,14 +302,14 @@ func (a *PraxisAgent) updateP2PCardWithTools() {
 			Description: tool.Description,
 			Parameters:  []p2p.ToolParameter{}, // Will be filled if we can extract them
 		}
-		
+
 		// For now, we'll use simplified parameter extraction
 		// since the MCP tool structure might vary
 		// This can be enhanced later when we have a clearer schema structure
-		
+
 		toolSpecs = append(toolSpecs, spec)
 	}
-	
+
 	// Create updated P2P card with full tool specifications
 	p2pCard := &p2p.AgentCard{
 		Name:         a.card.Name,
@@ -319,12 +319,12 @@ func (a *PraxisAgent) updateP2PCardWithTools() {
 		Tools:        toolSpecs,
 		Timestamp:    time.Now().Unix(),
 	}
-	
+
 	// Add filesystem capabilities for agent-2
 	if a.name == "praxis-agent-2" {
 		p2pCard.Capabilities = append(p2pCard.Capabilities, "filesystem", "file_operations")
 	}
-	
+
 	a.p2pProtocol.SetAgentCard(p2pCard)
 	a.logger.Infof("Updated P2P card with %d tool specifications", len(toolSpecs))
 }
@@ -340,7 +340,7 @@ func (a *PraxisAgent) initializeHTTP() {
 	a.httpServer.POST("/execute", a.handleExecuteDSL)
 	a.httpServer.GET("/p2p/cards", a.handleGetP2PCards)
 	a.httpServer.POST("/p2p/tool", a.handleInvokeP2PTool)
-	
+
 	// Diagnostic endpoints
 	a.httpServer.GET("/p2p/info", a.handleGetP2PInfo)
 	a.httpServer.GET("/mcp/tools", a.handleGetMCPTools)
@@ -354,12 +354,11 @@ func (a *PraxisAgent) initializeDSL() {
 	// Create analyzer with agent integration for real execution
 	a.dslAnalyzer = dsl.NewAnalyzerWithAgent(a.logger, a)
 	a.logger.Info("DSL analyzer initialized with agent integration")
-	
+
 	// Create orchestrator analyzer for complex workflows
 	a.orchestratorAnalyzer = dsl.NewOrchestratorAnalyzer(a.logger, a, a.eventBus)
 	a.logger.Info("Orchestrator analyzer initialized with event bus integration")
 }
-
 
 func (a *PraxisAgent) initializeAgentCard() {
 	a.card = &AgentCard{
@@ -394,26 +393,26 @@ func (a *PraxisAgent) initializeAgentCard() {
 			},
 		},
 	}
-	
+
 	// Update P2P protocol handler with our card
 	if a.p2pProtocol != nil {
 		// Convert to P2P card format
 		p2pCard := &p2p.AgentCard{
-			Name:    a.card.Name,
-			Version: a.card.Version,
-			PeerID:  a.host.ID().String(),
+			Name:         a.card.Name,
+			Version:      a.card.Version,
+			PeerID:       a.host.ID().String(),
 			Capabilities: []string{"mcp", "dsl", "workflow", "p2p"},
-			Tools: []p2p.ToolSpec{}, // Will be populated based on registered MCP tools
-			Timestamp: time.Now().Unix(),
+			Tools:        []p2p.ToolSpec{}, // Will be populated based on registered MCP tools
+			Timestamp:    time.Now().Unix(),
 		}
-		
+
 		// Add capabilities from skills
 		for _, skill := range a.card.Skills {
 			for _, tag := range skill.Tags {
 				p2pCard.Capabilities = append(p2pCard.Capabilities, tag)
 			}
 		}
-		
+
 		a.p2pProtocol.SetAgentCard(p2pCard)
 	}
 }
@@ -439,7 +438,7 @@ func (a *PraxisAgent) Start() error {
 		a.logger.Infof("WebSocket gateway started on port %d", a.websocketPort)
 	}
 
-	a.logger.Infof("Agent %s started on HTTP port %d, P2P port %d, SSE port %d", 
+	a.logger.Infof("Agent %s started on HTTP port %d, P2P port %d, SSE port %d",
 		a.name, a.httpPort, a.p2pPort, a.ssePort)
 
 	return nil
@@ -477,8 +476,8 @@ func (a *PraxisAgent) Stop() error {
 
 func (a *PraxisAgent) handleHealth(c *gin.Context) {
 	c.JSON(200, gin.H{
-		"status": "healthy",
-		"agent":  a.name,
+		"status":  "healthy",
+		"agent":   a.name,
 		"version": a.version,
 	})
 }
@@ -490,17 +489,17 @@ func (a *PraxisAgent) handleGetCard(c *gin.Context) {
 func (a *PraxisAgent) handleListPeers(c *gin.Context) {
 	// Get peers from discovery
 	discoveredPeers := a.discovery.GetConnectedPeers()
-	
+
 	peers := make([]gin.H, 0, len(discoveredPeers))
 	for _, peerInfo := range discoveredPeers {
 		peers = append(peers, gin.H{
-			"id":          peerInfo.ID.String(),
-			"connected":   peerInfo.IsConnected,
-			"foundAt":     peerInfo.FoundAt,
-			"lastSeen":    peerInfo.LastSeen,
+			"id":        peerInfo.ID.String(),
+			"connected": peerInfo.IsConnected,
+			"foundAt":   peerInfo.FoundAt,
+			"lastSeen":  peerInfo.LastSeen,
 		})
 	}
-	
+
 	c.JSON(200, gin.H{"peers": peers})
 }
 
@@ -654,8 +653,8 @@ func (a *PraxisAgent) ExecuteLocalTool(ctx context.Context, toolName string, arg
 	// Create MCP request
 	req := mcpTypes.CallToolRequest{
 		Params: struct {
-			Name      string      `json:"name"`
-			Arguments interface{} `json:"arguments,omitempty"`
+			Name      string         `json:"name"`
+			Arguments interface{}    `json:"arguments,omitempty"`
 			Meta      *mcpTypes.Meta `json:"_meta,omitempty"`
 		}{
 			Name:      toolName,
@@ -737,14 +736,14 @@ func (a *PraxisAgent) GetPeerCards() map[string]*p2p.AgentCard {
 	if a.p2pProtocol == nil {
 		return make(map[string]*p2p.AgentCard)
 	}
-	
+
 	peerCards := a.p2pProtocol.GetPeerCards()
 	result := make(map[string]*p2p.AgentCard)
-	
+
 	for peerID, card := range peerCards {
 		result[peerID.String()] = card
 	}
-	
+
 	return result
 }
 
@@ -754,7 +753,7 @@ func (a *PraxisAgent) GetAgentNameByPeerID(peerIDStr string) string {
 	if card, exists := peerCards[peerIDStr]; exists {
 		return card.Name
 	}
-	
+
 	// Try short peer ID
 	shortID := peerIDStr
 	if len(peerIDStr) > 8 {
@@ -765,7 +764,7 @@ func (a *PraxisAgent) GetAgentNameByPeerID(peerIDStr string) string {
 			return card.Name
 		}
 	}
-	
+
 	return fmt.Sprintf("Agent %s", shortID)
 }
 
@@ -775,12 +774,12 @@ func (a *PraxisAgent) handleGetP2PInfo(c *gin.Context) {
 		c.JSON(503, gin.H{"error": "P2P host not initialized"})
 		return
 	}
-	
+
 	addrs := []string{}
 	for _, addr := range a.host.Addrs() {
 		addrs = append(addrs, addr.String())
 	}
-	
+
 	c.JSON(200, gin.H{
 		"peer_id":   a.host.ID().String(),
 		"addresses": addrs,
@@ -795,9 +794,9 @@ func (a *PraxisAgent) handleGetMCPTools(c *gin.Context) {
 		c.JSON(503, gin.H{"error": "MCP server not initialized"})
 		return
 	}
-	
+
 	tools := a.mcpServer.GetRegisteredTools()
-	
+
 	c.JSON(200, gin.H{
 		"tools": tools,
 		"count": len(tools),
@@ -808,7 +807,7 @@ func (a *PraxisAgent) handleGetMCPTools(c *gin.Context) {
 // handleGetCacheStats returns cache statistics
 func (a *PraxisAgent) handleGetCacheStats(c *gin.Context) {
 	stats := a.dslAnalyzer.GetCacheStats()
-	
+
 	c.JSON(200, gin.H{
 		"cache": stats,
 		"agent": a.name,
@@ -818,7 +817,7 @@ func (a *PraxisAgent) handleGetCacheStats(c *gin.Context) {
 // handleClearCache clears the tool execution cache
 func (a *PraxisAgent) handleClearCache(c *gin.Context) {
 	a.dslAnalyzer.ClearCache()
-	
+
 	c.JSON(200, gin.H{
 		"status": "cache cleared",
 		"agent":  a.name,

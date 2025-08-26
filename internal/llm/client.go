@@ -15,16 +15,16 @@ import (
 
 // NetworkContext represents the current state of P2P network capabilities
 type NetworkContext struct {
-	Agents map[string]*AgentCapability `json:"agents"`
-	Tools  map[string][]string         `json:"tools"`  // tool_name -> peer_ids
-	Timestamp time.Time                `json:"timestamp"`
+	Agents    map[string]*AgentCapability `json:"agents"`
+	Tools     map[string][]string         `json:"tools"` // tool_name -> peer_ids
+	Timestamp time.Time                   `json:"timestamp"`
 }
 
 // AgentCapability represents what an agent can do with full tool specifications
 type AgentCapability struct {
 	PeerID       string         `json:"peer_id"`
 	Name         string         `json:"name"`
-	Tools        []p2p.ToolSpec `json:"tools"`       // Changed from []string to []p2p.ToolSpec
+	Tools        []p2p.ToolSpec `json:"tools"` // Changed from []string to []p2p.ToolSpec
 	Capabilities []string       `json:"capabilities"`
 	LastSeen     time.Time      `json:"last_seen"`
 }
@@ -76,19 +76,19 @@ type LLMClient struct {
 // NewLLMClient creates a new LLM client with fallback safety
 func NewLLMClient(logger *logrus.Logger) *LLMClient {
 	apiKey := os.Getenv("OPENAI_API_KEY")
-	
+
 	client := &LLMClient{
 		logger:  logger,
 		enabled: apiKey != "",
 	}
-	
+
 	if apiKey != "" {
 		client.openaiClient = openai.NewClient(apiKey)
 		logger.Info("LLM client initialized with OpenAI")
 	} else {
 		logger.Warn("OPENAI_API_KEY not found - LLM features disabled, falling back to traditional DSL")
 	}
-	
+
 	return client
 }
 
@@ -102,12 +102,12 @@ func (c *LLMClient) GenerateWorkflowFromNaturalLanguage(ctx context.Context, use
 	if !c.enabled {
 		return nil, fmt.Errorf("LLM client not enabled - missing OPENAI_API_KEY")
 	}
-	
+
 	c.logger.Infof("Generating workflow from natural language: %s", userRequest)
-	
+
 	// Build intelligent system prompt with network context
 	systemPrompt := c.buildSystemPrompt(networkContext)
-	
+
 	// Create the request
 	resp, err := c.openaiClient.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
 		Model: openai.GPT4o,
@@ -128,30 +128,30 @@ func (c *LLMClient) GenerateWorkflowFromNaturalLanguage(ctx context.Context, use
 		Temperature: 0.1, // Low temperature for consistent results
 		TopP:        0.9,
 	})
-	
+
 	if err != nil {
 		return nil, fmt.Errorf("OpenAI API call failed: %w", err)
 	}
-	
+
 	if len(resp.Choices) == 0 {
 		return nil, fmt.Errorf("no response from OpenAI")
 	}
-	
+
 	// Parse the JSON response
 	var plan WorkflowPlan
 	content := resp.Choices[0].Message.Content
 	if err := json.Unmarshal([]byte(content), &plan); err != nil {
 		return nil, fmt.Errorf("failed to parse workflow plan: %w, content: %s", err, content)
 	}
-	
+
 	// Generate unique ID and add metadata
 	plan.ID = fmt.Sprintf("workflow_%d", time.Now().UnixNano())
 	if plan.Metadata.Complexity == "" {
 		plan.Metadata.Complexity = c.assessComplexity(&plan)
 	}
-	
+
 	c.logger.Infof("Generated workflow plan %s with %d nodes and %d edges", plan.ID, len(plan.Nodes), len(plan.Edges))
-	
+
 	return &plan, nil
 }
 
@@ -161,7 +161,7 @@ func (c *LLMClient) buildSystemPrompt(ctx *NetworkContext) string {
 	var toolsDocumentation strings.Builder
 	toolsDocumentation.WriteString("### AVAILABLE TOOLS (API)\n")
 	toolsDocumentation.WriteString("=====================================\n")
-	
+
 	// Build detailed tool specifications from agents
 	for _, agent := range ctx.Agents {
 		if len(agent.Tools) > 0 {
@@ -176,14 +176,14 @@ func (c *LLMClient) buildSystemPrompt(ctx *NetworkContext) string {
 						if param.Required {
 							req = "(REQUIRED)"
 						}
-						toolsDocumentation.WriteString(fmt.Sprintf("    - `%s` (%s) %s: %s\n", 
+						toolsDocumentation.WriteString(fmt.Sprintf("    - `%s` (%s) %s: %s\n",
 							param.Name, param.Type, req, param.Description))
 					}
 				}
 			}
 		}
 	}
-	
+
 	return fmt.Sprintf(`You are the brain and main orchestrator of a distributed P2P network of agents.
 
 ### YOUR MISSION:
@@ -239,12 +239,12 @@ You must understand ANY requests and find suitable tools:
 func (c *LLMClient) assessComplexity(plan *WorkflowPlan) string {
 	nodeCount := len(plan.Nodes)
 	edgeCount := len(plan.Edges)
-	
+
 	// Simple heuristics for complexity assessment
 	if nodeCount <= 2 && edgeCount <= 1 {
 		return "simple"
 	} else if nodeCount <= 5 && edgeCount <= 4 {
-		return "medium"  
+		return "medium"
 	}
 	return "complex"
 }
@@ -259,7 +259,7 @@ func (c *LLMClient) ValidateWorkflowPlan(plan *WorkflowPlan, ctx *NetworkContext
 				if !exists {
 					return fmt.Errorf("node %s references non-existent agent %s", node.ID, node.AgentID)
 				}
-				
+
 				hasTools := false
 				for _, toolSpec := range agent.Tools {
 					if toolSpec.Name == node.ToolName {
@@ -273,20 +273,20 @@ func (c *LLMClient) ValidateWorkflowPlan(plan *WorkflowPlan, ctx *NetworkContext
 			}
 		}
 	}
-	
+
 	return nil
 }
 
 // ConvertPlanToDSLCommands converts workflow plan to executable DSL commands
 func (c *LLMClient) ConvertPlanToDSLCommands(plan *WorkflowPlan) []string {
 	commands := make([]string, 0, len(plan.Nodes))
-	
+
 	for _, node := range plan.Nodes {
 		switch node.Type {
 		case "tool":
 			if node.ToolName != "" {
 				cmd := fmt.Sprintf("CALL %s", node.ToolName)
-				
+
 				// Add arguments in correct order for common tools
 				switch node.ToolName {
 				case "write_file":
@@ -307,7 +307,7 @@ func (c *LLMClient) ConvertPlanToDSLCommands(plan *WorkflowPlan) []string {
 						cmd += fmt.Sprintf(" %s", value)
 					}
 				}
-				
+
 				commands = append(commands, cmd)
 			}
 		case "orchestrator":
@@ -315,6 +315,6 @@ func (c *LLMClient) ConvertPlanToDSLCommands(plan *WorkflowPlan) []string {
 			continue
 		}
 	}
-	
+
 	return commands
 }

@@ -14,10 +14,10 @@ import (
 type ClientType string
 
 const (
-	ClientTypeSTDIO         ClientType = "stdio"
+	ClientTypeSTDIO          ClientType = "stdio"
 	ClientTypeStreamableHTTP ClientType = "streamablehttp"
-	ClientTypeSSE           ClientType = "sse"
-	ClientTypeInProcess     ClientType = "inprocess"
+	ClientTypeSSE            ClientType = "sse"
+	ClientTypeInProcess      ClientType = "inprocess"
 )
 
 type MCPClientWrapper struct {
@@ -99,8 +99,8 @@ func (w *MCPClientWrapper) Initialize(ctx context.Context) error {
 	}
 
 	w.initialized = true
-	w.logger.Infof("MCP client initialized. Server: %s v%s", 
-		w.serverInfo.ServerInfo.Name, 
+	w.logger.Infof("MCP client initialized. Server: %s v%s",
+		w.serverInfo.ServerInfo.Name,
 		w.serverInfo.ServerInfo.Version)
 
 	return nil
@@ -130,7 +130,7 @@ func (w *MCPClientWrapper) CallTool(ctx context.Context, name string, args map[s
 	request.Params.Arguments = args
 
 	w.logger.Debugf("Calling tool %s with args: %v", name, args)
-	
+
 	result, err := w.client.CallTool(ctx, request)
 	if err != nil {
 		return nil, fmt.Errorf("tool call failed: %w", err)
@@ -195,11 +195,11 @@ func (w *MCPClientWrapper) Close() error {
 	defer w.mu.Unlock()
 
 	w.cancel()
-	
+
 	if w.client != nil {
 		return w.client.Close()
 	}
-	
+
 	return nil
 }
 
