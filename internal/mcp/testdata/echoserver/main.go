@@ -1,20 +1,31 @@
 package main
 
 import (
-	mcp "github.com/metoro-io/mcp-golang"
-	"github.com/metoro-io/mcp-golang/transport/stdio"
+	"context"
+
+	mcp "github.com/mark3labs/mcp-go/mcp"
+	"github.com/mark3labs/mcp-go/server"
 )
 
-type EchoArgs struct {
-	Text string `json:"text"`
-}
-
 func main() {
-	server := mcp.NewServer(stdio.NewStdioServerTransport())
-	_ = server.RegisterTool("echo", "echo text back", func(args EchoArgs) (*mcp.ToolResponse, error) {
-		return mcp.NewToolResponse(mcp.NewTextContent(args.Text)), nil
+	srv := server.NewMCPServer("echo", "1.0.0")
+	tool := mcp.Tool{
+		Name:        "echo",
+		Description: "echo text back",
+		InputSchema: mcp.ToolInputSchema{
+			Type: "object",
+			Properties: map[string]any{
+				"text": map[string]any{"type": "string"},
+			},
+			Required: []string{"text"},
+		},
+	}
+	srv.AddTool(tool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{mcp.NewTextContent(req.GetString("text", ""))},
+		}, nil
 	})
-	if err := server.Serve(); err != nil {
+	if err := server.ServeStdio(srv); err != nil {
 		panic(err)
 	}
 	select {}

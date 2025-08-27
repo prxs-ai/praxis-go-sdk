@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	mcp "github.com/metoro-io/mcp-golang"
+	mcp "github.com/mark3labs/mcp-go/mcp"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 
@@ -81,14 +81,18 @@ func TestMCPBridge_StartAndInvokeEchoTool(t *testing.T) {
 		t.Fatalf("InvokeTool: %v", err)
 	}
 
-	resp, ok := result.(*mcp.ToolResponse)
+	resp, ok := result.(*mcp.CallToolResult)
 	if !ok {
 		t.Fatalf("unexpected result type %T", result)
 	}
-	if len(resp.Content) != 1 || resp.Content[0].TextContent == nil {
+	if len(resp.Content) != 1 {
 		t.Fatalf("unexpected content %#v", resp.Content)
 	}
-	if resp.Content[0].TextContent.Text != "hello" {
-		t.Fatalf("unexpected response text: %s", resp.Content[0].TextContent.Text)
+	text, ok := resp.Content[0].(mcp.TextContent)
+	if !ok {
+		t.Fatalf("unexpected content type %T", resp.Content[0])
+	}
+	if text.Text != "hello" {
+		t.Fatalf("unexpected response text: %s", text.Text)
 	}
 }

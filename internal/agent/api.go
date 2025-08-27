@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	mcp "github.com/metoro-io/mcp-golang"
-	mcphttp "github.com/metoro-io/mcp-golang/transport/http"
+	mcpclient "github.com/mark3labs/mcp-go/client"
+	mcp "github.com/mark3labs/mcp-go/mcp"
 	"github.com/sirupsen/logrus"
 
 	"praxis-go-sdk/internal/config"
@@ -390,17 +390,24 @@ func (s *APIServer) findAgent(c *gin.Context) {
 		return
 	}
 
-	transport := mcphttp.NewHTTPClientTransport("/llm/mcp/")
-	transport.WithBaseURL("http://ai-registry.prxs.ai:8000")
-
-	client := mcp.NewClient(transport)
+	client, err := mcpclient.NewStreamableHttpClient(s.agent.GetRegistryConfig().Url)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	ctx := context.Background()
-	if _, err := client.Initialize(ctx); err != nil {
+	if err := client.Start(ctx); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	initReq := mcp.InitializeRequest{Params: mcp.InitializeParams{ProtocolVersion: mcp.LATEST_PROTOCOL_VERSION}}
+	if _, err := client.Initialize(ctx, initReq); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	resp, err := client.CallTool(ctx, "find_agent", map[string]interface{}{"goal": input.Goal})
+	req := mcp.CallToolRequest{Params: mcp.CallToolParams{Name: "find_agent", Arguments: map[string]any{"goal": input.Goal}}}
+	resp, err := client.CallTool(ctx, req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

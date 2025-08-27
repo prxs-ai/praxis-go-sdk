@@ -8,6 +8,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"praxis-go-sdk/internal/config"
 	"praxis-go-sdk/internal/llm"
 	"praxis-go-sdk/internal/mcp"
 	"praxis-go-sdk/internal/p2p"
@@ -164,6 +165,10 @@ func (a *P2PAgent) GetCard() *agentcard.ExtendedAgentCard {
 	return a.config.Card
 }
 
+func (a *P2PAgent) GetRegistryConfig() *config.RegistryConfig {
+	return &(a.config.AppConfig).Registry
+}
+
 // GetP2PHost returns the P2P host
 func (a *P2PAgent) GetP2PHost() p2p.Host {
 	return a.host
@@ -244,14 +249,14 @@ func (a *P2PAgent) updateMCPCapabilities() {
 	for i, cap := range capabilities {
 		tools := make([]agentcard.MCPTool, len(cap.Tools))
 		for j, tool := range cap.Tools {
-			var desc string
-			if tool.Description != nil {
-				desc = *tool.Description
+			inputSchema := map[string]interface{}{
+				"type":       tool.InputSchema.Type,
+				"properties": tool.InputSchema.Properties,
+				"required":   tool.InputSchema.Required,
 			}
-			inputSchema, _ := tool.InputSchema.(map[string]interface{})
 			tools[j] = agentcard.MCPTool{
 				Name:         tool.Name,
-				Description:  desc,
+				Description:  tool.Description,
 				InputSchema:  inputSchema,
 				OutputSchema: nil,
 			}
@@ -259,18 +264,12 @@ func (a *P2PAgent) updateMCPCapabilities() {
 
 		resources := make([]agentcard.MCPResource, len(cap.Resources))
 		for j, res := range cap.Resources {
-			var desc, mime string
-			if res.Description != nil {
-				desc = *res.Description
-			}
-			if res.MimeType != nil {
-				mime = *res.MimeType
-			}
 			resources[j] = agentcard.MCPResource{
-				URI:         res.Uri,
+				URI: res.URI,
+
 				Name:        res.Name,
-				Description: desc,
-				MimeType:    mime,
+				Description: res.Description,
+				MimeType:    res.MIMEType,
 			}
 		}
 

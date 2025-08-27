@@ -21,6 +21,9 @@ type Agent interface {
 	// GetCard returns the agent card
 	GetCard() *agentcard.ExtendedAgentCard
 
+	// GetRegistryConfig returns the registry configuration
+	GetRegistryConfig() *config.RegistryConfig
+
 	// GetP2PHost returns the P2P host
 	GetP2PHost() p2p.Host
 
