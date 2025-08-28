@@ -98,6 +98,7 @@ func (h *P2PHost) Start() error {
 	h.logger.Infof("Listening on addresses: %v", host.Addrs())
 
 	// Register protocol handlers
+	// Need to tracing here
 	h.host.SetStreamHandler(CardProtocol, h.handleCardRequest)
 	h.logger.Info("Registered stream handler for card protocol")
 
@@ -174,6 +175,7 @@ func (h *P2PHost) GetAddresses() []string {
 
 // ConnectToPeer connects to a peer by name using discovery
 func (h *P2PHost) ConnectToPeer(peerName string) error {
+	// Need to tracing here
 	if h.host == nil {
 		return fmt.Errorf("P2P host not initialized")
 	}
@@ -218,10 +220,12 @@ func (h *P2PHost) ConnectToPeerDirect(peerName string, peerID peer.ID) error {
 	defer cancel()
 
 	// Test connection with a stream
+	// Need to tracing here
 	stream, err := h.host.NewStream(ctx, peerID, CardProtocol)
 	if err != nil {
 		return fmt.Errorf("failed to establish direct connection to %s: %w", peerID, err)
 	}
+	// Need to tracing here
 	stream.Close()
 
 	// Store connection
@@ -255,16 +259,19 @@ func (h *P2PHost) ConnectToPeerWithAddr(peerName string, peerID peer.ID, addr st
 	ctx, cancel := context.WithTimeout(h.ctx, 15*time.Second)
 	defer cancel()
 
+	// Need to tracing here
 	err = h.host.Connect(ctx, peer.AddrInfo{ID: peerID, Addrs: []multiaddr.Multiaddr{maddr}})
 	if err != nil {
 		return fmt.Errorf("failed to connect to peer %s at %s: %w", peerID, addr, err)
 	}
 
 	// Test connection with a stream
+	// Need to tracing here
 	stream, err := h.host.NewStream(ctx, peerID, CardProtocol)
 	if err != nil {
 		return fmt.Errorf("failed to establish stream to %s: %w", peerID, err)
 	}
+	// Need to tracing here
 	stream.Close()
 
 	// Store connection
@@ -318,11 +325,13 @@ func (h *P2PHost) RequestData(peerName string, protocolID protocol.ID) ([]byte, 
 	ctx, cancel := context.WithTimeout(h.ctx, 30*time.Second)
 	defer cancel()
 
+	// Need to tracing here
 	stream, err := h.host.NewStream(ctx, peerID, protocolID)
 	if err != nil {
 		h.logger.Errorf("Failed to open stream: %v", err)
 		return nil, fmt.Errorf("failed to open stream: %w", err)
 	}
+	// Need to tracing here
 	defer stream.Close()
 
 	// Read response
@@ -338,6 +347,7 @@ func (h *P2PHost) RequestData(peerName string, protocolID protocol.ID) ([]byte, 
 
 // handleCardRequest handles requests for the agent card
 func (h *P2PHost) handleCardRequest(stream network.Stream) {
+	// Need to tracing here
 	defer stream.Close()
 
 	peerID := stream.Conn().RemotePeer()

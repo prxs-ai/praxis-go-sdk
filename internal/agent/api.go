@@ -187,6 +187,7 @@ func (s *APIServer) getP2PStatus(c *gin.Context) {
 
 // connectToPeer connects to a peer
 func (s *APIServer) connectToPeer(c *gin.Context) {
+	// Need to tracing here
 	peerName := c.Param("peer_name")
 
 	if err := s.agent.ConnectToPeer(peerName); err != nil {
@@ -203,6 +204,7 @@ func (s *APIServer) connectToPeer(c *gin.Context) {
 
 // requestPeerCard requests a card from a peer
 func (s *APIServer) requestPeerCard(c *gin.Context) {
+	// Need to tracing here
 	peerName := c.Param("peer_name")
 
 	card, err := s.agent.RequestCard(peerName)
@@ -287,6 +289,7 @@ func (s *APIServer) invokeTool(c *gin.Context) {
 
 // processLLMRequest processes an LLM request
 func (s *APIServer) processLLMRequest(c *gin.Context) {
+	// Need to tracing here
 	client := s.agent.GetLLMClient()
 	if client == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "LLM client not available"})

@@ -100,6 +100,7 @@ func (d *PeerDiscovery) GetPeerCount() int {
 
 // ConnectToPeerByName attempts to connect to a peer by name
 func (d *PeerDiscovery) ConnectToPeerByName(peerName string) error {
+	// Need to tracing here
 	d.logger.Infof("Looking for peer: %s", peerName)
 
 	// Check if we already know this peer
@@ -355,6 +356,7 @@ func (d *PeerDiscovery) HandlePeerFound(pi peer.AddrInfo) {
 	ctx, cancel := context.WithTimeout(d.ctx, 10*time.Second)
 	defer cancel()
 
+	// Need to tracing here
 	if err := d.host.Connect(ctx, pi); err != nil {
 		d.logger.Warnf("Failed to connect to discovered peer %s: %v", pi.ID, err)
 		return

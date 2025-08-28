@@ -44,6 +44,7 @@ func NewAgent(cfg *Config, logger *logrus.Logger) (Agent, error) {
 
 // Start initializes and starts the agent
 func (a *P2PAgent) Start() error {
+	// Need to tracing here
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
@@ -120,6 +121,7 @@ func (a *P2PAgent) Start() error {
 
 // Shutdown stops the agent and cleans up resources
 func (a *P2PAgent) Shutdown() error {
+	// Need to tracing here
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
@@ -185,6 +187,7 @@ func (a *P2PAgent) ConnectToPeer(peerName string) error {
 		return fmt.Errorf("P2P host not initialized")
 	}
 
+	// Need to tracing here
 	return a.host.ConnectToPeer(peerName)
 }
 
@@ -200,6 +203,7 @@ func (a *P2PAgent) RequestCard(peerName string) (*agentcard.ExtendedAgentCard, e
 		return nil, fmt.Errorf("failed to get peer ID: %w", err)
 	}
 
+	// Need to tracing here
 	// Request card data
 	cardData, err := a.host.RequestData(peerName, p2p.CardProtocol)
 	if err != nil {
@@ -228,6 +232,7 @@ func (a *P2PAgent) ProcessLLMRequest(ctx context.Context, req *llm.Request) (*ll
 		return nil, fmt.Errorf("LLM client not initialized")
 	}
 
+	// Need to tracing here
 	return a.llmClient.ProcessRequest(ctx, req)
 }
 
