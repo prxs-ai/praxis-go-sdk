@@ -12,6 +12,8 @@ type AppConfig struct {
 	MCP     MCPBridgeConfig `yaml:"mcp" json:"mcp"`
 	LLM     LLMConfig       `yaml:"llm" json:"llm"`
 	Logging LogConfig       `yaml:"logging" json:"logging"`
+
+	Registry RegistryConfig `yaml:"registry" json:"registry"`
 }
 
 // AgentConfig contains basic agent information
@@ -114,6 +116,10 @@ type LogConfig struct {
 	File   string `yaml:"file" json:"file"`
 }
 
+type RegistryConfig struct {
+	Url string `yaml:"url" json:"url"`
+}
+
 // DefaultConfig returns the default configuration
 func DefaultConfig() *AppConfig {
 	return &AppConfig{
@@ -174,6 +180,9 @@ func DefaultConfig() *AppConfig {
 		Logging: LogConfig{
 			Level:  "info",
 			Format: "text",
+		},
+		Registry: RegistryConfig{
+			Url: "http://localhost:8080",
 		},
 	}
 }

@@ -7,8 +7,9 @@ import (
 	"os/exec"
 	"time"
 
-	mcp "github.com/metoro-io/mcp-golang"
-	"github.com/metoro-io/mcp-golang/transport/stdio"
+	mcpclient "github.com/mark3labs/mcp-go/client"
+	transport "github.com/mark3labs/mcp-go/client/transport"
+	mcp "github.com/mark3labs/mcp-go/mcp"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 
@@ -23,7 +24,7 @@ func NewMCPBridge(_ interface{}, configPath string, logger *logrus.Logger) (Brid
 	}
 	b := &mcpBridge{
 		cfg:       cfg,
-		clients:   make(map[string]*mcp.Client),
+		clients:   make(map[string]*mcpclient.Client),
 		processes: make(map[string]*exec.Cmd),
 		logger:    logger,
 	}
@@ -75,9 +76,15 @@ func (b *mcpBridge) Start() error {
 			return fmt.Errorf("failed to start server %s: %w", srv.Name, err)
 		}
 
-		transport := stdio.NewStdioServerTransportWithIO(stdout, stdin)
-		client := mcp.NewClient(transport)
-		if _, err := client.Initialize(context.Background()); err != nil {
+		transport := transport.NewIO(stdout, stdin, nil)
+		if err := transport.Start(context.Background()); err != nil {
+			_ = cmd.Process.Kill()
+			return fmt.Errorf("failed to start transport for %s: %w", srv.Name, err)
+		}
+
+		client := mcpclient.NewClient(transport)
+		initReq := mcp.InitializeRequest{Params: mcp.InitializeParams{ProtocolVersion: mcp.LATEST_PROTOCOL_VERSION}}
+		if _, err := client.Initialize(context.Background(), initReq); err != nil {
 			_ = cmd.Process.Kill()
 			return fmt.Errorf("failed to initialize server %s: %w", srv.Name, err)
 		}
@@ -102,7 +109,7 @@ func (b *mcpBridge) Shutdown() error {
 		}
 	}
 
-	b.clients = make(map[string]*mcp.Client)
+	b.clients = make(map[string]*mcpclient.Client)
 	b.processes = make(map[string]*exec.Cmd)
 	b.capabilities = nil
 	return nil
@@ -131,7 +138,7 @@ func (b *mcpBridge) GetCapabilities() []MCPCapability {
 func (b *mcpBridge) ListAllTools() map[string][]MCPTool {
 	res := make(map[string][]MCPTool)
 	for name, client := range b.clients {
-		toolsResp, err := client.ListTools(context.Background(), nil)
+		toolsResp, err := client.ListTools(context.Background(), mcp.ListToolsRequest{})
 
 		if err != nil {
 			b.logger.Warnf("failed to list tools for %s: %v", name, err)
@@ -148,18 +155,18 @@ func (b *mcpBridge) ListAllTools() map[string][]MCPTool {
 func (b *mcpBridge) ListAllResources() map[string][]MCPResource {
 	res := make(map[string][]MCPResource)
 	for name, client := range b.clients {
-		resResp, err := client.ListResources(context.Background(), nil)
+		resResp, err := client.ListResources(context.Background(), mcp.ListResourcesRequest{})
 
 		if err != nil {
 			b.logger.Warnf("failed to list resources for %s: %v", name, err)
 			continue
 		}
 		resources := make([]MCPResource, 0, len(resResp.Resources))
-		for _, r := range resResp.Resources {
-			if r != nil {
-				resources = append(resources, *r)
-			}
-		}
+		// for _, r := range resResp.Resources {
+		// 	if r != nil {
+		// 		resources = append(resources, *r)
+		// 	}
+		// }
 		res[name] = resources
 	}
 
@@ -173,23 +180,18 @@ func (b *mcpBridge) updateCapabilities() {
 
 	var caps []MCPCapability
 	for name, client := range b.clients {
-		toolsResp, err := client.ListTools(context.Background(), nil)
+		toolsResp, err := client.ListTools(context.Background(), mcp.ListToolsRequest{})
 		if err != nil {
 			b.logger.Warnf("failed to list tools for %s: %v", name, err)
 			continue
 		}
 
-		resResp, err := client.ListResources(context.Background(), nil)
+		resResp, err := client.ListResources(context.Background(), mcp.ListResourcesRequest{})
 		var resources []MCPResource
 		if err != nil {
 			b.logger.Warnf("failed to list resources for %s: %v", name, err)
 		} else {
-			resources = make([]MCPResource, 0, len(resResp.Resources))
-			for _, r := range resResp.Resources {
-				if r != nil {
-					resources = append(resources, *r)
-				}
-			}
+			resources = resResp.Resources
 		}
 		caps = append(caps, MCPCapability{
 			ServerName: name,
@@ -228,7 +230,13 @@ func (c *mcpClient) InvokeTool(ctx interface{}, _ interface{}, serverName, toolN
 		realCtx = context.Background()
 	}
 
-	resp, err := client.CallTool(realCtx, toolName, params)
+	req := mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name:      toolName,
+			Arguments: params,
+		},
+	}
+	resp, err := client.CallTool(realCtx, req)
 	if err != nil {
 		return nil, err
 	}

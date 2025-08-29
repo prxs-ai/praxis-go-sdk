@@ -175,4 +175,8 @@ func applyEnvironmentOverrides(config *AppConfig) {
 	if level := os.Getenv("LOG_LEVEL"); level != "" {
 		config.Logging.Level = level
 	}
+
+	if registryUrl := os.Getenv("REGISTRY_URL"); registryUrl != "" {
+		config.Registry.Url = registryUrl
+	}
 }

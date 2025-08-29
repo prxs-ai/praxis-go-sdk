@@ -73,3 +73,6 @@ llm:
 logging:
   level: "info"
   format: "json"
+
+registry:
+  url: "http://localhost:8080/llm/mcp"
