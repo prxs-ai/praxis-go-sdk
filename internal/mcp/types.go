@@ -5,17 +5,18 @@ import (
 	"sync"
 	"time"
 
-	mcp "github.com/metoro-io/mcp-golang"
+	mcpclient "github.com/mark3labs/mcp-go/client"
+	mcp "github.com/mark3labs/mcp-go/mcp"
 	"github.com/sirupsen/logrus"
 
 	"praxis-go-sdk/internal/config"
 )
 
 // MCPTool describes a tool provided by an MCP server
-type MCPTool = mcp.ToolRetType
+type MCPTool = mcp.Tool
 
 // MCPResource describes a resource provided by an MCP server
-type MCPResource = mcp.ResourceSchema
+type MCPResource = mcp.Resource
 
 // MCPCapability contains information about a server's tools and resources
 type MCPCapability struct {
@@ -48,7 +49,7 @@ type Client interface {
 
 type mcpBridge struct {
 	cfg          *config.MCPBridgeConfig
-	clients      map[string]*mcp.Client
+	clients      map[string]*mcpclient.Client
 	processes    map[string]*exec.Cmd
 	capabilities []MCPCapability
 	logger       *logrus.Logger
