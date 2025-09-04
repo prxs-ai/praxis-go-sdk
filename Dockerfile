@@ -18,7 +18,7 @@ ARG CACHEBUST=1
 COPY . .
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o praxis-agent ./cmd/agent/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o praxis-agent ./agent/main.go
 
 # Runtime stage
 FROM busybox:1.35
