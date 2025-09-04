@@ -7,7 +7,7 @@ echo "=================================================="
 
 echo "📦 Step 1: Building Linux binaries..."
 echo "Building main application..."
-GOOS=linux GOARCH=amd64 go build -o go-agent cmd/agent/main.go
+GOOS=linux GOARCH=amd64 go build -o go-agent agent/main.go
 
 echo "Building MCP server..."
 GOOS=linux GOARCH=amd64 go build -o examples/mcp-server ./examples/mcp-server.go
@@ -15,7 +15,7 @@ GOOS=linux GOARCH=amd64 go build -o examples/mcp-server ./examples/mcp-server.go
 echo "✅ Binaries built successfully"
 
 echo "🐳 Step 2: Building Docker images..."
-docker build -f Dockerfile.fast -t go-agent:latest .
+docker build -f Dockerfile -t go-agent:latest .
 echo "✅ Docker images built successfully"
 
 echo "🚀 Step 3: Docker Compose options available:"
