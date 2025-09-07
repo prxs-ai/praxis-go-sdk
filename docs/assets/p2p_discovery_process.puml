@@ -1,0 +1,24 @@
+@startuml
+!theme plain
+
+participant "Agent 1" as A1
+participant "mDNS" as MDNS
+participant "Network" as Net
+participant "Agent 2" as A2
+
+A1 -> MDNS: Start Discovery Service
+A2 -> MDNS: Start Discovery Service
+MDNS -> Net: Broadcast Service\n"praxis-p2p-mcp"
+A2 -> Net: Listen for Peers
+Net -> A2: Peer Found (Agent 1)
+A2 -> A1: Connect
+A1 <-> A2: Exchange A2A Cards
+A1 -> A1: Store Peer Info
+A2 -> A2: Store Peer Info
+
+loop Every 10 seconds
+  A1 -> A1: Check Peer Status
+  A2 -> A2: Check Peer Status
+end
+
+@enduml

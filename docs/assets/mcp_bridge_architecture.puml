@@ -1,0 +1,38 @@
+@startuml
+title MCP Bridge Tool Processing
+
+rectangle "P2P Layer" {
+  [P2P Stream Handler] as Stream
+  [Protocol Handler] as Proto
+}
+
+rectangle "MCP Server" {
+  [Request Router] as Router
+  [Tool Resolver] as Resolver
+  [Response Builder] as Builder
+  [Tool Registry] as Registry
+  [Tool Handlers] as Handlers
+}
+
+rectangle "Tools" {
+  [write_file] as Tool1
+  [read_file] as Tool2
+  [list_files] as Tool3
+  [delete_file] as Tool4
+}
+
+Stream --> Proto : P2P Message
+Proto --> Router : MCP Request
+Router --> Resolver : Find Tool
+Resolver --> Registry : Lookup
+Registry --> Handlers : Get Handler
+Handlers --> Tool1 : Execute
+Tool1 --> Builder : Result
+Builder --> Proto : MCP Response
+Proto --> Stream : P2P Response
+
+note right of Registry : Tools registered at startup
+
+note bottom of Tool4 : Standard MCP filesystem tools
+
+@enduml

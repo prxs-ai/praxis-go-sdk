@@ -1,0 +1,27 @@
+@startuml
+!theme plain
+
+start
+:Receive DSL String;
+:Tokenize Input;
+note right: Split by spaces,\npreserve quotes
+:Parse Tokens;
+:Build AST;
+note right: Abstract Syntax Tree
+if (Command Type?) then (CALL)
+  :Extract Tool Name;
+  :Parse Arguments;
+  :Check Local Tools;
+  if (Tool Available Locally?) then (yes)
+    :Execute Local Tool;
+  else (no)
+    :Find Peer with Tool;
+    :Execute Remote Tool;
+  endif
+else (Other)
+  :Handle Other Commands;
+endif
+:Return Result;
+stop
+
+@enduml

@@ -8,7 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 
-	"praxis-go-sdk/pkg/utils"
+	"github.com/praxis/praxis-go-sdk/pkg/utils"
 )
 
 // LoadConfig loads configuration from a YAML file
@@ -20,6 +20,8 @@ func LoadConfig(path string, logger *logrus.Logger) (*AppConfig, error) {
 	// Check if the config file exists
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		logger.Warnf("Configuration file %s not found, using defaults", path)
+		// Still apply environment overrides even with defaults
+		applyEnvironmentOverrides(config)
 		return config, nil
 	}
 
@@ -174,9 +176,5 @@ func applyEnvironmentOverrides(config *AppConfig) {
 	// Logging overrides
 	if level := os.Getenv("LOG_LEVEL"); level != "" {
 		config.Logging.Level = level
-	}
-
-	if registryUrl := os.Getenv("REGISTRY_URL"); registryUrl != "" {
-		config.Registry.Url = registryUrl
 	}
 }

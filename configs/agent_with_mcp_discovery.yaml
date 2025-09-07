@@ -1,0 +1,79 @@
+agent:
+  name: "praxis-agent-autodiscovery"
+  version: "1.0.0"
+  description: "Praxis P2P Agent with automatic MCP tool discovery"
+  url: "http://localhost:8000"
+  shared_dir: "./shared"
+  # External MCP servers for automatic tool discovery
+  external_mcp_endpoints:
+    - "http://localhost:3000/mcp"  # Example MCP server with filesystem tools
+    - "http://localhost:3001/mcp"  # Another MCP server with different tools
+  tools:
+    # Local tools still defined here
+    - name: "python_analyzer"
+      description: "Analyzes data using an external Python script"
+      engine: "dagger"
+      params:
+        - name: "input_file"
+          type: "string"
+          required: "true"
+      engineSpec:
+        image: "python:3.11-slim"
+        command: ["python", "/shared/analyzer.py"]
+        mounts:
+          ./shared: /shared
+
+p2p:
+  enabled: true
+  port: 4001
+  secure: true
+  rendezvous: "praxis-agents"
+  enable_mdns: true
+  enable_dht: true
+  bootstrap_nodes: []
+
+http:
+  enabled: true
+  port: 8000
+  host: "0.0.0.0"
+
+mcp:
+  enabled: true
+  # No hardcoded servers - they will be discovered from external_mcp_endpoints
+  servers: []
+  limits:
+    max_concurrent_requests: 100
+    request_timeout_ms: 30000
+    max_response_size_bytes: 10485760
+    max_servers_per_node: 10
+    connection_pool_size: 5
+    retry_attempts: 3
+    retry_backoff_ms: 1000
+  log_level: "info"
+
+llm:
+  enabled: true
+  provider: "openai"
+  api_key: "${OPENAI_API_KEY}"
+  model: "gpt-4o-mini"
+  max_tokens: 4096
+  temperature: 0.1
+  timeout: "30s"
+  # LLM will handle ALL messages as DSL commands
+  always_use_llm_for_dsl: true
+  function_calling:
+    strict_mode: true
+    max_parallel_calls: 5
+    tool_timeout: "15s"
+  caching:
+    enabled: true
+    ttl: "300s"
+    max_size: 1000
+  rate_limiting:
+    requests_per_minute: 60
+    tokens_per_minute: 100000
+
+logging:
+  level: "info"
+  format: "text"
+  file: ""

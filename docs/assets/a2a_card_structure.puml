@@ -1,0 +1,32 @@
+@startuml
+!theme plain
+
+class AgentCard {
+  +Name: string
+  +Version: string
+  +PeerID: string
+  +Capabilities: []string
+  +Tools: []string
+  +Timestamp: int64
+}
+
+class Agent1Card {
+  Name = "praxis-agent-1"
+  Version = "1.0.0"
+  PeerID = "12D3KooW..."
+  Capabilities = ["mcp", "dsl", "p2p"]
+  Tools = ["analyze_dsl"]
+}
+
+class Agent2Card {
+  Name = "praxis-agent-2"
+  Version = "1.0.0"
+  PeerID = "12D3KooW..."
+  Capabilities = ["mcp", "dsl", "p2p", "filesystem"]
+  Tools = ["write_file", "read_file", "list_files"]
+}
+
+AgentCard <|-- Agent1Card
+AgentCard <|-- Agent2Card
+
+@enduml

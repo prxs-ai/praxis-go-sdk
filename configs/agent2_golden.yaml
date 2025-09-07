@@ -1,0 +1,57 @@
+agent:
+  name: "praxis-agent-2"
+  version: "1.0.0"
+  description: "Filesystem Agent with External MCP Tools"
+  url: "http://localhost:8001"
+  shared_dir: "./shared"
+  
+  # External MCP server for filesystem operations
+  external_mcp_endpoints:
+    - "http://localhost:8080"  # External filesystem MCP server
+  
+  # No local tools - Agent-2 only uses external MCP tools
+  tools: []
+
+p2p:
+  enabled: true
+  port: 4002
+  secure: false
+  rendezvous: "praxis-network"
+  enable_mdns: true
+  enable_dht: true
+  bootstrap_nodes: []
+
+http:
+  enabled: true
+  port: 8001
+  host: "0.0.0.0"
+
+mcp:
+  enabled: true
+  servers: []
+  limits:
+    max_concurrent_requests: 10
+    request_timeout_ms: 30000
+    max_response_size_bytes: 10485760
+    max_servers_per_node: 5
+    connection_pool_size: 10
+    retry_attempts: 3
+    retry_backoff_ms: 1000
+  log_level: "info"
+
+llm:
+  enabled: false  # Agent-2 doesn't need LLM
+  provider: "openai"
+  api_key: ""
+  model: ""
+  max_tokens: 2000
+  temperature: 0.7
+  request_timeout: 30
+  cache_enabled: false
+  cache_ttl: 600
+  tools_enabled: false
+
+logging:
+  level: "debug"
+  format: "text"
+  output: "stdout"

@@ -1,0 +1,49 @@
+@startuml
+title Praxis P2P Agent System - Complete Flow
+
+actor User
+box "Agent 1 (Port 8000)" #LightBlue
+participant "HTTP API" as API1
+participant "DSL Orchestrator" as DSL1
+participant "Agent Core" as Core1
+database "Tool Registry" as Reg1
+end box
+
+cloud "P2P Network (libp2p)" as P2P
+
+box "Agent 2 (Port 8001)" #LightYellow
+participant "Agent Core" as Core2
+participant "MCP Server" as Bridge2
+participant "Filesystem Tools" as FS2
+database "Shared Volume" as Volume
+end box
+
+== Initialization Phase ==
+Core1 -> P2P: Start Discovery
+Core2 -> P2P: Start Discovery
+P2P -> Core1: Found Peer Agent-2
+P2P -> Core2: Found Peer Agent-1
+Core1 <-> Core2: Exchange A2A Cards
+Core1 -> Reg1: Update Agent-2 tools
+
+== Tool Execution Phase ==
+User -> API1: POST /execute
+API1 -> DSL1: Parse DSL
+DSL1 -> Core1: Execute write_file
+Core1 -> Reg1: Has local tool?
+Reg1 --> Core1: No, Agent-2 has it
+Core1 -> P2P: Send to Agent-2
+P2P -> Core2: Tool Request
+Core2 -> Bridge2: Process Tool Request
+Bridge2 -> FS2: WriteFileHandler()
+FS2 -> Volume: Create file
+Volume --> FS2: Success
+FS2 --> Bridge2: Tool Result
+Bridge2 --> Core2: Response
+Core2 --> P2P: Send Response
+P2P --> Core1: Tool Result
+Core1 --> DSL1: Success
+DSL1 --> API1: Format Response
+API1 --> User: JSON Response
+
+@enduml

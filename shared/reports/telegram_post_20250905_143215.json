@@ -1,0 +1,34 @@
+{
+  "metadata": {
+    "posted_at": "2025-09-05T14:32:15.267010",
+    "channel_id": "-1002939691708",
+    "channel_title": "Praxis Demo",
+    "message_id": 11,
+    "bot_token_used": "...ko2KPLxhWk"
+  },
+  "message": {
+    "content": "Salut",
+    "length": 5,
+    "preview": "Salut"
+  },
+  "telegram_response": {
+    "ok": true,
+    "result": {
+      "message_id": 11,
+      "from": {
+        "id": 8211737690,
+        "is_bot": true,
+        "first_name": "PraxisDemo",
+        "username": "praxisdemobot"
+      },
+      "chat": {
+        "id": -1002939691708,
+        "title": "Praxis Demo",
+        "username": "praxisdemogroup",
+        "type": "supergroup"
+      },
+      "date": 1757082735,
+      "text": "Salut"
+    }
+  }
+}

@@ -1,0 +1,35 @@
+@startuml
+title Data Flow - DSL to File Creation
+
+start
+
+:User Input;
+note right: CALL write_file test.txt "Hello World"
+
+:HTTP POST /execute;
+
+:Parse DSL;
+note left: Tokenize and build AST
+
+:Analyze Command;
+
+if (Local Tool?) then (no)
+  :Query Peer Registry;
+  :Find Agent with Tool;
+  :Create P2P Request;
+  :Send via libp2p;
+  :Remote Agent Processes;
+  :Execute MCP Tool;
+  :Write to Filesystem;
+  :Return via P2P;
+else (yes)
+  :Execute Local Tool;
+endif
+
+:Format Response;
+
+:Return to User;
+
+stop
+
+@enduml

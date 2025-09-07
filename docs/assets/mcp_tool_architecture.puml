@@ -1,0 +1,37 @@
+@startuml
+!theme plain
+
+interface Tool {
+  +GetTool(): mcpTypes.Tool
+  +Handler(ctx, req): Result
+}
+
+class FilesystemTools {
+  -baseDir: string
+  -logger: Logger
+  +GetWriteFileTool(): Tool
+  +WriteFileHandler(ctx, req): Result
+  +GetReadFileTool(): Tool
+  +ReadFileHandler(ctx, req): Result
+  +GetListFilesTool(): Tool
+  +ListFilesHandler(ctx, req): Result
+}
+
+class MCPServer {
+  -tools: map[string]Handler
+  +AddTool(tool, handler)
+  +FindToolHandler(name): Handler
+  +HasTool(name): bool
+}
+
+class P2PMCPBridge {
+  -mcpServer: MCPServer
+  +ProcessMCPRequest(req): Response
+  +handleCallTool(ctx, req): Response
+}
+
+Tool <|.. FilesystemTools
+MCPServer --> Tool : manages
+P2PMCPBridge --> MCPServer : uses
+
+@enduml

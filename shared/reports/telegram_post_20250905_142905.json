@@ -1,0 +1,34 @@
+{
+  "metadata": {
+    "posted_at": "2025-09-05T14:29:05.210155",
+    "channel_id": "-1002939691708",
+    "channel_title": "Praxis Demo",
+    "message_id": 10,
+    "bot_token_used": "...ko2KPLxhWk"
+  },
+  "message": {
+    "content": "Direct test from Praxis AI - Container",
+    "length": 38,
+    "preview": "Direct test from Praxis AI - Container"
+  },
+  "telegram_response": {
+    "ok": true,
+    "result": {
+      "message_id": 10,
+      "from": {
+        "id": 8211737690,
+        "is_bot": true,
+        "first_name": "PraxisDemo",
+        "username": "praxisdemobot"
+      },
+      "chat": {
+        "id": -1002939691708,
+        "title": "Praxis Demo",
+        "username": "praxisdemogroup",
+        "type": "supergroup"
+      },
+      "date": 1757082545,
+      "text": "Direct test from Praxis AI - Container"
+    }
+  }
+}
