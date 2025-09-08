@@ -1,0 +1,18 @@
+[
+  {
+    "id": "1234567890",
+    "text": "Hello world! This is a test tweet from Elon Musk.",
+    "author": "elonmusk",
+    "created_at": "2024-01-01T10:00:00Z",
+    "likes": 1000,
+    "retweets": 500
+  },
+  {
+    "id": "1234567891",
+    "text": "Another test tweet about rockets and space exploration!",
+    "author": "elonmusk",
+    "created_at": "2024-01-01T11:00:00Z",
+    "likes": 2000,
+    "retweets": 750
+  }
+]

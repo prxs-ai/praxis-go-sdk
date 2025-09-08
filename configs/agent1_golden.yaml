@@ -1,0 +1,83 @@
+agent:
+  name: "praxis-agent-1"
+  version: "1.0.0"
+  description: "Orchestrator Agent with Dagger Tools"
+  url: "http://localhost:8000"
+  shared_dir: "./shared"
+  
+  # No external MCP endpoints - Agent 1 only has Dagger tools
+  external_mcp_endpoints: []
+  
+  # Only Dagger tools for Agent-1
+  tools:
+    - name: "python_analyzer"
+      description: "Analyzes data using an external Python script"
+      engine: "dagger"
+      params:
+        - name: "input_file"
+          type: "string"
+          description: "Input file for the operation"
+          required: "true"
+      meta:
+        daggerImage: "python:3.11-slim"
+        daggerCommand: ["python", "/shared/analyzer.py"]
+    
+    - name: "twitter_scraper"
+      description: "Scrapes tweets from Twitter/X using Apify API - provide username without @ symbol"
+      engine: "dagger"
+      params:
+        - name: "username"
+          type: "string"
+          description: "Twitter username to scrape (without @ symbol, e.g. 'elonmusk')"
+          required: "true"
+        - name: "tweets_count"
+          type: "number"
+          description: "Number of tweets to scrape (default: 50, max: 100)"
+          required: "false"
+      meta:
+        daggerImage: "praxis-python:latest"
+        daggerCommand: ["python", "/shared/twitter_scraper.py"]
+
+p2p:
+  enabled: true
+  port: 4001
+  secure: false
+  rendezvous: "praxis-network"
+  enable_mdns: true
+  enable_dht: true
+  bootstrap_nodes: []
+
+http:
+  enabled: true
+  port: 8000
+  host: "0.0.0.0"
+
+mcp:
+  enabled: true
+  servers: []
+  limits:
+    max_concurrent_requests: 10
+    request_timeout_ms: 30000
+    max_response_size_bytes: 10485760
+    max_servers_per_node: 5
+    connection_pool_size: 10
+    retry_attempts: 3
+    retry_backoff_ms: 1000
+  log_level: "info"
+
+llm:
+  enabled: true  # Enable LLM for orchestration
+  provider: "openai"
+  api_key: "${OPENAI_API_KEY}"
+  model: "gpt-4o-mini"
+  max_tokens: 2000
+  temperature: 0.7
+  request_timeout: 30
+  cache_enabled: true
+  cache_ttl: 600
+  tools_enabled: true
+
+logging:
+  level: "debug"
+  format: "text"
+  output: "stdout"
