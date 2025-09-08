@@ -1,0 +1,118 @@
+agent:
+  name: "praxis-agent-from-yaml"
+  version: "1.0.0"
+  description: "Praxis P2P Agent with Event-Driven Architecture"
+  url: "http://localhost:8000"
+  shared_dir: "./shared"
+  external_mcp_endpoints:
+    - "http://host.docker.internal:3000/mcp"
+  tools:
+    - name: "python_analyzer"
+      description: "Analyzes data using an external Python script"
+      engine: "dagger"
+      params:
+        - name: "input_file"
+          type: "string"
+          required: "true"
+      engineSpec:
+        image: "python:3.11-slim"
+        command: ["python", "/shared/analyzer.py"]
+        mounts:
+          ./shared: /shared
+    - name: "greet_external"
+      description: "Calls a greeting tool on an external MCP server"
+      engine: "remote-mcp"
+      params:
+        - name: "name"
+          type: "string"
+          required: "true"
+      engineSpec:
+        address: "http://host.docker.internal:8080"
+    - name: "twitter_scraper"
+      description: "Scrape tweets from Twitter/X using Apify API - provide username without @ symbol"
+      engine: "dagger"
+      params:
+        - name: "username"
+          type: "string" 
+          description: "Twitter username to scrape (without @ symbol, e.g. 'elonmusk')"
+          required: "true"
+        - name: "tweets_count"
+          type: "number"
+          description: "Number of tweets to scrape (default: 50, max: 100)"
+          required: "false"
+      engineSpec:
+        image: "python:3.11"
+        command: ["sh", "-c", "pip install apify-client==1.6.4 && python /shared/twitter_scraper.py"]
+        mounts:
+          ./shared: /shared
+        env_passthrough: ["APIFY_API_TOKEN"]
+    - name: "telegram_poster"
+      description: "Posts messages to Telegram channels using a bot - useful for notifications, alerts, or sharing information"
+      engine: "dagger"
+      params:
+        - name: "message"
+          type: "string"
+          description: "Message content to post to the Telegram channel"
+          required: "true"
+        - name: "channel"
+          type: "string"
+          description: "Telegram channel ID (optional, uses default channel from environment if not specified)"
+          required: "false"
+      engineSpec:
+        image: "python:3.11-slim"
+        command: ["sh", "-c", "pip install requests && python /shared/telegram_post.py"]
+        mounts:
+          ./shared: /shared
+        env_passthrough: ["TELEGRAM_BOT_TOKEN", "TELEGRAM_CHANNEL_ID"]
+
+p2p:
+  enabled: true
+  port: 4001
+  secure: true
+  rendezvous: "praxis-agents"
+  enable_mdns: true
+  enable_dht: true
+  bootstrap_nodes: []
+
+http:
+  enabled: true
+  port: 8000
+  host: "0.0.0.0"
+
+mcp:
+  enabled: true
+  servers: []
+  limits:
+    max_concurrent_requests: 100
+    request_timeout_ms: 30000
+    max_response_size_bytes: 10485760
+    max_servers_per_node: 10
+    connection_pool_size: 5
+    retry_attempts: 3
+    retry_backoff_ms: 1000
+  log_level: "info"
+
+llm:
+  enabled: true
+  provider: "openai"
+  api_key: "${OPENAI_API_KEY}"
+  model: "gpt-4o-mini"
+  max_tokens: 4096
+  temperature: 0.1
+  timeout: "30s"
+  function_calling:
+    strict_mode: true
+    max_parallel_calls: 5
+    tool_timeout: "15s"
+  caching:
+    enabled: true
+    ttl: "300s"
+    max_size: 1000
+  rate_limiting:
+    requests_per_minute: 60
+    tokens_per_minute: 100000
+
+logging:
+  level: "info"
+  format: "text"
+  file: ""

@@ -12,16 +12,35 @@ type AppConfig struct {
 	MCP     MCPBridgeConfig `yaml:"mcp" json:"mcp"`
 	LLM     LLMConfig       `yaml:"llm" json:"llm"`
 	Logging LogConfig       `yaml:"logging" json:"logging"`
+}
 
-	Registry RegistryConfig `yaml:"registry" json:"registry"`
+// ToolConfig определяет конфигурацию одного инструмента в YAML.
+type ToolConfig struct {
+	Name        string                 `yaml:"name"`
+	Description string                 `yaml:"description"`
+	Engine      string                 `yaml:"engine"`
+	Params      []map[string]string    `yaml:"params"`
+	EngineSpec  map[string]interface{} `yaml:"engineSpec"`
+}
+
+// ToolParamConfig описывает параметр инструмента
+type ToolParamConfig struct {
+	Name        string `yaml:"name"`
+	Type        string `yaml:"type"`
+	Description string `yaml:"description"`
+	Required    string `yaml:"required"`
 }
 
 // AgentConfig contains basic agent information
 type AgentConfig struct {
-	Name        string `yaml:"name" json:"name"`
-	Version     string `yaml:"version" json:"version"`
-	Description string `yaml:"description" json:"description"`
-	URL         string `yaml:"url" json:"url"`
+	Name                 string       `yaml:"name" json:"name"`
+	Version              string       `yaml:"version" json:"version"`
+	Description          string       `yaml:"description" json:"description"`
+	URL                  string       `yaml:"url" json:"url"`
+	SharedDir            string       `yaml:"shared_dir" json:"shared_dir"`                          // Base directory for filesystem tools
+	Tools                []ToolConfig `yaml:"tools"`                                                  // Список инструментов, доступных агенту
+	ExternalMCPEndpoints []string     `yaml:"external_mcp_endpoints" json:"external_mcp_endpoints"`     // Внешние MCP серверы для автообнаружения
+	ExternalMCPServers   []string     `yaml:"external_mcp_servers" json:"external_mcp_servers"`         // Alias для ExternalMCPEndpoints
 }
 
 // P2PConfig contains libp2p configuration
@@ -116,10 +135,6 @@ type LogConfig struct {
 	File   string `yaml:"file" json:"file"`
 }
 
-type RegistryConfig struct {
-	Url string `yaml:"url" json:"url"`
-}
-
 // DefaultConfig returns the default configuration
 func DefaultConfig() *AppConfig {
 	return &AppConfig{
@@ -180,9 +195,6 @@ func DefaultConfig() *AppConfig {
 		Logging: LogConfig{
 			Level:  "info",
 			Format: "text",
-		},
-		Registry: RegistryConfig{
-			Url: "http://localhost:8080",
 		},
 	}
 }

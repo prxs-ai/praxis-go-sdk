@@ -1,0 +1,47 @@
+@startuml
+title Agent to Agent Card Structure
+
+class Agent1Card {
+  Name: praxis-agent-1
+  Version: 1.0.0
+  PeerID: 12D3KooWLE4h...
+  --
+  Capabilities:
+  - mcp
+  - dsl
+  - p2p
+  - llm
+  --
+  Tools:
+  - analyze_dsl
+  - orchestrate_workflow
+  - llm_generate
+  --
+  Timestamp: 1755885935
+}
+
+class Agent2Card {
+  Name: praxis-agent-2
+  Version: 1.0.0
+  PeerID: 12D3KooWPcnb...
+  --
+  Capabilities:
+  - mcp
+  - dsl
+  - p2p
+  - filesystem
+  --
+  Tools:
+  - write_file
+  - read_file
+  - list_files
+  - delete_file
+  --
+  Timestamp: 1755885936
+}
+
+Agent1Card <--> Agent2Card : Exchange on Discovery
+
+note bottom of Agent2Card: Has filesystem tools for remote use
+
+@enduml

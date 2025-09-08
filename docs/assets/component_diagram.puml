@@ -1,0 +1,50 @@
+@startuml
+title Praxis Agent Components
+
+component "Praxis Agent" {
+
+  port "HTTP 8000" as HTTP
+  port "P2P 4001" as P2PPort
+  port "SSE 8090" as SSE
+
+  component "Core" {
+    [Agent Core] as AgentCore
+    [DSL Orchestrator] as DSL
+    [MCP Server] as MCP
+    [P2P Protocol] as Proto
+    [LLM Client] as LLM
+  }
+
+  component "Registries" {
+    database "Tool Registry" as ToolReg
+    database "Peer Registry" as PeerReg
+    database "Card Registry" as CardReg
+  }
+
+  component "Tools" {
+    [write_file] as T1
+    [read_file] as T2
+    [list_files] as T3
+    [delete_file] as T4
+  }
+
+  HTTP --> AgentCore
+  P2PPort --> Proto
+  SSE --> MCP
+
+  AgentCore --> DSL
+  AgentCore --> MCP
+  AgentCore --> Proto
+  DSL --> LLM
+
+  Proto --> PeerReg
+  Proto --> CardReg
+  MCP --> ToolReg
+
+  ToolReg --> T1
+  ToolReg --> T2
+  ToolReg --> T3
+  ToolReg --> T4
+}
+
+@enduml

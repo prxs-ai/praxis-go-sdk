@@ -1,0 +1,28 @@
+@startuml
+title Tool Discovery When Peers Join
+
+participant "New Agent" as New
+participant "Network" as Net
+participant "Agent 1" as A1
+participant "Agent 2" as A2
+
+== New Agent Joins ==
+New -> Net: Start mDNS Discovery
+New -> Net: Broadcast Service
+A1 -> New: Connect
+A2 -> New: Connect
+
+== Card Exchange ==
+New <-> A1: Exchange Cards
+note left: Learn A1 tools
+
+New <-> A2: Exchange Cards
+note right: Learn A2 tools
+
+== Registry Update ==
+New -> New: Update Tool Registry
+
+== Ready for Operation ==
+note over New: Can use any peer tool
+
+@enduml

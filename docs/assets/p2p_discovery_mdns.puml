@@ -1,0 +1,32 @@
+@startuml
+title P2P Discovery via mDNS
+
+participant "Agent 1" as A1
+participant "mDNS Service" as mDNS
+participant "Local Network" as Net
+participant "Agent 2" as A2
+
+== Startup ==
+A1 -> mDNS: Register Service
+A2 -> mDNS: Register Service
+
+== Discovery Loop ==
+mDNS -> Net: Broadcast Service
+A1 -> Net: Agent-1 at 172.20.0.2:4001
+A2 -> Net: Agent-2 at 172.20.0.3:4002
+
+A1 -> A1: Discovered Agent-2
+A2 -> A2: Discovered Agent-1
+
+== Connection ==
+A1 -> A2: TCP Connect port 4002
+A1 <-> A2: TLS Handshake
+A1 <-> A2: Protocol Negotiation
+
+== Card Exchange ==
+A1 -> A2: Send Agent-1 Card
+A2 -> A1: Send Agent-2 Card
+
+note over A1,A2: Peers know each other capabilities
+
+@enduml
