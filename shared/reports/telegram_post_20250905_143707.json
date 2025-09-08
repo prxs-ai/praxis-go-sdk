@@ -1,0 +1,34 @@
+{
+  "metadata": {
+    "posted_at": "2025-09-05T14:37:07.669504",
+    "channel_id": "-1002939691708",
+    "channel_title": "Praxis Demo",
+    "message_id": 12,
+    "bot_token_used": "...ko2KPLxhWk"
+  },
+  "message": {
+    "content": "Here are my thoughts about Web3: It's a decentralized revolution transforming the internet landscape, with potential for redefining data ownership, privacy, and digital collaboration.",
+    "length": 183,
+    "preview": "Here are my thoughts about Web3: It's a decentralized revolution transforming the internet landscape..."
+  },
+  "telegram_response": {
+    "ok": true,
+    "result": {
+      "message_id": 12,
+      "from": {
+        "id": 8211737690,
+        "is_bot": true,
+        "first_name": "PraxisDemo",
+        "username": "praxisdemobot"
+      },
+      "chat": {
+        "id": -1002939691708,
+        "title": "Praxis Demo",
+        "username": "praxisdemogroup",
+        "type": "supergroup"
+      },
+      "date": 1757083027,
+      "text": "Here are my thoughts about Web3: It's a decentralized revolution transforming the internet landscape, with potential for redefining data ownership, privacy, and digital collaboration."
+    }
+  }
+}

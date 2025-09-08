@@ -1,0 +1,108 @@
+agent:
+  name: "praxis-agent-external-test"
+  version: "1.0.0"
+  description: "Praxis Agent with External MCP Server Discovery"
+  url: "http://localhost:8000"
+  shared_dir: "./shared"
+  
+  # External MCP servers for automatic tool discovery
+  external_mcp_endpoints:
+    - "http://localhost:8080"  # External filesystem MCP server
+  
+  # Local tools (Dagger and local-go engines)
+  tools:
+    - name: "python_analyzer"
+      description: "Analyzes data using an external Python script"
+      engine: "dagger"
+      params:
+        - name: "input_file"
+          type: "string"
+          description: "Input file for the operation"
+          required: "true"
+      meta:
+        daggerImage: "python:3.11-slim"
+        daggerCommand: ["python", "/shared/analyzer.py"]
+
+    - name: "write_file"
+      description: "Write content to a file in the shared filesystem"
+      engine: "local-go"
+      params:
+        - name: "filename"
+          type: "string"
+          description: "Name of the file to write"
+          required: "true"
+        - name: "content"
+          type: "string"
+          description: "Content to write to the file"
+          required: "true"
+
+    - name: "read_file"
+      description: "Read content from a file in the shared filesystem"
+      engine: "local-go"
+      params:
+        - name: "filename"
+          type: "string"
+          description: "Name of the file to read"
+          required: "true"
+
+    - name: "list_files"
+      description: "List files in the shared filesystem"
+      engine: "local-go"
+      params:
+        - name: "path"
+          type: "string"
+          description: "Path to list files from"
+          required: "false"
+
+    - name: "delete_file"
+      description: "Delete a file from the shared filesystem"
+      engine: "local-go"
+      params:
+        - name: "filename"
+          type: "string"
+          description: "Name of the file to delete"
+          required: "true"
+
+p2p:
+  enabled: true
+  port: 4001
+  secure: false
+  rendezvous: "praxis-network"
+  enable_mdns: true
+  enable_dht: true
+  bootstrap_nodes: []
+
+http:
+  enabled: true
+  port: 8000
+  host: "0.0.0.0"
+
+mcp:
+  enabled: true
+  servers: []
+  limits:
+    max_concurrent_requests: 10
+    request_timeout_ms: 30000
+    max_response_size_bytes: 10485760
+    max_servers_per_node: 5
+    connection_pool_size: 10
+    retry_attempts: 3
+    retry_backoff_ms: 1000
+  log_level: "info"
+
+llm:
+  enabled: false
+  provider: "openai"
+  api_key: "${OPENAI_API_KEY}"
+  model: "gpt-4o-mini"
+  max_tokens: 2000
+  temperature: 0.7
+  request_timeout: 30
+  cache_enabled: true
+  cache_ttl: 600
+  tools_enabled: true
+
+logging:
+  level: "debug"
+  format: "text"
+  output: "stdout"

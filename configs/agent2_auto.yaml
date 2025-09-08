@@ -1,0 +1,57 @@
+agent:
+  name: "praxis-agent-2"
+  version: "1.0.0"
+  description: "Agent with Auto-discovered External MCP Tools"
+  url: "http://localhost:8001"
+  shared_dir: "./shared"
+  
+  # External MCP servers for automatic tool discovery
+  external_mcp_servers:
+    - "http://host.docker.internal:8080"  # For Docker to access host
+  
+  # No manual tools - all will be auto-discovered
+  tools: []
+
+p2p:
+  enabled: true
+  port: 4002
+  secure: false
+  rendezvous: "praxis-network"
+  enable_mdns: true
+  enable_dht: true
+  bootstrap_nodes: []
+
+http:
+  enabled: true
+  port: 8001
+  host: "0.0.0.0"
+
+mcp:
+  enabled: true
+  servers: []
+  limits:
+    max_concurrent_requests: 10
+    request_timeout_ms: 30000
+    max_response_size_bytes: 10485760
+    max_servers_per_node: 5
+    connection_pool_size: 10
+    retry_attempts: 3
+    retry_backoff_ms: 1000
+  log_level: "info"
+
+llm:
+  enabled: false
+  provider: ""
+  api_key: ""
+  model: ""
+  max_tokens: 0
+  temperature: 0
+  request_timeout: 0
+  cache_enabled: false
+  cache_ttl: 0
+  tools_enabled: false
+
+logging:
+  level: "debug"
+  format: "text"
+  output: "stdout"

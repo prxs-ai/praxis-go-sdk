@@ -1,0 +1,19 @@
+@startuml
+!theme plain
+
+participant "DSL Analyzer" as DSL
+participant "Agent Core" as Core
+participant "MCP Server" as MCP
+participant "Tool Handler" as Tool
+
+DSL -> Core: executeCall("tool_name", args)
+Core -> Core: HasLocalTool("tool_name")
+note right: Returns true
+Core -> MCP: FindToolHandler("tool_name")
+MCP -> Tool: Handler(ctx, request)
+Tool -> Tool: Process request
+Tool --> MCP: Result
+MCP --> Core: Result
+Core --> DSL: Result
+
+@enduml

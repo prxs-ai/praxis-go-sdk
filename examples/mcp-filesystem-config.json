@@ -1,0 +1,21 @@
+{
+  "server": {
+    "name": "filesystem-server",
+    "version": "1.0.0"
+  },
+  "directories": [
+    {
+      "path": "./test-filesystem",
+      "permissions": ["read", "write", "delete", "create"]
+    },
+    {
+      "path": "./shared",
+      "permissions": ["read", "write"]
+    }
+  ],
+  "transport": {
+    "type": "http",
+    "port": 3000,
+    "endpoint": "/mcp"
+  }
+}
