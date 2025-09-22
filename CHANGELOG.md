@@ -2,10 +2,92 @@
 
 ## [0.2.1](https://github.com/prxs-ai/praxis-go-sdk/compare/v0.2.0...v0.2.1) (2025-09-22)
 
+### Major New Features
+
+#### **ERC-8004 Blockchain Identity Integration**
+- **Agent Identity Registry**: Full ERC-8004 standard implementation for on-chain agent identity verification
+- **Blockchain Registration**: Agent cards now support blockchain-based identity registration with signature verification
+- **Trust Models**: Integrated feedback and inference-validation trust models
+- **Offchain Data Endpoints**: Well-known endpoints for feedback, validation requests/responses
+  - `/.well-known/feedback.json` - Agent feedback data for trust assessment
+  - `/.well-known/validation-requests.json` - Validation request mappings (DataHash→DataURI)
+  - `/.well-known/validation-responses.json` - Validation response mappings
+- **Admin Registration API**: `POST /admin/erc8004/register` for updating agent registration after on-chain transactions
+- **CAIP-10 Address Support**: Standardized blockchain address format integration
+
+#### **Praxis Explorer - Blockchain Indexer**
+- **New Command-Line Tool**: `cmd/praxis-explorer/main.go` for blockchain data indexing
+- **ERC-8004 Event Indexing**: Monitor and index agent registration events from smart contracts
+- **PostgreSQL Integration**: Robust database storage for blockchain data
+- **REST API**: Query indexed agent data and registration history
+- **Multi-Chain Support**: Configurable for different blockchain networks
+
+#### **Enhanced MCP Transport Layer**
+- **Streamable HTTP Support**: New transport option for high-throughput MCP communication
+- **Improved Transport Reliability**: Better error handling and connection management
+- **Transport Auto-Detection**: Automatic selection of optimal transport protocol
+- **External Endpoint Configuration**: Enhanced support for remote MCP servers
+
+### Infrastructure & Developer Experience Improvements
+
+#### **Documentation Overhaul**
+- **Comprehensive Testing Guide**: New `TESTING_INSTRUCTIONS.md` with detailed test scenarios
+- **Dagger Demo Scripts**: Complete `DAGGER_DEMO_SCRIPT.md` with practical examples
+- **Dynamic MCP Discovery**: Detailed guide in `DYNAMIC_MCP_DISCOVERY.md`
+- **A2A Implementation Analysis**: In-depth technical analysis document
+- **Updated API References**: Enhanced HTTP, WebSocket, and MCP API documentation
+- **Architecture Documentation**: Refined and expanded architecture guides
+
+#### **Enhanced Testing & Quality Assurance**
+- **Pre-commit Hooks**: Comprehensive code quality checks and formatting
+- **Integration Test Suite**: Expanded test coverage for A2A protocol and ERC-8004
+- **WebSocket Gateway Tests**: New comprehensive test suite for real-time communication
+- **Workflow Orchestrator Tests**: Enhanced testing for DSL processing and workflow execution
+
+#### **Configuration & Deployment**
+- **ERC-8004 Configuration**: New `configs/erc8004.yaml` and sample configuration
+- **Utility Modules**: New `utils/` package with environment, logging, and network utilities
+- **Database Migrations**: SQL migration scripts for blockchain indexer
+- **Docker Optimizations**: Improved containerization with better resource management
+
+### API & Protocol Enhancements
+
+#### **A2A Protocol Improvements**
+- **Enhanced Agent Cards**: ERC-8004 compliant agent card specification
+- **Better Task Management**: Improved async task processing and lifecycle management
+- **Protocol Validation**: Enhanced A2A protocol compliance checking
+- **Extended Card Support**: Authenticated extended card retrieval
+
+#### **WebSocket Gateway Enhancements**
+- **Real-time Event Streaming**: Enhanced WebSocket support for live updates
+- **Improved Error Handling**: Better error propagation and status reporting
+- **Event Bus Integration**: Tighter coupling with internal event system
+- **Performance Optimizations**: Reduced latency and improved throughput
+
+#### **DSL & Workflow Processing**
+- **Enhanced LLM Integration**: Improved OpenAI client with better error handling
+- **Workflow Orchestration**: More robust workflow execution with better state management
+- **DSL Analysis**: Enhanced parsing and execution of domain-specific language commands
+- **Execution Engine Improvements**: Better abstraction and error handling for tool execution
+
+### Bug Fixes & Stability
+
+- **Dependency Management**: Streamlined Go module dependencies
+- **Test Cleanup**: Removed redundant test files and improved test organization
+- **Memory Management**: Better resource cleanup in execution engines
+- **Error Propagation**: Enhanced error handling throughout the system
+- **Configuration Validation**: Improved YAML configuration parsing and validation
+
+### Breaking Changes
+
+- **MCP Transport Configuration**: New transport options may require configuration updates
+- **Agent Card Format**: Enhanced A2A agent cards with ERC-8004 fields
+- **API Response Format**: Some endpoints now include additional metadata for blockchain integration
 
 ### Features
 
 * trigger build ([3daee89](https://github.com/prxs-ai/praxis-go-sdk/commit/3daee89ace6eb8dd8ca61398eadce365f0f6340a))
+* add support ERC-8004 and fix docs ([b7100aa](https://github.com/prxs-ai/praxis-go-sdk/commit/b7100aac7bb2f721a92237292f3995342ac48152))
 
 ## [0.2.0](https://github.com/prxs-ai/praxis-go-sdk/compare/v0.1.0...v0.2.0) (2025-09-08)
 
