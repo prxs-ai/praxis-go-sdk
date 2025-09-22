@@ -2,7 +2,9 @@ version: '3.8'
 
 services:
   praxis-agent-1:
-    image: praxis-go-sdk-praxis-agent-2
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: praxis-agent-1
     ports:
       - "8000:8000"  # HTTP API

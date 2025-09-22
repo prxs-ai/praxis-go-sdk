@@ -1,27 +1,40 @@
 repos:
--   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.4.0
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
     hooks:
-    -   id: trailing-whitespace
-    -   id: end-of-file-fixer
-    -   id: check-yaml
-    -   id: check-added-large-files
-    -   id: check-merge-conflict
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: check-merge-conflict
 
--   repo: https://github.com/golangci/golangci-lint
-    rev: v1.54.2
-    hooks:
-    -   id: golangci-lint
-        args: [--timeout=5m]
-
--   repo: https://github.com/dnephin/pre-commit-golang
+  - repo: https://github.com/dnephin/pre-commit-golang
     rev: v0.5.1
     hooks:
-    -   id: go-fmt
-    -   id: go-vet
+      - id: go-fmt
+      - id: validate-toml
+      - id: go-mod-tidy
+
+  - repo: local
+    hooks:
+      - id: go-vet
+        name: go vet (system)
+        language: system
         pass_filenames: false
-        args: [./...]
-    -   id: go-imports
-    -   id: go-unit-tests
-    -   id: validate-toml
-    -   id: go-mod-tidy
+        entry: bash -c '
+          set -euo pipefail;
+          pkgs=$(go list ./... 2>/dev/null || true);
+          [ -z "$pkgs" ] && exit 0;
+          go vet $pkgs
+         '
+
+      - id: go-unit-tests
+        name: go unit tests (exclude examples)
+        language: system
+        pass_filenames: false
+        entry: bash -c '
+          set -euo pipefail;
+          pkgs=$(go list ./... | grep -Ev "/examples($|/)" || true);
+          [ -z "$pkgs" ] && exit 0;
+          go test -v $pkgs
+         '

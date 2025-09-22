@@ -66,7 +66,7 @@ func init() {
 func printBanner() {
 	banner := `
 ╔══════════════════════════════════════════╗
-║       PRAXIS P2P AGENT WITH MCP          ║
+║       PRAXIS P2P AGENT                   ║
 ║                                          ║
 ╚══════════════════════════════════════════╝
 `
