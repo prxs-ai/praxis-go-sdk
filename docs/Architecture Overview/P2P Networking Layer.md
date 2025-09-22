@@ -97,51 +97,51 @@ The `P2PProtocolHandler` manages incoming streams for various protocols and rout
 ```mermaid
 classDiagram
 class P2PProtocolHandler {
-+host Host
-+logger Logger
-+peerCards Map~PeerID, AgentCard~
-+ourCard AgentCard
-+mcpBridge P2PMCPBridge
-+agent A2AAgent
++Host : host
++Logger : logger
++AgentCard~ : peerCards Map~PeerID
++AgentCard : ourCard
++P2PMCPBridge : mcpBridge
++A2AAgent : agent
 +SetMCPBridge(bridge)
 +SetAgent(agent)
 +handleMCPStream(stream)
 +handleCardStream(stream)
 +handleToolStream(stream)
 +handleA2AStream(stream)
-+RequestCard(ctx, peerID)
-+InvokeTool(ctx, peerID, name, args)
++RequestCard(ctx: peerID)
++InvokeTool(ctx: peerID, name: args)
 }
 class AgentCard {
-+Name string
-+Version string
-+PeerID string
-+Capabilities []string
-+Tools []ToolSpec
-+Timestamp int64
++string : Name
++string : Version
++string : PeerID
++[]string : Capabilities
++[]ToolSpec : Tools
++int64 : Timestamp
 }
 class ToolSpec {
-+Name string
-+Description string
-+Parameters []ToolParameter
++string : Name
++string : Description
++[]ToolParameter : Parameters
 }
 class ToolParameter {
-+Name string
-+Type string
-+Description string
-+Required bool
++string : Name
++string : Type
++string : Description
++bool : Required
 }
 class P2PMessage {
-+Type string
-+ID string
-+Method string
-+Params interface{}
-+Result interface{}
-+Error P2PError
++string : Type
++string : ID
++string : Method
++interface{} : Params
++interface{} : Result
++P2PError : Error
 }
 class P2PError {
-+Code int
-+Message string
++int : Code
++string : Message
 }
 P2PProtocolHandler --> AgentCard : "Stores"
 P2PProtocolHandler --> ToolSpec : "Contains"
@@ -162,34 +162,34 @@ The `P2PMCPBridge` serves as an interface between the P2P layer and MCP services
 ```mermaid
 classDiagram
 class P2PMCPBridge {
-+host Host
-+mcpServer MCPServerWrapper
-+peerClients Map~PeerID, MCPClientWrapper~
++Host : host
++MCPServerWrapper : mcpServer
++MCPClientWrapper~ : peerClients Map~PeerID
 +ProcessMCPRequest(request)
 +handleMCPStream(stream)
 +handleCardStream(stream)
 +ConnectToPeer(peerID)
-+CallPeerTool(ctx, peerID, name, args)
++CallPeerTool(ctx: peerID, name: args)
 +ListPeers(ctx)
-+SendMessage(ctx, peerID, message)
++SendMessage(ctx: peerID, message)
 }
 class MCPRequest {
-+ID int
-+Method string
-+Params Map~string, interface{}~
++int : ID
++string : Method
++interface{}~ : Params Map~string
 }
 class MCPResponse {
-+ID int
-+Result interface{}
-+Error MCPError
++int : ID
++interface{} : Result
++MCPError : Error
 }
 class MCPError {
-+Code int
-+Message string
-+Data interface{}
++int : Code
++string : Message
++interface{} : Data
 }
 class P2PStreamTransport {
-+stream Stream
++Stream : stream
 +Send(data)
 +Receive()
 +Close()
@@ -351,7 +351,7 @@ Common issues and their solutions:
 ## Conclusion
 The P2P networking layer provides a robust foundation for decentralized agent communication. By leveraging libp2p for transport and implementing a modular architecture with clear separation between protocol handling, bridge integration, and discovery, the system enables flexible and scalable agent networks. The agent card exchange mechanism facilitates capability discovery, while the MCP bridge allows seamless integration with higher-level services. This architecture supports the development of complex distributed agent systems with dynamic peer interactions and remote tool execution capabilities.
 
-**Referenced Files in This Document**   
+**Referenced Files in This Document**
 - [protocol.go](file://internal/p2p/protocol.go#L1-L536)
 - [bridge.go](file://internal/p2p/bridge.go#L1-L472)
 - [discovery.go](file://internal/p2p/discovery.go#L1-L233)

@@ -4,10 +4,10 @@ agent:
   description: "Orchestrator Agent with Dagger Tools"
   url: "http://localhost:8000"
   shared_dir: "./shared"
-  
+
   # No external MCP endpoints - Agent 1 only has Dagger tools
   external_mcp_endpoints: []
-  
+
   # Only Dagger tools for Agent-1
   tools:
     - name: "python_analyzer"
@@ -21,7 +21,7 @@ agent:
       meta:
         daggerImage: "python:3.11-slim"
         daggerCommand: ["python", "/shared/analyzer.py"]
-    
+
     - name: "twitter_scraper"
       description: "Scrapes tweets from Twitter/X using Apify API - provide username without @ symbol"
       engine: "dagger"

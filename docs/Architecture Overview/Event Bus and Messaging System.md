@@ -82,20 +82,20 @@ The EventBus struct provides thread-safe event handling using `sync.RWMutex` for
 ```mermaid
 classDiagram
 class EventBus {
--mu : sync.RWMutex
--handlers : map[EventType][]EventHandler
--logger : *logrus.Logger
--eventChan : chan Event
--stopChan : chan struct{}
-+Subscribe(eventType, handler)
+-mu : RWMutex
+-handlers : Map<EventType, List<EventHandler>>
+-logger : Logger
+-eventChan : Chan<Event>
+-stopChan : Chan<struct>
++Subscribe(eventType: handler)
 +SubscribeAll(handler)
 +Publish(event)
-+PublishAsync(eventType, payload)
++PublishAsync(eventType: payload)
 +Stop()
 }
 class Event {
 +Type : EventType
-+Payload : map[string]interface{}
++Payload : Map<string, interface>
 }
 class EventHandler {
 <<function>>
@@ -257,7 +257,7 @@ Common issues and their solutions:
 ## Conclusion
 The EventBus implementation provides a reliable foundation for asynchronous communication in the Praxis agent system. Its thread-safe design, integration with WebSocket for real-time updates, and comprehensive event taxonomy enable robust component interaction. While the current implementation handles basic backpressure through channel dropping, future enhancements could include message persistence, event filtering, and schema versioning for improved reliability and backward compatibility. The system demonstrates effective use of Go's concurrency primitives to build a scalable messaging infrastructure.
 
-**Referenced Files in This Document**   
+**Referenced Files in This Document**
 - [event_bus.go](file://internal/bus/event_bus.go#L1-L188)
 - [websocket_gateway.go](file://internal/api/websocket_gateway.go#L1-L671)
 - [websocket_gateway_test.go](file://internal/api/websocket_gateway_test.go#L1-L266)

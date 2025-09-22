@@ -17,7 +17,7 @@ type Task struct {
 
 // TaskStatus represents the current state of a task
 type TaskStatus struct {
-	State     string   `json:"state"` // "submitted", "working", "completed", "failed", "input-required"
+	State     string   `json:"state"` // "submitted", "working", "completed", "failed", "input-required", "canceled", "rejected", "auth-required"
 	Message   *Message `json:"message,omitempty"`
 	Timestamp string   `json:"timestamp,omitempty"`
 }
@@ -80,13 +80,19 @@ type RPCError struct {
 	Data    interface{} `json:"data,omitempty"`
 }
 
+// Error implements the error interface
+func (e *RPCError) Error() string {
+	return e.Message
+}
+
 // A2A JSON-RPC Error Codes
 const (
-	ErrorCodeTaskNotFound   = -32001
-	ErrorCodeInvalidParams  = -32602
-	ErrorCodeMethodNotFound = -32601
-	ErrorCodeInternalError  = -32603
-	ErrorCodeParseError     = -32700
+	ErrorCodeTaskNotFound      = -32001
+	ErrorCodeTaskNotCancelable = -32002
+	ErrorCodeInvalidParams     = -32602
+	ErrorCodeMethodNotFound    = -32601
+	ErrorCodeInternalError     = -32603
+	ErrorCodeParseError        = -32700
 )
 
 // MessageSendParams represents parameters for message/send method
@@ -99,19 +105,24 @@ type TasksGetParams struct {
 	ID string `json:"id"`
 }
 
+// TasksCancelParams represents parameters for tasks/cancel method
+type TasksCancelParams struct {
+	ID string `json:"id"`
+}
+
 // A2A Agent Card extensions (full specification)
 type A2AAgentCard struct {
-	Name               string                 `json:"name"`
-	Version            string                 `json:"version"`
-	ProtocolVersion    string                 `json:"protocolVersion"`
-	URL                string                 `json:"url"`
-	Description        string                 `json:"description"`
-	Skills             []A2ASkill             `json:"skills"`
-	Capabilities       A2ACapabilities        `json:"capabilities"`
-	SecuritySchemes    map[string]interface{} `json:"securitySchemes,omitempty"`
-	SupportedTransports []string              `json:"supportedTransports"`
-	Provider           *A2AProvider           `json:"provider,omitempty"`
-	Metadata           interface{}            `json:"metadata,omitempty"`
+	Name                string                 `json:"name"`
+	Version             string                 `json:"version"`
+	ProtocolVersion     string                 `json:"protocolVersion"`
+	URL                 string                 `json:"url"`
+	Description         string                 `json:"description"`
+	Skills              []A2ASkill             `json:"skills"`
+	Capabilities        A2ACapabilities        `json:"capabilities"`
+	SecuritySchemes     map[string]interface{} `json:"securitySchemes,omitempty"`
+	SupportedTransports []string               `json:"supportedTransports"`
+	Provider            *A2AProvider           `json:"provider,omitempty"`
+	Metadata            interface{}            `json:"metadata,omitempty"`
 }
 
 // A2ASkill represents an agent skill
@@ -214,3 +225,9 @@ func NewJSONRPCErrorResponse(id interface{}, err *RPCError) JSONRPCResponse {
 		Error:   err,
 	}
 }
+
+// Error variables for common A2A errors
+var (
+	ErrTaskNotFound      = NewRPCError(ErrorCodeTaskNotFound, "Task not found")
+	ErrTaskNotCancelable = NewRPCError(ErrorCodeTaskNotCancelable, "Task is not in a cancelable state")
+)

@@ -1,18 +1,25 @@
 package agent
 
-// AgentCard represents agent capabilities (A2A compatible)
+// AgentCard represents agent capabilities (A2A v0.2.9 compatible)
 type AgentCard struct {
-	Name               string                 `json:"name"`
-	Description        string                 `json:"description"`
-	URL                string                 `json:"url"`
-	Version            string                 `json:"version"`
-	ProtocolVersion    string                 `json:"protocolVersion"`
-	Provider           *AgentProvider         `json:"provider,omitempty"`
-	Capabilities       AgentCapabilities      `json:"capabilities"`
-	Skills             []AgentSkill           `json:"skills"`
-	SecuritySchemes    map[string]interface{} `json:"securitySchemes,omitempty"`
-	SupportedTransports []string              `json:"supportedTransports"`
-	Metadata           interface{}            `json:"metadata,omitempty"`
+	Name                              string                 `json:"name"`
+	Description                       string                 `json:"description"`
+	URL                               string                 `json:"url"` // main A2A endpoint
+	PreferredTransport                string                 `json:"preferredTransport"`
+	AdditionalInterfaces              []AgentInterface       `json:"additionalInterfaces,omitempty"`
+	Version                           string                 `json:"version"`
+	ProtocolVersion                   string                 `json:"protocolVersion"` // e.g., "0.2.9"
+	Provider                          *AgentProvider         `json:"provider,omitempty"`
+	Capabilities                      AgentCapabilities      `json:"capabilities"`
+	Skills                            []AgentSkill           `json:"skills"`
+	SecuritySchemes                   map[string]interface{} `json:"securitySchemes,omitempty"`
+	DefaultInputModes                 []string               `json:"defaultInputModes,omitempty"`
+	DefaultOutputModes                []string               `json:"defaultOutputModes,omitempty"`
+	Security                          []map[string][]string  `json:"security,omitempty"`
+	SupportsAuthenticatedExtendedCard bool                   `json:"supportsAuthenticatedExtendedCard,omitempty"`
+	IconURL                           string                 `json:"iconUrl,omitempty"`
+	DocumentationURL                  string                 `json:"documentationUrl,omitempty"`
+	Metadata                          interface{}            `json:"metadata,omitempty"`
 }
 
 type AgentProvider struct {
@@ -24,10 +31,17 @@ type AgentProvider struct {
 	Organization string `json:"organization,omitempty"`
 }
 
+// AgentInterface represents an additional interface endpoint for the agent
+type AgentInterface struct {
+	URL       string `json:"url"`
+	Transport string `json:"transport"` // "JSONRPC" | "GRPC" | "HTTP+JSON"
+}
+
+// AgentCapabilities describes what the agent is capable of
 type AgentCapabilities struct {
-	Streaming         *bool `json:"streaming,omitempty"`
-	PushNotifications *bool `json:"pushNotifications,omitempty"`
-	StateTransition   *bool `json:"stateTransition,omitempty"`
+	Streaming              *bool `json:"streaming,omitempty"`
+	PushNotifications      *bool `json:"pushNotifications,omitempty"`
+	StateTransitionHistory *bool `json:"stateTransitionHistory,omitempty"` // renamed from StateTransition
 }
 
 type AgentSkill struct {

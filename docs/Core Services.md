@@ -23,43 +23,43 @@ The P2P Networking service enables agent discovery and direct communication usin
 ```mermaid
 classDiagram
 class Discovery {
-+host Host
-+foundPeers Map~PeerID, PeerInfo~
-+peerHandlers []PeerHandler
-+protocolHandler P2PProtocolHandler
-+Start() error
-+Stop() error
-+HandlePeerFound(pi AddrInfo)
-+GetConnectedPeers() []PeerInfo
++Host : host
++PeerInfo~ : foundPeers Map~PeerID
++[]PeerHandler : peerHandlers
++P2PProtocolHandler : protocolHandler
++Start() : error
++Stop() : error
++HandlePeerFound(pi: AddrInfo)
++GetConnectedPeers() : List<PeerInfo>
 }
 class PeerInfo {
-+ID PeerID
-+Addrs []Multiaddr
-+FoundAt Time
-+LastSeen Time
-+AgentCard AgentCard
-+IsConnected bool
++PeerID : ID
++[]Multiaddr : Addrs
++Time : FoundAt
++Time : LastSeen
++AgentCard : AgentCard
++bool : IsConnected
 }
 class P2PProtocolHandler {
-+host Host
-+peerCards Map~PeerID, AgentCard~
-+ourCard AgentCard
-+SetMCPBridge(bridge P2PMCPBridge)
-+RequestCard(ctx Context, peerID PeerID) (*AgentCard, error)
-+InvokeTool(ctx Context, peerID PeerID, toolName string, args Map~string, interface{}~) (*ToolResponse, error)
++Host : host
++AgentCard~ : peerCards Map~PeerID
++AgentCard : ourCard
++SetMCPBridge(bridge: P2PMCPBridge)
++RequestCard(ctx: Context, peerID: PeerID) : (AgentCard, error)
++InvokeTool(ctx: Context, peerID: PeerID, toolName: string, args: Map~string, interface~) : (ToolResponse, error)
 }
 class AgentCard {
-+Name string
-+Version string
-+PeerID string
-+Capabilities []string
-+Tools []ToolSpec
-+Timestamp int64
++string : Name
++string : Version
++string : PeerID
++[]string : Capabilities
++[]ToolSpec : Tools
++int64 : Timestamp
 }
 class ToolSpec {
-+Name string
-+Description string
-+Parameters []ToolParameter
++string : Name
++string : Description
++[]ToolParameter : Parameters
 }
 Discovery --> PeerInfo : "maintains"
 P2PProtocolHandler --> AgentCard : "exchanges"
@@ -122,20 +122,20 @@ Execution Engines provide the runtime environment for executing tasks securely a
 classDiagram
 class ExecutionEngine {
 <<interface>>
-+Execute(ctx Context, contract ToolContract, args Map~string, interface{}~) (string, error)
++Execute(ctx: Context, contract: ToolContract, args: Map~string, interface~) : (string, error)
 }
 class ToolContract {
-+Engine string
-+Name string
-+EngineSpec Map~string, interface{}~
++string : Engine
++string : Name
++interface{}~ : EngineSpec Map~string
 }
 class RemoteMCPEngine {
-+transportManager TransportManager
-+Execute(ctx Context, contract ToolContract, args Map~string, interface{}~) (string, error)
++TransportManager : transportManager
++Execute(ctx: Context, contract: ToolContract, args: Map~string, interface~) : (string, error)
 }
 class DaggerEngine {
-+client *dagger.Client
-+Execute(ctx Context, contract ToolContract, args Map~string, interface{}~) (string, error)
++*dagger.Client : client
++Execute(ctx: Context, contract: ToolContract, args: Map~string, interface~) : (string, error)
 }
 ExecutionEngine <|.. RemoteMCPEngine
 ExecutionEngine <|.. DaggerEngine
@@ -297,7 +297,7 @@ The agent provides built-in monitoring through the WebSocket gateway, which stre
 
 The Praxis agent's core services form a robust foundation for distributed AI workflows. The P2P Networking layer enables decentralized agent discovery and communication, while the MCP Protocol standardizes tool sharing across the network. Execution Engines provide secure, pluggable runtimes for task processing, and DSL Processing bridges natural language commands with executable workflows. These services are tightly integrated through well-defined interfaces and event-driven communication, enabling agents to collaborate effectively on complex tasks. The architecture prioritizes modularity, security, and real-time interaction, making it suitable for dynamic, multi-agent environments where adaptability and reliability are paramount.
 
-**Referenced Files in This Document**   
+**Referenced Files in This Document**
 - [agent.go](file://internal/agent/agent.go#L1-L1563)
 - [discovery.go](file://internal/p2p/discovery.go#L1-L283)
 - [protocol.go](file://internal/p2p/protocol.go#L1-L536)

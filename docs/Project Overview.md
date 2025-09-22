@@ -79,51 +79,51 @@ The `PraxisAgent` struct is the central component of the system, encapsulating a
 ```mermaid
 classDiagram
 class PraxisAgent {
-+string name
-+string version
-+host.Host host
-+*p2p.Discovery discovery
-+*mcp.MCPServerWrapper mcpServer
-+*p2p.P2PMCPBridge p2pBridge
-+*p2p.P2PProtocolHandler p2pProtocol
-+*dsl.Analyzer dslAnalyzer
-+*workflow.WorkflowOrchestrator orchestrator
-+*gin.Engine httpServer
-+*api.WebSocketGateway websocketGateway
-+*bus.EventBus eventBus
-+*a2a.TaskManager taskManager
-+context.Context ctx
-+context.CancelFunc cancel
-+sync.WaitGroup wg
-+*AgentCard card
-+*mcp.TransportManager transportManager
-+map[string]contracts.ExecutionEngine executionEngines
-+*appconfig.AppConfig appConfig
-+Start() error
-+Stop() error
-+initializeP2P() error
++name : string
++version : string
++host : Host
++discovery : Discovery
++mcpServer : MCPServerWrapper
++p2pBridge : P2PMCPBridge
++p2pProtocol : P2PProtocolHandler
++dslAnalyzer : Analyzer
++orchestrator : WorkflowOrchestrator
++httpServer : Engine
++websocketGateway : WebSocketGateway
++eventBus : EventBus
++taskManager : TaskManager
++ctx : Context
++cancel : CancelFunc
++wg : WaitGroup
++card : AgentCard
++transportManager : TransportManager
++executionEngines : Map<string, ExecutionEngine>
++appConfig : AppConfig
++Start() : error
++Stop() : error
++initializeP2P() : error
 +initializeHTTP()
 +initializeDSL()
-+initializeMCP() error
++initializeMCP() : error
 }
 class AgentCard {
-+string Name
-+string Version
-+string PeerID
-+string[] Capabilities
-+[]ToolSpec Tools
-+int64 Timestamp
++Name : string
++Version : string
++PeerID : string
++Capabilities : List<string>
++Tools : List<ToolSpec>
++Timestamp : int64
 }
 class ToolSpec {
-+string Name
-+string Description
-+[]ToolParameter Parameters
++Name : string
++Description : string
++Parameters : List<ToolParameter>
 }
 class ToolParameter {
-+string Name
-+string Type
-+string Description
-+bool Required
++Name : string
++Type : string
++Description : string
++Required : bool
 }
 PraxisAgent --> AgentCard : "has"
 PraxisAgent --> ToolSpec : "exposes"
@@ -246,44 +246,44 @@ The `TaskManager` handles the lifecycle of agent-to-agent (A2A) tasks, including
 ```mermaid
 classDiagram
 class TaskManager {
-+map[string]*Task tasks
-+*bus.EventBus eventBus
-+*logrus.Logger logger
-+CreateTask(Message) *Task
-+GetTask(string) (*Task, bool)
-+UpdateTaskStatus(string, string, *Message)
-+AddArtifactToTask(string, Artifact)
-+AddMessageToHistory(string, Message)
-+ListTasks() map[string]*Task
++tasks : Map<string, Task>
++eventBus : EventBus
++logger : Logger
++CreateTask(Message) : Task
++GetTask(string) : (Task, bool)
++UpdateTaskStatus(string: string, Message)
++AddArtifactToTask(string: Artifact)
++AddMessageToHistory(string: Message)
++ListTasks() : Map<string, Task>
 }
 class Task {
-+string ID
-+string ContextID
-+TaskStatus Status
-+[]Message History
-+[]Artifact Artifacts
-+string Kind
++ID : string
++ContextID : string
++Status : TaskStatus
++History : List<Message>
++Artifacts : List<Artifact>
++Kind : string
 }
 class TaskStatus {
-+string State
-+string Timestamp
-+*Message Message
++State : string
++Timestamp : string
++Message : Message
 }
 class Message {
-+string MessageID
-+string TaskID
-+string ContextID
-+string AgentID
-+string Content
-+string Role
-+string Timestamp
++MessageID : string
++TaskID : string
++ContextID : string
++AgentID : string
++Content : string
++Role : string
++Timestamp : string
 }
 class Artifact {
-+string Name
-+string Type
-+string URI
-+string Description
-+string Timestamp
++Name : string
++Type : string
++URI : string
++Description : string
++Timestamp : string
 }
 TaskManager --> Task : "manages"
 Task --> TaskStatus : "has"
@@ -348,7 +348,7 @@ Key strengths include its event-driven architecture, real-time monitoring capabi
 
 Future enhancements could include enhanced security features, improved load balancing across agents, and expanded support for additional LLM providers and tool protocols.
 
-**Referenced Files in This Document**   
+**Referenced Files in This Document**
 - [agent/main.go](file://agent/main.go)
 - [internal/agent/agent.go](file://internal/agent/agent.go)
 - [internal/dsl/analyzer.go](file://internal/dsl/analyzer.go)

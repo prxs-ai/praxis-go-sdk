@@ -22,38 +22,38 @@ The `AgentCard` structure serves as a comprehensive capability advertisement for
 ```mermaid
 classDiagram
 class AgentCard {
-+string Name
-+string Description
-+string URL
-+string Version
-+string ProtocolVersion
-+AgentProvider Provider
-+AgentCapabilities Capabilities
-+AgentSkill[] Skills
-+map[string]interface{} SecuritySchemes
-+string[] SupportedTransports
-+interface{} Metadata
++Name : string
++Description : string
++URL : string
++Version : string
++ProtocolVersion : string
++Provider : AgentProvider
++Capabilities : AgentCapabilities
++Skills : List<AgentSkill>
++SecuritySchemes : Map<string, interface>
++SupportedTransports : List<string>
++Metadata : interface
 }
 class AgentProvider {
-+string Name
-+string Version
-+string Description
-+string URL
-+string Organization
++Name : string
++Version : string
++Description : string
++URL : string
++Organization : string
 }
 class AgentCapabilities {
-+*bool Streaming
-+*bool PushNotifications
-+*bool StateTransition
++Streaming : bool
++PushNotifications : bool
++StateTransition : bool
 }
 class AgentSkill {
-+string ID
-+string Name
-+string Description
-+string[] Tags
-+string[] Examples
-+string[] InputModes
-+string[] OutputModes
++ID : string
++Name : string
++Description : string
++Tags : List<string>
++Examples : List<string>
++InputModes : List<string>
++OutputModes : List<string>
 }
 AgentCard --> AgentProvider : "has"
 AgentCard --> AgentCapabilities : "has"
@@ -134,40 +134,40 @@ The Bridge component, implemented as `P2PMCPBridge`, plays a critical role in pr
 ```mermaid
 classDiagram
 class P2PMCPBridge {
-+host.Host host
-+*MCPServerWrapper mcpServer
-+*TransportManager transportMgr
-+map[peer.ID]*MCPClientWrapper peerClients
-+*logrus.Logger logger
-+context.Context ctx
-+context.CancelFunc cancel
-+sync.RWMutex mu
++host : Host
++mcpServer : MCPServerWrapper
++transportMgr : TransportManager
++peerClients : Map<ID, MCPClientWrapper>
++logger : Logger
++ctx : Context
++cancel : CancelFunc
++mu : RWMutex
 +handleMCPStream(stream)
 +handleCardStream(stream)
 +ProcessMCPRequest(request)
 +ConnectToPeer(peerID)
-+CallPeerTool(ctx, peerID, toolName, args)
++CallPeerTool(ctx: peerID, toolName: args)
 +ListPeers(ctx)
-+SendMessage(ctx, peerIDStr, message)
++SendMessage(ctx: peerIDStr, message)
 +GetAgentCard(peerID)
 +getAgentCard()
 +Close()
 }
 class P2PProtocolHandler {
-+host.Host host
-+*logrus.Logger logger
-+map[protocol.ID]StreamHandler handlers
-+map[peer.ID]*AgentCard peerCards
-+*AgentCard ourCard
-+*P2PMCPBridge mcpBridge
-+A2AAgent agent
-+sync.RWMutex mu
++host : Host
++logger : Logger
++handlers : Map<ID, StreamHandler>
++peerCards : Map<ID, AgentCard>
++ourCard : AgentCard
++mcpBridge : P2PMCPBridge
++agent : A2AAgent
++mu : RWMutex
 +handleMCPStream(stream)
 +handleCardStream(stream)
 +handleToolStream(stream)
-+RequestCard(ctx, peerID)
-+InvokeTool(ctx, peerID, toolName, args)
-+SendMCPRequest(ctx, peerID, request)
++RequestCard(ctx: peerID)
++InvokeTool(ctx: peerID, toolName: args)
++SendMCPRequest(ctx: peerID, request)
 +GetPeerCards()
 +processMCPMessage(msg)
 +listTools()
@@ -289,7 +289,7 @@ agentCard := &AgentCard{
 
 The `Metadata` field in the `AgentCard` struct is defined as `interface{}` with the JSON tag `metadata,omitempty`, allowing it to contain any valid JSON-serializable data structure. This design enables developers to add custom fields without modifying the core schema. For example, deployment-specific information like Kubernetes namespace, cloud region, or priority levels can be included to support advanced routing or load balancing decisions. The metadata is preserved during serialization and transmission, making it available to peer agents for decision-making purposes. This extensibility ensures that the AgentCard system can evolve to meet new requirements without breaking backward compatibility.
 
-**Referenced Files in This Document**   
+**Referenced Files in This Document**
 - [card.go](file://internal/agent/card.go#L0-L40)
 - [agent.go](file://internal/agent/agent.go#L500-L700)
 - [protocol.go](file://internal/p2p/protocol.go#L100-L250)

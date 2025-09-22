@@ -1,3 +1,5 @@
+//go:build examples
+
 package main
 
 import (
@@ -6,8 +8,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/mark3labs/mcp-go/server"
 	mcpTypes "github.com/mark3labs/mcp-go/mcp"
+	"github.com/mark3labs/mcp-go/server"
 )
 
 func main() {
@@ -76,7 +78,7 @@ func main() {
 
 	// Start stdio server (for now, as HTTP requires additional setup)
 	log.Println("Starting MCP Filesystem Server with stdio transport")
-	
+
 	// Use ServeStdio for simplicity
 	if err := server.ServeStdio(mcpServer); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
@@ -148,9 +150,9 @@ func listDirectoryHandler(ctx context.Context, req mcpTypes.CallToolRequest) (*m
 	var result string
 	for _, entry := range entries {
 		info, _ := entry.Info()
-		result += fmt.Sprintf("%s %10d %s\n", 
-			entry.Type().String(), 
-			info.Size(), 
+		result += fmt.Sprintf("%s %10d %s\n",
+			entry.Type().String(),
+			info.Size(),
 			entry.Name())
 	}
 

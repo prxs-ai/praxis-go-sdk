@@ -104,21 +104,21 @@ The `OrchestratorAnalyzer` is responsible for transforming natural language requ
 ```mermaid
 classDiagram
 class OrchestratorAnalyzer {
-+*Analyzer analyzer
-+*bus.EventBus eventBus
-+*llm.LLMClient llmClient
-+AnalyzeWithOrchestration(ctx, dsl) (interface{}, error)
-+buildNetworkContext() *llm.NetworkContext
-+findAgentsForWorkflow(ctx, ast) []map[string]interface{}
-+publishProgress(stage, message, details) void
-+publishResult(command, result, workflow) void
++analyzer : Analyzer
++eventBus : EventBus
++llmClient : LLMClient
++AnalyzeWithOrchestration(ctx: dsl) : (interface, error)
++buildNetworkContext() : NetworkContext
++findAgentsForWorkflow(ctx: ast) : List<Map<string, interface>>
++publishProgress(stage: message, details) : void
++publishResult(command: result, workflow) : void
 }
 class Analyzer {
-+*logrus.Logger logger
-+*AgentInterface agent
-+AnalyzeDSL(ctx, dsl) (interface{}, error)
-+tokenize(dsl) []string
-+parse(tokens) (*AST, error)
++logger : Logger
++agent : AgentInterface
++AnalyzeDSL(ctx: dsl) : (interface, error)
++tokenize(dsl) : List<string>
++parse(tokens) : (AST, error)
 }
 OrchestratorAnalyzer --> Analyzer : "extends"
 OrchestratorAnalyzer --> bus.EventBus : "uses"
@@ -139,42 +139,42 @@ The `WorkflowOrchestrator` manages the execution of complex workflows by coordin
 ```mermaid
 classDiagram
 class WorkflowOrchestrator {
-+*bus.EventBus eventBus
-+*dsl.Analyzer dslAnalyzer
-+AgentInterface agentInterface
-+*logrus.Logger logger
-+map[string]*WorkflowExecution workflows
-+ExecuteWorkflow(ctx, workflowID, nodes, edges) error
-+GetWorkflowStatus(workflowID) (map[string]interface{}, error)
-+buildGraph(nodes, edges) (*WorkflowGraph, error)
-+findEntryNodes(graph) []string
-+executeNode(ctx, execution, nodeID) error
++eventBus : EventBus
++dslAnalyzer : Analyzer
++agentInterface : AgentInterface
++logger : Logger
++workflows : Map<string, WorkflowExecution>
++ExecuteWorkflow(ctx: workflowID, nodes: edges) : error
++GetWorkflowStatus(workflowID) : (Map<string, interface>, error)
++buildGraph(nodes: edges) : (WorkflowGraph, error)
++findEntryNodes(graph) : List<string>
++executeNode(ctx: execution, nodeID) : error
 }
 class WorkflowExecution {
-+string ID
-+*WorkflowGraph Graph
-+string Status
-+time.Time StartTime
-+*time.Time EndTime
-+map[string]interface{} Results
++ID : string
++Graph : WorkflowGraph
++Status : string
++StartTime : Time
++EndTime : Time
++Results : Map<string, interface>
 }
 class WorkflowGraph {
-+map[string]*Node Nodes
-+[]*Edge Edges
-+map[string][]string Adjacency
++Nodes : Map<string, Node>
++Edges : List<Edge>
++Adjacency : Map<string, List<string>>
 }
 class Node {
-+string ID
-+string Type
-+map[string]int Position
-+map[string]interface{} Data
-+NodeStatus Status
++ID : string
++Type : string
++Position : Map<string, int>
++Data : Map<string, interface>
++Status : NodeStatus
 }
 class Edge {
-+string ID
-+string Source
-+string Target
-+string Type
++ID : string
++Source : string
++Target : string
++Type : string
 }
 class NodeStatus {
 <<enumeration>>
@@ -353,7 +353,7 @@ Common issues and their solutions when working with the DSL Orchestrator:
 ## Conclusion
 The DSL Orchestrator provides a robust framework for transforming natural language requests into executable workflows across distributed agent networks. By leveraging AI-driven planning, the system intelligently selects appropriate agents and tools based on capabilities and availability. The modular architecture enables seamless integration with various execution engines and communication protocols, while the EventBus provides real-time visibility into workflow execution. Future enhancements could include more sophisticated error recovery mechanisms, enhanced parallelization strategies, and improved resource optimization algorithms.
 
-**Referenced Files in This Document**   
+**Referenced Files in This Document**
 - [agent.go](file://internal/agent/agent.go#L0-L1563)
 - [orchestrator.go](file://internal/dsl/orchestrator.go#L0-L1172)
 - [workflow_orchestrator.go](file://internal/workflow/workflow_orchestrator.go#L0-L517)

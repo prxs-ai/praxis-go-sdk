@@ -318,7 +318,7 @@ if [ "$peer_count" -gt 0 ]; then
     print_success "P2P discovery working: $peer_count peers discovered"
 else
     print_error "No P2P peers discovered"
-    
+
     # Check logs for discovery issues
     docker logs praxis-agent-1 2>&1 | grep -E "(Discovered|Card exchange|Connected)" | tail -5
     return 1
@@ -424,7 +424,7 @@ For large-scale deployments, consider the following optimization strategies:
 
 These strategies can reduce network overhead while maintaining reliable peer discovery in large-scale deployments.
 
-**Referenced Files in This Document**   
+**Referenced Files in This Document**
 - [discovery.go](file://internal/p2p/discovery.go)
 - [protocol.go](file://internal/p2p/protocol.go)
 - [bridge.go](file://internal/p2p/bridge.go)
