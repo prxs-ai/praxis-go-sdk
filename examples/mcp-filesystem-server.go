@@ -1,3 +1,5 @@
+//go:build examples
+
 package main
 
 import (
@@ -178,7 +180,7 @@ func (s *FileSystemServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						"name":        "list_allowed_directories",
 						"description": "List all directories the server is allowed to access",
 						"inputSchema": map[string]interface{}{
-							"type": "object",
+							"type":       "object",
 							"properties": map[string]interface{}{},
 						},
 					},
@@ -376,7 +378,7 @@ func (s *FileSystemServer) searchFiles(path string, pattern string) ([]string, e
 		}
 		return nil
 	})
-	
+
 	if err != nil {
 		return nil, err
 	}
@@ -411,11 +413,11 @@ func main() {
 	}
 
 	log.Printf("Starting MCP Filesystem Server with access to: %v", allowedDirs)
-	
+
 	server := NewFileSystemServer(allowedDirs)
-	
+
 	http.HandleFunc("/mcp", server.ServeHTTP)
-	
+
 	log.Println("MCP Filesystem Server listening on http://localhost:3000/mcp")
 	if err := http.ListenAndServe(":3000", nil); err != nil {
 		log.Fatalf("Server failed: %v", err)

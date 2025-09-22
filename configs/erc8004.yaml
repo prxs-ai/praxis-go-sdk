@@ -1,0 +1,6 @@
+networks:
+  sepolia:
+    rpc: https://sepolia.infura.io/v3/f592d86d563c456e808f9eb554b35c96
+    identity: "0x127C86a24F46033E77C347258354ee4C739b139C"
+    reputation: "0x57396214E6E65E9B3788DE7705D5ABf3647764e0"
+    validation: "0x5d332cE798e491feF2de260bddC7f24978eefD85"

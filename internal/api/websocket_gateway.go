@@ -11,6 +11,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/praxis/praxis-go-sdk/internal/bus"
 	"github.com/praxis/praxis-go-sdk/internal/dsl"
+	"github.com/praxis/praxis-go-sdk/internal/workflow"
 	"github.com/sirupsen/logrus"
 )
 
@@ -88,6 +89,10 @@ type WebSocketGateway struct {
 // WorkflowOrchestrator interface for workflow execution
 type WorkflowOrchestrator interface {
 	ExecuteWorkflow(ctx context.Context, workflowID string, nodes []interface{}, edges []interface{}) error
+}
+
+type workflowExecWithOpts interface {
+	ExecuteWorkflowWithOptions(ctx context.Context, workflowID string, nodes []interface{}, edges []interface{}, opts *workflow.WorkflowOptions) error
 }
 
 // NewWebSocketGateway creates a new WebSocket gateway
@@ -170,14 +175,14 @@ func (gw *WebSocketGateway) handleWebSocket(w http.ResponseWriter, r *http.Reque
 func (gw *WebSocketGateway) readPump(client *Client) {
 	defer func() {
 		client.hub.unregister <- client
-		client.conn.Close()
+		_ = client.conn.Close()
 		gw.logger.Infof("WebSocket client disconnected: %s", client.clientID)
 	}()
 
 	client.conn.SetReadLimit(maxMessageSize)
-	client.conn.SetReadDeadline(time.Now().Add(pongWait))
+	_ = client.conn.SetReadDeadline(time.Now().Add(pongWait))
 	client.conn.SetPongHandler(func(string) error {
-		client.conn.SetReadDeadline(time.Now().Add(pongWait))
+		_ = client.conn.SetReadDeadline(time.Now().Add(pongWait))
 		return nil
 	})
 
@@ -206,15 +211,15 @@ func (c *Client) writePump() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		ticker.Stop()
-		c.conn.Close()
+		_ = c.conn.Close()
 	}()
 
 	for {
 		select {
 		case message, ok := <-c.send:
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			_ = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
-				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+				_ = c.conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
 
@@ -232,7 +237,7 @@ func (c *Client) writePump() {
 			}
 
 		case <-ticker.C:
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			_ = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				return
 			}
@@ -300,6 +305,21 @@ func (gw *WebSocketGateway) handleDSLCommand(client *Client, payload map[string]
 	if workflowID == "" {
 		workflowID = fmt.Sprintf("workflow-%d", time.Now().UnixNano())
 	}
+	// Pull optional params/secrets from payload and inject into analyzers
+	ps := &dsl.ParamStore{
+		Params:  toStringAnyMap(payload["params"]),
+		Secrets: toStringStringMap(payload["secrets"]),
+	}
+	// Safe even if empty; avoids secret leakage in logs
+	if gw.orchestratorAnalyzer != nil {
+		gw.orchestratorAnalyzer.SetParams(ps)
+	}
+	if gw.dslAnalyzer != nil {
+		// Analyzer has SetParams in our DSL extension
+		if setter, ok := interface{}(gw.dslAnalyzer).(interface{ SetParams(*dsl.ParamStore) }); ok {
+			setter.SetParams(ps)
+		}
+	}
 
 	// Use OrchestratorAnalyzer if available for better agent selection and UI feedback
 	ctx := context.Background()
@@ -349,13 +369,16 @@ func (gw *WebSocketGateway) handleDSLCommand(client *Client, payload map[string]
 
 // handleExecuteWorkflow processes workflow execution requests
 func (gw *WebSocketGateway) handleExecuteWorkflow(client *Client, payload map[string]interface{}) {
+	params := toStringAnyMap(payload["params"])
+	secrets := toStringStringMap(payload["secrets"])
+
 	// First check if we have the full workflow object with an ID
 	if workflow, ok := payload["workflow"].(map[string]interface{}); ok {
 		if workflowID, ok := workflow["id"].(string); ok {
 			// This is a stored workflow - execute it
 			if gw.orchestratorAnalyzer != nil {
 				gw.logger.Infof("▶️ Executing stored workflow: %s", workflowID)
-				
+
 				// Publish workflow start event
 				gw.eventBus.Publish(bus.Event{
 					Type: bus.EventWorkflowStart,
@@ -363,20 +386,24 @@ func (gw *WebSocketGateway) handleExecuteWorkflow(client *Client, payload map[st
 						"workflowId": workflowID,
 					},
 				})
-				
+
 				ctx := context.Background()
 				go func() {
+					gw.orchestratorAnalyzer.SetParams(&dsl.ParamStore{
+						Params:  params,
+						Secrets: secrets,
+					})
 					result, err := gw.orchestratorAnalyzer.ExecuteStoredWorkflow(ctx, workflowID)
 					if err != nil {
 						gw.logger.Errorf("Workflow execution failed: %v", err)
 						gw.eventBus.PublishWorkflowError(workflowID, err.Error(), "")
 					} else {
 						gw.logger.Infof("✅ Workflow %s executed successfully", workflowID)
-						
+
 						// Extract tool execution results for better frontend display
 						var message string
 						var toolResults []interface{}
-						
+
 						if resultMap, ok := result.(map[string]interface{}); ok {
 							if results, ok := resultMap["results"].([]interface{}); ok && len(results) > 0 {
 								toolResults = results
@@ -400,17 +427,17 @@ func (gw *WebSocketGateway) handleExecuteWorkflow(client *Client, payload map[st
 								}
 							}
 						}
-						
+
 						if message == "" {
 							message = "Workflow execution completed"
 						}
-						
+
 						gw.eventBus.Publish(bus.Event{
 							Type: bus.EventWorkflowComplete,
 							Payload: map[string]interface{}{
-								"workflowId": workflowID,
-								"result":     result,
-								"message":    message,
+								"workflowId":  workflowID,
+								"result":      result,
+								"message":     message,
 								"toolResults": toolResults,
 							},
 						})
@@ -420,7 +447,7 @@ func (gw *WebSocketGateway) handleExecuteWorkflow(client *Client, payload map[st
 			}
 		}
 	}
-	
+
 	// Fallback to old method with nodes and edges
 	workflowID, _ := payload["workflowId"].(string)
 	if workflowID == "" {
@@ -447,6 +474,18 @@ func (gw *WebSocketGateway) handleExecuteWorkflow(client *Client, payload map[st
 	if gw.orchestrator != nil {
 		ctx := context.Background()
 		go func() {
+			// Prefer parameterized execution if supported by orchestrator
+			if withOpts, ok := gw.orchestrator.(workflowExecWithOpts); ok {
+				err := withOpts.ExecuteWorkflowWithOptions(ctx, workflowID, nodes, edges, &workflow.WorkflowOptions{
+					Params:  params,
+					Secrets: secrets,
+				})
+				if err != nil {
+					gw.eventBus.PublishWorkflowError(workflowID, err.Error(), "")
+				}
+				return
+			}
+			// Legacy path (no params support)
 			err := gw.orchestrator.ExecuteWorkflow(ctx, workflowID, nodes, edges)
 			if err != nil {
 				gw.eventBus.PublishWorkflowError(workflowID, err.Error(), "")
@@ -462,7 +501,7 @@ func (gw *WebSocketGateway) handleExecuteWorkflow(client *Client, payload map[st
 func (gw *WebSocketGateway) handleChatMessage(client *Client, payload map[string]interface{}) {
 	content, _ := payload["content"].(string)
 	gw.logger.Infof("📨 Received chat message: %s", content)
-	
+
 	// Log orchestrator status
 	if gw.orchestratorAnalyzer == nil {
 		gw.logger.Warn("⚠️ OrchestratorAnalyzer is nil - cannot process message!")
@@ -486,7 +525,7 @@ func (gw *WebSocketGateway) handleChatMessage(client *Client, payload map[string
 			go func() {
 				ctx := context.Background()
 				gw.logger.Infof("🚀 Processing chat message with OrchestratorAnalyzer: %s", content)
-				
+
 				// Use orchestrator analyzer for intelligent processing
 				result, err := gw.orchestratorAnalyzer.AnalyzeWithOrchestration(ctx, content)
 				if err != nil {
@@ -519,29 +558,29 @@ func (gw *WebSocketGateway) handleChatMessage(client *Client, payload map[string
 			go func() {
 				ctx := context.Background()
 				gw.logger.Infof("Processing chat message with DSL analyzer: %s", content)
-			
-			result, err := gw.dslAnalyzer.AnalyzeDSL(ctx, content)
-			if err != nil {
-				gw.logger.Errorf("Failed to analyze DSL: %v", err)
+
+				result, err := gw.dslAnalyzer.AnalyzeDSL(ctx, content)
+				if err != nil {
+					gw.logger.Errorf("Failed to analyze DSL: %v", err)
+					gw.eventBus.Publish(bus.Event{
+						Type: bus.EventChatMessage,
+						Payload: map[string]interface{}{
+							"content": fmt.Sprintf("❌ Error: %v", err),
+							"sender":  "system",
+						},
+					})
+					return
+				}
+
+				// Send success message
 				gw.eventBus.Publish(bus.Event{
 					Type: bus.EventChatMessage,
 					Payload: map[string]interface{}{
-						"content": fmt.Sprintf("❌ Error: %v", err),
+						"content": fmt.Sprintf("✅ Result: %v", result),
 						"sender":  "system",
 					},
 				})
-				return
-			}
-
-			// Send success message  
-			gw.eventBus.Publish(bus.Event{
-				Type: bus.EventChatMessage,
-				Payload: map[string]interface{}{
-					"content": fmt.Sprintf("✅ Result: %v", result),
-					"sender":  "system",
-				},
-			})
-		}()
+			}()
 		}
 	}
 }
@@ -668,4 +707,35 @@ func (gw *WebSocketGateway) simulateWorkflowExecution(workflowID string, nodes [
 			"message": "Workflow completed successfully",
 		})
 	}()
+}
+
+func toStringAnyMap(v interface{}) map[string]interface{} {
+	out := map[string]interface{}{}
+	if v == nil {
+		return out
+	}
+	if m, ok := v.(map[string]interface{}); ok {
+		return m
+	}
+	// tolerate JSON maps that came in as map[string]any already
+	if m, ok := v.(map[string]any); ok {
+		return m
+	}
+	return out
+}
+
+func toStringStringMap(v interface{}) map[string]string {
+	out := map[string]string{}
+	if v == nil {
+		return out
+	}
+	if m, ok := v.(map[string]string); ok {
+		return m
+	}
+	if m, ok := v.(map[string]interface{}); ok {
+		for k, vv := range m {
+			out[k] = fmt.Sprintf("%v", vv)
+		}
+	}
+	return out
 }

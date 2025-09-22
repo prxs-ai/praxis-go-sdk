@@ -22,15 +22,15 @@ func NewTaskManager(eb *bus.EventBus, logger *logrus.Logger) *TaskManager {
 	if logger == nil {
 		logger = logrus.New()
 	}
-	
+
 	tm := &TaskManager{
 		tasks:    make(map[string]*Task),
 		eventBus: eb,
 		logger:   logger,
 	}
-	
+
 	logger.Info("A2A TaskManager initialized successfully")
-	
+
 	return tm
 }
 
@@ -82,7 +82,7 @@ func (tm *TaskManager) CreateTask(msg Message) *Task {
 func (tm *TaskManager) GetTask(id string) (*Task, bool) {
 	tm.mu.RLock()
 	defer tm.mu.RUnlock()
-	
+
 	task, exists := tm.tasks[id]
 	return task, exists
 }
@@ -203,7 +203,7 @@ func (tm *TaskManager) CleanupCompletedTasks(olderThan time.Duration) int {
 	cleaned := 0
 
 	for id, task := range tm.tasks {
-		if task.Status.State == "completed" || task.Status.State == "failed" {
+		if task.Status.State == "completed" || task.Status.State == "failed" || task.Status.State == "canceled" || task.Status.State == "rejected" {
 			if timestamp, err := time.Parse(time.RFC3339, task.Status.Timestamp); err == nil {
 				if timestamp.Before(cutoff) {
 					delete(tm.tasks, id)
@@ -220,6 +220,54 @@ func (tm *TaskManager) CleanupCompletedTasks(olderThan time.Duration) int {
 	return cleaned
 }
 
+// CancelTask cancels a task if it's in a cancelable state
+func (tm *TaskManager) CancelTask(id string) (*Task, error) {
+	tm.mu.Lock()
+	defer tm.mu.Unlock()
+
+	// Check if task exists
+	task, exists := tm.tasks[id]
+	if !exists {
+		return nil, ErrTaskNotFound
+	}
+
+	// Check if task is in a cancelable state
+	// Non-cancelable states: completed, failed, canceled, rejected
+	nonCancelableStates := map[string]bool{
+		"completed": true,
+		"failed":    true,
+		"canceled":  true,
+		"rejected":  true,
+	}
+
+	if nonCancelableStates[task.Status.State] {
+		tm.logger.Warnf("[TaskID: %s] Attempted to cancel task in non-cancelable state: %s", id, task.Status.State)
+		return nil, ErrTaskNotCancelable
+	}
+
+	// Update task status to canceled
+	oldState := task.Status.State
+	task.Status.State = "canceled"
+	task.Status.Timestamp = time.Now().UTC().Format(time.RFC3339)
+
+	tm.logger.Infof("[TaskID: %s] Status updated from '%s' to 'canceled'", id, oldState)
+
+	// Publish task cancellation event
+	if tm.eventBus != nil {
+		tm.eventBus.Publish(bus.Event{
+			Type: bus.EventTaskStatusUpdate,
+			Payload: map[string]interface{}{
+				"taskId":   id,
+				"oldState": oldState,
+				"newState": "canceled",
+				"status":   task.Status,
+			},
+		})
+	}
+
+	return task, nil
+}
+
 // GetTaskCount returns the number of tasks by state
 func (tm *TaskManager) GetTaskCount() map[string]int {
 	tm.mu.RLock()
@@ -231,6 +279,9 @@ func (tm *TaskManager) GetTaskCount() map[string]int {
 		"completed":      0,
 		"failed":         0,
 		"input-required": 0,
+		"canceled":       0,
+		"rejected":       0,
+		"auth-required":  0,
 	}
 
 	for _, task := range tm.tasks {

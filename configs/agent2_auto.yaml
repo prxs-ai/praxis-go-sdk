@@ -4,11 +4,11 @@ agent:
   description: "Agent with Auto-discovered External MCP Tools"
   url: "http://localhost:8001"
   shared_dir: "./shared"
-  
+
   # External MCP servers for automatic tool discovery
   external_mcp_servers:
     - "http://host.docker.internal:8080"  # For Docker to access host
-  
+
   # No manual tools - all will be auto-discovered
   tools: []
 

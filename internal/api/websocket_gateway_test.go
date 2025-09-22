@@ -13,6 +13,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/praxis/praxis-go-sdk/internal/bus"
 	"github.com/praxis/praxis-go-sdk/internal/dsl"
+	"github.com/praxis/praxis-go-sdk/internal/workflow"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
@@ -25,6 +26,48 @@ type MockOrchestrator struct {
 func (m *MockOrchestrator) ExecuteWorkflow(ctx context.Context, workflowID string, nodes []interface{}, edges []interface{}) error {
 	m.called = true
 	return nil
+}
+
+// MockOrchestratorWithOpts captures WorkflowOptions when available
+type MockOrchestratorWithOpts struct {
+	calledLegacy   bool
+	calledWithOpts bool
+	lastOpts       *workflow.WorkflowOptions
+	calledCh       chan struct{}
+}
+
+func (m *MockOrchestratorWithOpts) ExecuteWorkflow(ctx context.Context, id string, nodes, edges []interface{}) error {
+	m.calledLegacy = true
+	return nil
+}
+
+func (m *MockOrchestratorWithOpts) ExecuteWorkflowWithOptions(ctx context.Context, id string, nodes, edges []interface{}, opts *workflow.WorkflowOptions) error {
+	m.calledWithOpts = true
+	m.lastOpts = opts
+	if m.calledCh != nil {
+		select {
+		case m.calledCh <- struct{}{}:
+		default:
+		}
+	}
+	return nil
+}
+
+// wsReadUntilType reads messages until we see the given event type or timeout
+func wsReadUntilType(ws *websocket.Conn, want string, timeout time.Duration) (map[string]interface{}, error) {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		_ = ws.SetReadDeadline(time.Now().Add(2 * time.Second))
+		var msg map[string]interface{}
+		if err := ws.ReadJSON(&msg); err != nil {
+			// keep looping until deadline
+			continue
+		}
+		if typ, _ := msg["type"].(string); typ == want {
+			return msg, nil
+		}
+	}
+	return nil, fmt.Errorf("did not receive %s before timeout", want)
 }
 
 // INT-WS-01: Test WebSocketGateway message parsing and routing
@@ -179,11 +222,160 @@ func TestWebSocketGateway_MessageRouting(t *testing.T) {
 		assert.True(t, foundChatMessage, "Expected to receive chatMessage event")
 		assert.NotNil(t, response["payload"])
 
-		payload := response["payload"]
-		if payloadMap, ok := payload.(map[string]interface{}); ok {
-			assert.Contains(t, payloadMap["content"], "Processing")
+		// Payload.content can be the intermediate log ("Processing ...")
+		// OR the final structured result ("✅ Result: ... status:completed ...")
+		if payloadMap, ok := response["payload"].(map[string]interface{}); ok {
+			content := fmt.Sprint(payloadMap["content"]) // safe stringify
+			okProcessing := strings.Contains(content, "Processing")
+			okFinal := strings.Contains(content, "status:completed") &&
+				strings.Contains(content, "type:command") &&
+				strings.Contains(content, "value:Test")
+
+			assert.True(
+				t,
+				okProcessing || okFinal,
+				"expected either an in-flight 'Processing' log or a final result with 'status:completed', 'type:command', and 'value:Test'; got: %q",
+				content,
+			)
 		}
 	})
+}
+
+// INT-WS-02: Ensure ExecuteWorkflow uses options when supported and passes params/secrets
+func TestWebSocketGateway_ExecuteWorkflow_PassesOptions(t *testing.T) {
+	logger := logrus.New()
+	eventBus := bus.NewEventBus(logger)
+	dslAnalyzer := dsl.NewAnalyzer(logger)
+	gateway := NewWebSocketGateway(9001, eventBus, dslAnalyzer, logger)
+
+	mockOrch := &MockOrchestratorWithOpts{calledCh: make(chan struct{}, 1)}
+	gateway.SetOrchestrator(mockOrch)
+	go gateway.hub.run()
+
+	server := httptest.NewServer(http.HandlerFunc(gateway.handleWebSocket))
+	defer server.Close()
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws/workflow"
+
+	ws, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	assert.NoError(t, err)
+	defer ws.Close()
+
+	msg := map[string]interface{}{
+		"type": "EXECUTE_WORKFLOW",
+		"payload": map[string]interface{}{
+			"workflowId": "wf-opts-1",
+			"nodes": []interface{}{
+				map[string]interface{}{
+					"id":   "n1",
+					"type": "tool",
+					"data": map[string]interface{}{
+						"label": "Tool",
+						"type":  "tool",
+						"args": map[string]interface{}{
+							"username": "{{params.username}}",
+							"token":    "{{secrets.apify_key}}",
+						},
+					},
+				},
+			},
+			"edges":   []interface{}{},
+			"params":  map[string]interface{}{"username": "elonmusk"},
+			"secrets": map[string]interface{}{"apify_key": "SECRET123"},
+		},
+	}
+	assert.NoError(t, ws.WriteJSON(msg))
+
+	// Expect workflowStart event
+	_, err = wsReadUntilType(ws, "workflowStart", 3*time.Second)
+	assert.NoError(t, err)
+
+	// Wait until orchestrator receives options
+	select {
+	case <-mockOrch.calledCh:
+	case <-time.After(2 * time.Second):
+		t.Fatal("orchestrator was not called with options")
+	}
+	assert.True(t, mockOrch.calledWithOpts, "ExecuteWorkflowWithOptions should be used")
+	if assert.NotNil(t, mockOrch.lastOpts) {
+		assert.Equal(t, "elonmusk", mockOrch.lastOpts.Params["username"])
+		assert.Equal(t, "SECRET123", mockOrch.lastOpts.Secrets["apify_key"])
+	}
+}
+
+// INT-WS-03: Ensure DSL_COMMAND interpolates params into analyzer execution
+func TestWebSocketGateway_DSLCommand_ParamsInterpolation(t *testing.T) {
+	logger := logrus.New()
+	eventBus := bus.NewEventBus(logger)
+	dslAnalyzer := dsl.NewAnalyzer(logger)
+	gateway := NewWebSocketGateway(9001, eventBus, dslAnalyzer, logger)
+	go gateway.hub.run()
+
+	server := httptest.NewServer(http.HandlerFunc(gateway.handleWebSocket))
+	defer server.Close()
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws/workflow"
+
+	ws, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	assert.NoError(t, err)
+	defer ws.Close()
+
+	// This uses analyzer's CALL path; with our analyzer extensions, args are resolved.
+	msg := map[string]interface{}{
+		"type": "DSL_COMMAND",
+		"payload": map[string]interface{}{
+			"command": `CALL write_file --filename "out.txt" --content "Hello {{params.name}}"`,
+			"params":  map[string]interface{}{"name": "Praxis"},
+		},
+	}
+	assert.NoError(t, ws.WriteJSON(msg))
+
+	// Read until dslResult
+	resp, err := wsReadUntilType(ws, "dslResult", 5*time.Second)
+	assert.NoError(t, err)
+	pl := resp["payload"].(map[string]interface{})
+	res := pl["result"].(map[string]interface{})
+	results := res["results"].([]interface{})
+	assert.NotEmpty(t, results)
+	first := results[0].(map[string]interface{})
+	args := first["args"].(map[string]interface{})
+	assert.Equal(t, "out.txt", args["filename"])
+	assert.Equal(t, "Hello Praxis", args["content"]) // <- interpolation worked
+}
+
+// INT-WS-04: Ensure DSL_COMMAND supports {{env.*}} interpolation
+func TestWebSocketGateway_DSLCommand_EnvInterpolation(t *testing.T) {
+	t.Setenv("PRACTICE_VAR", "FromEnv")
+
+	logger := logrus.New()
+	eventBus := bus.NewEventBus(logger)
+	dslAnalyzer := dsl.NewAnalyzer(logger)
+	gateway := NewWebSocketGateway(9001, eventBus, dslAnalyzer, logger)
+	go gateway.hub.run()
+
+	server := httptest.NewServer(http.HandlerFunc(gateway.handleWebSocket))
+	defer server.Close()
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws/workflow"
+
+	ws, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	assert.NoError(t, err)
+	defer ws.Close()
+
+	msg := map[string]interface{}{
+		"type": "DSL_COMMAND",
+		"payload": map[string]interface{}{
+			"command": `CALL write_file --filename "out.txt" --content "Env={{env.PRACTICE_VAR}}"`,
+		},
+	}
+	assert.NoError(t, ws.WriteJSON(msg))
+
+	resp, err := wsReadUntilType(ws, "dslResult", 5*time.Second)
+	assert.NoError(t, err)
+
+	pl := resp["payload"].(map[string]interface{})
+	res := pl["result"].(map[string]interface{})
+	results := res["results"].([]interface{})
+	args := results[0].(map[string]interface{})["args"].(map[string]interface{})
+
+	assert.Equal(t, "Env=FromEnv", args["content"])
 }
 
 // INT-BUS-01: Test EventBus end-to-end event flow
@@ -237,7 +429,6 @@ func TestEventBus_EndToEnd(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 
 		// Events should be processed
-		// (In real implementation, we'd check the WebSocket output)
 	})
 
 	t.Run("Multiple subscribers", func(t *testing.T) {

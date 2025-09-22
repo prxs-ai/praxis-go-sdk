@@ -1,16 +1,15 @@
+//go:build examples
+
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
+	mcpTypes "github.com/mark3labs/mcp-go/mcp"
+	"github.com/mark3labs/mcp-go/server"
 	"io"
 	"log"
 	"net/http"
-	"os"
-
-	"github.com/mark3labs/mcp-go/server"
-	mcpTypes "github.com/mark3labs/mcp-go/mcp"
 )
 
 type SSETransport struct {
@@ -51,7 +50,7 @@ func (t *SSETransport) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Handle different methods
 	method, _ := request["method"].(string)
 	id := request["id"]
-	
+
 	var response map[string]interface{}
 
 	switch method {
@@ -161,12 +160,12 @@ func main() {
 		"Simple MCP Server",
 		"1.0.0",
 	)
-	
+
 	transport := NewSSETransport(mcpServer)
 
 	// Setup HTTP server
 	http.HandleFunc("/mcp", transport.ServeHTTP)
-	
+
 	log.Println("Starting Simple MCP Server on http://localhost:3000/mcp")
 	if err := http.ListenAndServe(":3000", nil); err != nil {
 		log.Fatalf("Server failed: %v", err)

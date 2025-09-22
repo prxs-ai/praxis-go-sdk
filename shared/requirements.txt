@@ -6,7 +6,7 @@ apify-client>=1.7.0
 
 # Standard libraries already included in python:3.11-slim:
 # - json (built-in)
-# - sys (built-in) 
+# - sys (built-in)
 # - os (built-in)
 # - argparse (built-in)
 # - datetime (built-in)
