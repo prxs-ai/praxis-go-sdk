@@ -3,6 +3,9 @@ package workflow
 import (
 	"context"
 	"fmt"
+	"os"
+	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -56,6 +59,12 @@ type WorkflowOrchestrator struct {
 	workflows      map[string]*WorkflowExecution
 }
 
+// WorkflowOptions allows passing runtime parameters and secrets
+type WorkflowOptions struct {
+	Params  map[string]interface{}
+	Secrets map[string]string
+}
+
 // WorkflowExecution represents an active workflow execution
 type WorkflowExecution struct {
 	ID        string
@@ -65,6 +74,8 @@ type WorkflowExecution struct {
 	EndTime   *time.Time
 	Results   map[string]interface{}
 	mu        sync.RWMutex
+	Params    map[string]interface{}
+	Secrets   map[string]string
 }
 
 // AgentInterface provides access to agent functionality
@@ -90,15 +101,34 @@ func (wo *WorkflowOrchestrator) SetAgentInterface(agent AgentInterface) {
 	wo.agentInterface = agent
 }
 
-// ExecuteWorkflow executes a workflow from nodes and edges
+// Back-compat wrapper
 func (wo *WorkflowOrchestrator) ExecuteWorkflow(ctx context.Context, workflowID string, nodes []interface{}, edges []interface{}) error {
-	wo.logger.Infof("Starting workflow execution: %s", workflowID)
+	// Back-compat wrapper
+	return wo.ExecuteWorkflowWithOptions(ctx, workflowID, nodes, edges, nil)
+}
 
+// ExecuteWorkflowWithOptions executes a workflow and injects custom parameters
+func (wo *WorkflowOrchestrator) ExecuteWorkflowWithOptions(ctx context.Context, workflowID string, nodes []interface{}, edges []interface{}, opts *WorkflowOptions) error {
+	wo.logger.Infof("Starting workflow execution: %s", workflowID)
+	wo.logger.Infof("Starting workflow execution: %s", workflowID)
 	// Build workflow graph
 	graph, err := wo.buildGraph(nodes, edges)
 	if err != nil {
 		wo.eventBus.PublishWorkflowError(workflowID, fmt.Sprintf("Failed to build workflow graph: %v", err), "")
 		return err
+	}
+
+	var params map[string]interface{}
+	var secrets map[string]string
+	if opts != nil {
+		params = opts.Params
+		secrets = opts.Secrets
+	}
+	if params == nil {
+		params = map[string]interface{}{}
+	}
+	if secrets == nil {
+		secrets = map[string]string{}
 	}
 
 	// Create workflow execution
@@ -108,6 +138,8 @@ func (wo *WorkflowOrchestrator) ExecuteWorkflow(ctx context.Context, workflowID 
 		Status:    "running",
 		StartTime: time.Now(),
 		Results:   make(map[string]interface{}),
+		Params:    params,
+		Secrets:   secrets,
 	}
 
 	wo.mu.Lock()
@@ -166,6 +198,80 @@ func (wo *WorkflowOrchestrator) ExecuteWorkflow(ctx context.Context, workflowID 
 
 	wo.logger.Infof("Workflow %s completed successfully", workflowID)
 	return nil
+}
+
+// ---- interpolation helpers --------------------------------------------------
+
+var rePlaceholder = regexp.MustCompile(`\{\{\s*(params|secrets|env)\.([a-zA-Z0-9_\-\.]+)\s*\}\}`)
+
+func (wo *WorkflowOrchestrator) resolveArgs(raw map[string]interface{}, params map[string]interface{}, secrets map[string]string) map[string]interface{} {
+	if raw == nil {
+		return nil
+	}
+	out := make(map[string]interface{}, len(raw))
+	for k, v := range raw {
+		out[k] = wo.resolveValue(v, params, secrets)
+	}
+	return out
+}
+
+func (wo *WorkflowOrchestrator) resolveValue(v interface{}, params map[string]interface{}, secrets map[string]string) interface{} {
+	switch t := v.(type) {
+	case string:
+		return wo.interpolateString(t, params, secrets)
+	case map[string]interface{}:
+		return wo.resolveArgs(t, params, secrets)
+	case []interface{}:
+		arr := make([]interface{}, len(t))
+		for i, item := range t {
+			arr[i] = wo.resolveValue(item, params, secrets)
+		}
+		return arr
+	default:
+		return v
+	}
+}
+
+func (wo *WorkflowOrchestrator) interpolateString(s string, params map[string]interface{}, secrets map[string]string) string {
+	if s == "" || !strings.Contains(s, "{{") {
+		return s
+	}
+	return rePlaceholder.ReplaceAllStringFunc(s, func(m string) string {
+		sub := rePlaceholder.FindStringSubmatch(m)
+		if len(sub) != 3 {
+			return m
+		}
+		scope, path := sub[1], sub[2]
+		switch scope {
+		case "params":
+			if val, ok := getFromNested(params, path); ok {
+				return fmt.Sprintf("%v", val)
+			}
+		case "secrets":
+			if v, ok := secrets[path]; ok {
+				return v
+			}
+		case "env":
+			return os.Getenv(path)
+		}
+		return ""
+	})
+}
+
+func getFromNested(m map[string]interface{}, path string) (interface{}, bool) {
+	parts := strings.Split(path, ".")
+	var cur interface{} = m
+	for _, p := range parts {
+		asMap, ok := cur.(map[string]interface{})
+		if !ok {
+			return nil, false
+		}
+		cur, ok = asMap[p]
+		if !ok {
+			return nil, false
+		}
+	}
+	return cur, true
 }
 
 // buildGraph builds a workflow graph from nodes and edges
@@ -388,6 +494,11 @@ func (wo *WorkflowOrchestrator) executeExecutorNode(ctx context.Context, node *N
 	toolName, _ := node.Data["tool"].(string)
 	args, _ := node.Data["args"].(map[string]interface{})
 
+	// Parameter interpolation
+	if execution := wo.findExecutionByNode(node.ID); execution != nil {
+		args = wo.resolveArgs(args, execution.Params, execution.Secrets)
+	}
+
 	if toolName == "" {
 		// Simulate executor work if no tool specified
 		time.Sleep(1 * time.Second)
@@ -425,6 +536,11 @@ func (wo *WorkflowOrchestrator) executeToolNode(ctx context.Context, node *Node)
 
 	toolName, _ := node.Data["name"].(string)
 	args, _ := node.Data["args"].(map[string]interface{})
+
+	// Parameter interpolation
+	if execution := wo.findExecutionByNode(node.ID); execution != nil {
+		args = wo.resolveArgs(args, execution.Params, execution.Secrets)
+	}
 
 	if wo.agentInterface != nil && toolName != "" {
 		// Try local execution first
@@ -505,6 +621,11 @@ func (wo *WorkflowOrchestrator) GetWorkflowStatus(workflowID string) (map[string
 		status["duration"] = execution.EndTime.Sub(execution.StartTime).String()
 	}
 
+	// Return only public params (not secrets) for observability
+	if len(execution.Params) > 0 {
+		status["params"] = execution.Params
+	}
+
 	// Add node statuses
 	nodeStatuses := make(map[string]string)
 	for id, node := range execution.Graph.Nodes {
@@ -513,4 +634,17 @@ func (wo *WorkflowOrchestrator) GetWorkflowStatus(workflowID string) (map[string
 	status["nodeStatuses"] = nodeStatuses
 
 	return status, nil
+}
+
+// findExecutionByNode is a tiny helper to locate the execution by scanning active workflows
+// (kept simple to avoid changing call signatures across many methods)
+func (wo *WorkflowOrchestrator) findExecutionByNode(nodeID string) *WorkflowExecution {
+	wo.mu.RLock()
+	defer wo.mu.RUnlock()
+	for _, ex := range wo.workflows {
+		if _, ok := ex.Graph.Nodes[nodeID]; ok {
+			return ex
+		}
+	}
+	return nil
 }

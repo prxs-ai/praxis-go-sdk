@@ -4,6 +4,7 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	mcpTypes "github.com/mark3labs/mcp-go/mcp"
 	"github.com/praxis/praxis-go-sdk/internal/contracts"
@@ -32,7 +33,20 @@ func (e *RemoteMCPEngine) Execute(ctx context.Context, contract contracts.ToolCo
 
 	// Регистрируем эндпоинт в TransportManager, если его еще нет.
 	clientName := address
-	e.transportManager.RegisterSSEEndpoint(clientName, address, nil)
+	transport := strings.ToLower(strings.TrimSpace(getStringFromSpec(spec, "transport")))
+	if transport == "" {
+		transport = "http"
+	}
+	headers := getHeadersFromSpec(spec)
+
+	switch transport {
+	case "sse":
+		e.transportManager.RegisterSSEEndpoint(clientName, address, headers)
+	case "http", "streamable_http", "streamable-http":
+		e.transportManager.RegisterHTTPEndpoint(clientName, address, headers)
+	default:
+		e.transportManager.RegisterHTTPEndpoint(clientName, address, headers)
+	}
 
 	// Используем имя инструмента из контракта
 	toolName := contract.Name
@@ -50,4 +64,39 @@ func (e *RemoteMCPEngine) Execute(ctx context.Context, contract contracts.ToolCo
 	}
 
 	return fmt.Sprintf("Tool '%s' executed successfully with no text output.", toolName), nil
+}
+
+func getStringFromSpec(spec map[string]interface{}, key string) string {
+	if raw, ok := spec[key]; ok {
+		if str, ok := raw.(string); ok {
+			return str
+		}
+	}
+	return ""
+}
+
+func getHeadersFromSpec(spec map[string]interface{}) map[string]string {
+	raw, ok := spec["headers"]
+	if !ok || raw == nil {
+		return nil
+	}
+
+	headers := make(map[string]string)
+	switch typed := raw.(type) {
+	case map[string]string:
+		for k, v := range typed {
+			headers[k] = v
+		}
+	case map[string]interface{}:
+		for k, v := range typed {
+			if str, ok := v.(string); ok {
+				headers[k] = str
+			}
+		}
+	}
+
+	if len(headers) == 0 {
+		return nil
+	}
+	return headers
 }

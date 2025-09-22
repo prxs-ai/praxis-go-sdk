@@ -1,8 +1,39 @@
 package config
 
 import (
+	"fmt"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
+
+// ExternalMCPConfig describes configuration for an external MCP endpoint. Supports
+// either a plain string (URL) or full object via custom YAML unmarshalling.
+type ExternalMCPConfig struct {
+	Name      string            `yaml:"name" json:"name"`
+	URL       string            `yaml:"url" json:"url"`
+	Transport string            `yaml:"transport" json:"transport"`
+	Headers   map[string]string `yaml:"headers" json:"headers"`
+}
+
+// UnmarshalYAML allows ExternalMCPConfig to accept scalar (URL) or mapping values.
+func (c *ExternalMCPConfig) UnmarshalYAML(value *yaml.Node) error {
+	switch value.Kind {
+	case yaml.ScalarNode:
+		*c = ExternalMCPConfig{URL: value.Value}
+		return nil
+	case yaml.MappingNode:
+		type raw ExternalMCPConfig
+		var r raw
+		if err := value.Decode(&r); err != nil {
+			return err
+		}
+		*c = ExternalMCPConfig(r)
+		return nil
+	default:
+		return fmt.Errorf("invalid external MCP endpoint entry: kind %d", value.Kind)
+	}
+}
 
 // AppConfig is the main configuration structure for the application
 type AppConfig struct {
@@ -33,14 +64,14 @@ type ToolParamConfig struct {
 
 // AgentConfig contains basic agent information
 type AgentConfig struct {
-	Name                 string       `yaml:"name" json:"name"`
-	Version              string       `yaml:"version" json:"version"`
-	Description          string       `yaml:"description" json:"description"`
-	URL                  string       `yaml:"url" json:"url"`
-	SharedDir            string       `yaml:"shared_dir" json:"shared_dir"`                          // Base directory for filesystem tools
-	Tools                []ToolConfig `yaml:"tools"`                                                  // Список инструментов, доступных агенту
-	ExternalMCPEndpoints []string     `yaml:"external_mcp_endpoints" json:"external_mcp_endpoints"`     // Внешние MCP серверы для автообнаружения
-	ExternalMCPServers   []string     `yaml:"external_mcp_servers" json:"external_mcp_servers"`         // Alias для ExternalMCPEndpoints
+	Name                 string              `yaml:"name" json:"name"`
+	Version              string              `yaml:"version" json:"version"`
+	Description          string              `yaml:"description" json:"description"`
+	URL                  string              `yaml:"url" json:"url"`
+	SharedDir            string              `yaml:"shared_dir" json:"shared_dir"`                         // Base directory for filesystem tools
+	Tools                []ToolConfig        `yaml:"tools"`                                                // Список инструментов, доступных агенту
+	ExternalMCPEndpoints []ExternalMCPConfig `yaml:"external_mcp_endpoints" json:"external_mcp_endpoints"` // Внешние MCP серверы для автообнаружения
+	ExternalMCPServers   []ExternalMCPConfig `yaml:"external_mcp_servers" json:"external_mcp_servers"`     // Alias для ExternalMCPEndpoints
 }
 
 // P2PConfig contains libp2p configuration
@@ -63,10 +94,11 @@ type HTTPConfig struct {
 
 // MCPBridgeConfig contains MCP bridge configuration
 type MCPBridgeConfig struct {
-	Enabled  bool              `yaml:"enabled" json:"enabled"`
-	Servers  []MCPServerConfig `yaml:"servers" json:"servers"`
-	Limits   MCPLimits         `yaml:"limits" json:"limits"`
-	LogLevel string            `yaml:"log_level" json:"log_level"`
+	Enabled   bool              `yaml:"enabled" json:"enabled"`
+	Transport string            `yaml:"transport" json:"transport"`
+	Servers   []MCPServerConfig `yaml:"servers" json:"servers"`
+	Limits    MCPLimits         `yaml:"limits" json:"limits"`
+	LogLevel  string            `yaml:"log_level" json:"log_level"`
 }
 
 // MCPServerConfig defines a single MCP server configuration
@@ -158,7 +190,8 @@ func DefaultConfig() *AppConfig {
 			Host:    "0.0.0.0",
 		},
 		MCP: MCPBridgeConfig{
-			Enabled: true,
+			Enabled:   true,
+			Transport: "sse",
 			Limits: MCPLimits{
 				MaxConcurrentRequests: 100,
 				RequestTimeoutMs:      30000,

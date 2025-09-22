@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/praxis/praxis-go-sdk/internal/p2p"
 	"github.com/sashabaranov/go-openai"
 	"github.com/sirupsen/logrus"
-	"github.com/praxis/praxis-go-sdk/internal/p2p"
 )
 
 // NetworkContext represents the current state of the P2P network
@@ -83,10 +83,10 @@ func NewLLMClient(logger *logrus.Logger) *LLMClient {
 			client: nil,
 		}
 	}
-	
+
 	// Create OpenAI client
 	client := openai.NewClient(apiKey)
-	
+
 	return &LLMClient{
 		logger: logger,
 		client: client,
@@ -104,7 +104,20 @@ func (c *LLMClient) GenerateWorkflowFromNaturalLanguage(ctx context.Context, use
 		return nil, fmt.Errorf("LLM client not enabled")
 	}
 
+	// Validate userRequest is not empty
+	if strings.TrimSpace(userRequest) == "" {
+		return nil, fmt.Errorf("userRequest cannot be empty")
+	}
+
 	systemPrompt := c.buildSystemPrompt(networkContext)
+	
+	// Validate systemPrompt is not empty
+	if strings.TrimSpace(systemPrompt) == "" {
+		c.logger.Error("System prompt is empty, using fallback")
+		systemPrompt = "You are an AI orchestrator. Process the user request and return valid JSON."
+	}
+
+	c.logger.Debugf("🤖 System prompt length: %d, User request length: %d", len(systemPrompt), len(userRequest))
 	
 	req := openai.ChatCompletionRequest{
 		Model:     openai.GPT4o,
@@ -133,13 +146,13 @@ func (c *LLMClient) GenerateWorkflowFromNaturalLanguage(ctx context.Context, use
 	// Parse the JSON response
 	var plan WorkflowPlan
 	content := resp.Choices[0].Message.Content
-	
+
 	// Log the raw LLM response for debugging
 	c.logger.Infof("🤖 Raw LLM Response: %s", content)
-	
+
 	// Clean markdown code blocks if present
 	content = c.cleanMarkdownJSON(content)
-	
+
 	if err := json.Unmarshal([]byte(content), &plan); err != nil {
 		c.logger.Errorf("❌ Failed to parse LLM JSON response: %v", err)
 		c.logger.Errorf("📝 Raw response content: %s", content)
@@ -161,13 +174,24 @@ func (c *LLMClient) GenerateWorkflowFromNaturalLanguage(ctx context.Context, use
 }
 
 func (c *LLMClient) buildSystemPrompt(ctx *NetworkContext) string {
+	// Validate network context
+	if ctx == nil {
+		c.logger.Warn("NetworkContext is nil, using minimal system prompt")
+		ctx = &NetworkContext{
+			Agents: make(map[string]*AgentCapability),
+			Tools:  make(map[string][]string),
+		}
+	}
+
 	// Dynamically build the tools documentation section
 	var toolsDocumentation strings.Builder
 	toolsDocumentation.WriteString("AVAILABLE TOOLS:\n")
 
 	// Build detailed tool specifications from agents
+	hasTools := false
 	for _, agent := range ctx.Agents {
 		if len(agent.Tools) > 0 {
+			hasTools = true
 			toolsDocumentation.WriteString(fmt.Sprintf("Agent: %s (ID: %s)\n", agent.Name, agent.PeerID))
 			for _, tool := range agent.Tools {
 				toolsDocumentation.WriteString(fmt.Sprintf("TOOL: %s\n", tool.Name))
@@ -188,6 +212,16 @@ func (c *LLMClient) buildSystemPrompt(ctx *NetworkContext) string {
 		}
 	}
 
+	// If no tools found, add fallback documentation
+	if !hasTools {
+		c.logger.Warn("No tools found in network context, using fallback tools")
+		toolsDocumentation.WriteString("No agents or tools currently available in the network.\n")
+		toolsDocumentation.WriteString("Agent: Local Fallback (ID: local)\n")
+		toolsDocumentation.WriteString("TOOL: fallback_tool\n")
+		toolsDocumentation.WriteString("Description: Fallback tool for basic operations\n")
+		toolsDocumentation.WriteString("Usage: agent_id=local, tool_name=fallback_tool\n\n")
+	}
+
     return fmt.Sprintf("You are an intelligent AI ORCHESTRATOR for a distributed P2P agent network.\n\n"+
         "YOUR ROLE:\n"+
         "- Understand any user message as a task request (NO 'CALL' keyword needed)\n"+
@@ -199,18 +233,18 @@ func (c *LLMClient) buildSystemPrompt(ctx *NetworkContext) string {
 		"2. Agent specialization - Some agents may be specialized for certain tasks\n"+
 		"3. Load balancing - Distribute work across multiple agents when possible\n"+
 		"4. Locality - Use 'local' agent when tools are available locally\n\n"+
-        "%s\n\n"+
-        "IMPORTANT:\n"+
-        "- ANY message from the user is a DSL command - interpret it and execute\n"+
-        "- Don't require specific keywords like 'CALL' - understand intent\n"+
-        "- Choose the most suitable agent for each task\n"+
-        "- If multiple agents have the same tool, choose based on context\n"+
-        "CRITICAL: ALWAYS return a valid JSON object in the specified format. Even for a single tool call, represent it as a one-node workflow. Do not include prose outside JSON.\n\n"+
-        "Return valid JSON in this format:\n"+
-        "{\n"+
-        "  \"description\": \"Task description\",\n"+
-        "  \"nodes\": [\n"+
-        "    {\n"+
+		"%s\n\n"+
+		"IMPORTANT:\n"+
+		"- ANY message from the user is a DSL command - interpret it and execute\n"+
+		"- Don't require specific keywords like 'CALL' - understand intent\n"+
+		"- Choose the most suitable agent for each task\n"+
+		"- If multiple agents have the same tool, choose based on context\n"+
+		"CRITICAL: ALWAYS return a valid JSON object in the specified format. Even for a single tool call, represent it as a one-node workflow. Do not include prose outside JSON.\n\n"+
+		"Return valid JSON in this format:\n"+
+		"{\n"+
+		"  \"description\": \"Task description\",\n"+
+		"  \"nodes\": [\n"+
+		"    {\n"+
 		"      \"id\": \"node_1\",\n"+
 		"      \"type\": \"tool\",\n"+
 		"      \"agent_id\": \"peer_id_from_docs\",\n"+
@@ -279,7 +313,7 @@ func (c *LLMClient) ValidateWorkflowPlan(plan *WorkflowPlan, ctx *NetworkContext
 // ConvertPlanToDSLCommands converts a workflow plan to DSL commands
 func (c *LLMClient) ConvertPlanToDSLCommands(plan *WorkflowPlan) []string {
 	var commands []string
-	
+
 	for _, node := range plan.Nodes {
 		if node.Type == "tool" {
 			if node.AgentID == "local" {
@@ -315,7 +349,7 @@ func (c *LLMClient) ConvertPlanToDSLCommands(plan *WorkflowPlan) []string {
 			}
 		}
 	}
-	
+
 	return commands
 }
 
@@ -323,7 +357,7 @@ func (c *LLMClient) ConvertPlanToDSLCommands(plan *WorkflowPlan) []string {
 func (c *LLMClient) cleanMarkdownJSON(content string) string {
 	// Remove ```json and ``` from the response
 	content = strings.TrimSpace(content)
-	
+
 	// Remove leading ```json
 	if strings.HasPrefix(content, "```json") {
 		content = strings.TrimPrefix(content, "```json")
@@ -332,13 +366,13 @@ func (c *LLMClient) cleanMarkdownJSON(content string) string {
 		content = strings.TrimPrefix(content, "```")
 		content = strings.TrimSpace(content)
 	}
-	
+
 	// Remove trailing ```
 	if strings.HasSuffix(content, "```") {
 		content = strings.TrimSuffix(content, "```")
 		content = strings.TrimSpace(content)
 	}
-	
+
 	c.logger.Debugf("🧹 Cleaned JSON content: %s", content)
 	return content
 }
@@ -353,12 +387,12 @@ func (c *LLMClient) SummarizeTweetsWithCount(ctx context.Context, tweets []inter
 	if !c.IsEnabled() {
 		return "", fmt.Errorf("LLM client is not enabled")
 	}
-	
+
 	// Limit tweets to requested count
 	if count > 0 && count < len(tweets) {
 		tweets = tweets[:count]
 	}
-	
+
 	// Prepare tweets text
 	var tweetTexts []string
 	for i, tweet := range tweets {
@@ -369,11 +403,11 @@ func (c *LLMClient) SummarizeTweetsWithCount(ctx context.Context, tweets []inter
 			}
 		}
 	}
-	
+
 	if len(tweetTexts) == 0 {
 		return "", fmt.Errorf("no tweets to summarize")
 	}
-	
+
 	prompt := fmt.Sprintf(`Analyze these %d tweets and provide a concise summary highlighting:
 1. Main topics and themes
 2. Key announcements or news
@@ -385,12 +419,24 @@ Tweets:
 
 Provide a 3-4 paragraph summary in a professional tone.`, len(tweetTexts), strings.Join(tweetTexts, "\n\n"))
 	
+	// Validate prompt is not empty
+	if strings.TrimSpace(prompt) == "" {
+		return "", fmt.Errorf("generated prompt is empty")
+	}
+
+	systemMessage := "You are a social media analyst specializing in Twitter content analysis. Provide concise, insightful summaries."
+	if strings.TrimSpace(systemMessage) == "" {
+		systemMessage = "You are a helpful AI assistant."
+	}
+
+	c.logger.Debugf("🤖 Tweet summary - System message length: %d, Prompt length: %d", len(systemMessage), len(prompt))
+	
 	req := openai.ChatCompletionRequest{
 		Model: openai.GPT4oMini,
 		Messages: []openai.ChatCompletionMessage{
 			{
 				Role:    openai.ChatMessageRoleSystem,
-				Content: "You are a social media analyst specializing in Twitter content analysis. Provide concise, insightful summaries.",
+				Content: systemMessage,
 			},
 			{
 				Role:    openai.ChatMessageRoleUser,
@@ -400,19 +446,19 @@ Provide a 3-4 paragraph summary in a professional tone.`, len(tweetTexts), strin
 		Temperature: 0.3,
 		MaxTokens:   500,
 	}
-	
+
 	resp, err := c.client.CreateChatCompletion(ctx, req)
 	if err != nil {
 		c.logger.Errorf("Failed to generate tweet summary: %v", err)
 		return "", err
 	}
-	
+
 	if len(resp.Choices) == 0 {
 		return "", fmt.Errorf("no response from LLM")
 	}
-	
+
 	summary := resp.Choices[0].Message.Content
 	c.logger.Infof("✅ Generated tweet summary (%d chars)", len(summary))
-	
+
 	return summary, nil
 }
