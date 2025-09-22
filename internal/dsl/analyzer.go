@@ -3,6 +3,8 @@ package dsl
 import (
 	"context"
 	"fmt"
+	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -22,6 +24,20 @@ type Analyzer struct {
 	logger *logrus.Logger
 	agent  AgentInterface
 	cache  *llm.ToolCache
+	params *ParamStore
+}
+
+type ParamStore struct {
+	Params  map[string]interface{}
+	Secrets map[string]string
+	Env     map[string]string
+}
+
+func (a *Analyzer) SetParams(ps *ParamStore) {
+	a.params = ps
+	if a.params == nil {
+		a.params = &ParamStore{Params: map[string]interface{}{}, Secrets: map[string]string{}}
+	}
 }
 
 func NewAnalyzer(logger *logrus.Logger) *Analyzer {
@@ -32,6 +48,7 @@ func NewAnalyzer(logger *logrus.Logger) *Analyzer {
 	return &Analyzer{
 		logger: logger,
 		cache:  llm.NewToolCache(1000, 5*time.Minute), // 1000 entries, 5 minute TTL
+		params: &ParamStore{Params: map[string]interface{}{}, Secrets: map[string]string{}},
 	}
 }
 
@@ -169,6 +186,20 @@ func (a *Analyzer) parse(tokens []Token) (*AST, error) {
 		argsMap := make(map[string]interface{})
 		toolName := ""
 
+		// Support PARAM / INPUT / SECRET definitions
+		if (token.Value == "PARAM" || token.Value == "INPUT" || token.Value == "SECRET") && len(token.Args) > 0 {
+			for _, pair := range token.Args {
+				kv := strings.SplitN(pair, "=", 2)
+				key := strings.TrimSpace(kv[0])
+				val := ""
+				if len(kv) == 2 {
+					val = strings.TrimSpace(kv[1])
+				}
+				val = strings.Trim(val, `"`)
+				argsMap[key] = val
+			}
+		}
+
 		if token.Value == "CALL" && len(token.Args) > 0 {
 			toolName = token.Args[0]
 			// Debug logging
@@ -241,6 +272,8 @@ func (a *Analyzer) parse(tokens []Token) (*AST, error) {
 			node.Type = NodeTypeParallel
 		case "SEQUENCE":
 			node.Type = NodeTypeSequence
+		case "PARAM", "INPUT", "SECRET":
+			node.Type = NodeTypeParam
 		}
 
 		ast.Nodes = append(ast.Nodes, node)
@@ -277,6 +310,8 @@ func (a *Analyzer) executeNode(ctx context.Context, node ASTNode) (interface{}, 
 	a.logger.Debugf("Executing node: %s with args: %v", node.Type, node.Args)
 
 	switch node.Type {
+	case NodeTypeParam:
+		return a.executeParam(ctx, node)
 	case NodeTypeWorkflow:
 		return a.executeWorkflow(ctx, node)
 	case NodeTypeTask:
@@ -352,10 +387,118 @@ func (a *Analyzer) executeAgent(ctx context.Context, node ASTNode) (interface{},
 	}, nil
 }
 
+// --- PARAM handling & arg resolution ----------------------------------------
+func (a *Analyzer) executeParam(ctx context.Context, node ASTNode) (interface{}, error) {
+	if a.params == nil {
+		a.params = &ParamStore{Params: map[string]interface{}{}, Secrets: map[string]string{}}
+	}
+	// The node.Value determines whether it's SECRET or PARAM/INPUT
+	switch strings.ToUpper(node.Value) {
+	case "SECRET":
+		for k, v := range node.Args {
+			a.params.Secrets[k] = fmt.Sprintf("%v", v)
+		}
+	default: // PARAM / INPUT
+		for k, v := range node.Args {
+			a.params.Params[k] = v
+		}
+	}
+	return map[string]interface{}{
+		"type":   "param",
+		"status": "applied",
+		"kind":   strings.ToLower(node.Value),
+		"count":  len(node.Args),
+	}, nil
+}
+
+var reInterp = regexp.MustCompile(`\{\{\s*(params|secrets|env)\.([a-zA-Z0-9_\-\.]+)\s*\}\}`)
+
+func (a *Analyzer) resolveArgs(raw map[string]interface{}) map[string]interface{} {
+	if raw == nil {
+		return nil
+	}
+	out := make(map[string]interface{}, len(raw))
+	for k, v := range raw {
+		out[k] = a.resolveValue(v)
+	}
+	return out
+}
+
+func (a *Analyzer) resolveValue(v interface{}) interface{} {
+	switch t := v.(type) {
+	case string:
+		return a.interpolateString(t)
+	case map[string]interface{}:
+		return a.resolveArgs(t)
+	case []interface{}:
+		arr := make([]interface{}, len(t))
+		for i, item := range t {
+			arr[i] = a.resolveValue(item)
+		}
+		return arr
+	default:
+		return v
+	}
+}
+
+func (a *Analyzer) interpolateString(s string) string {
+	if s == "" || !strings.Contains(s, "{{") {
+		return s
+	}
+	return reInterp.ReplaceAllStringFunc(s, func(m string) string {
+		sub := reInterp.FindStringSubmatch(m)
+		if len(sub) != 3 {
+			return m
+		}
+		scope, path := sub[1], sub[2]
+		switch scope {
+		case "params":
+			if val, ok := getNested(a.paramsSafe().Params, path); ok {
+				return fmt.Sprintf("%v", val)
+			}
+		case "secrets":
+			if v, ok := a.paramsSafe().Secrets[path]; ok {
+				return v
+			}
+		case "env":
+			if a.params != nil && a.params.Env != nil {
+				if v, ok := a.params.Env[path]; ok {
+					return v
+				}
+			}
+			return os.Getenv(path)
+		}
+		return ""
+	})
+}
+
+func getNested(m map[string]interface{}, path string) (interface{}, bool) {
+	parts := strings.Split(path, ".")
+	var cur interface{} = m
+	for _, p := range parts {
+		asMap, ok := cur.(map[string]interface{})
+		if !ok {
+			return nil, false
+		}
+		cur, ok = asMap[p]
+		if !ok {
+			return nil, false
+		}
+	}
+	return cur, true
+}
+
+func (a *Analyzer) paramsSafe() *ParamStore {
+	if a.params == nil {
+		a.params = &ParamStore{Params: map[string]interface{}{}, Secrets: map[string]string{}}
+	}
+	return a.params
+}
+
 func (a *Analyzer) executeCall(ctx context.Context, node ASTNode) (interface{}, error) {
 	toolName := node.ToolName
-	argsMap := node.Args // Direct use of named arguments map
 
+	argsMap := a.resolveArgs(node.Args)
 	a.logger.Infof("Calling tool: %s with args: %v", toolName, argsMap)
 
 	// Check cache first
@@ -517,6 +660,7 @@ const (
 	TokenTypeCommand  TokenType = "command"
 	TokenTypeOperator TokenType = "operator"
 	TokenTypeValue    TokenType = "value"
+	NodeTypeParam     NodeType  = "param"
 )
 
 type AST struct {

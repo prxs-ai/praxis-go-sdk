@@ -303,7 +303,7 @@ func (s *ToolDiscoveryService) DiscoverToolsFromServer(ctx context.Context, serv
         "method":  "tools/list",
         "params":  map[string]interface{}{},
     }
-    
+
     // Process response and extract tools
     // ...
 }
@@ -355,7 +355,7 @@ For external tools, the MCP server acts as a proxy, forwarding requests to remot
 handler := func(ctx context.Context, req mcpTypes.CallToolRequest) (*mcpTypes.CallToolResult, error) {
     // Prepare arguments for the remote call
     args := req.GetArguments()
-    
+
     // Create contract for remote execution
     contract := contracts.ToolContract{
         Engine: "remote-mcp",
@@ -364,7 +364,7 @@ handler := func(ctx context.Context, req mcpTypes.CallToolRequest) (*mcpTypes.Ca
             "address": addrCopy,
         },
     }
-    
+
     // Execute via remote engine
     result, err := remoteEngine.Execute(ctx, contract, args)
     // ...
@@ -449,7 +449,7 @@ func (b *P2PMCPBridge) handleCallTool(ctx context.Context, request MCPRequest) M
             Error: &MCPError{Code: -32601, Message: fmt.Sprintf("Tool %s not found", toolName)},
         }
     }
-    
+
     result, err := toolHandler(ctx, mcpReq)
     if err != nil {
         return MCPResponse{
@@ -582,7 +582,7 @@ The MCP server acts as an adapter between clients and various execution engines.
 
 The Transport Manager handles connections to remote MCP servers, allowing the server to act as a proxy for external tools. This enables a federated architecture where agents can discover and use tools from multiple sources.
 
-**Referenced Files in This Document**   
+**Referenced Files in This Document**
 - [internal/mcp/server.go](file://internal/mcp/server.go)
 - [internal/mcp/transport.go](file://internal/mcp/transport.go)
 - [internal/mcp/discovery.go](file://internal/mcp/discovery.go)

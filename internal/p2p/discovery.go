@@ -36,6 +36,7 @@ type PeerInfo struct {
 	FoundAt     time.Time
 	LastSeen    time.Time
 	AgentCard   interface{}
+	A2ACard     interface{} // каноническая A2A карта пира
 	IsConnected bool
 }
 
@@ -202,6 +203,20 @@ func (d *Discovery) connectToPeer(pi peer.AddrInfo) {
 				}
 				d.mu.Unlock()
 			}
+
+			// Also request A2A card
+			a2aCard, err := d.protocolHandler.RequestA2ACard(context.Background(), pi.ID)
+			if err != nil {
+				d.logger.Errorf("Failed to exchange A2A card with %s: %v", pi.ID, err)
+			} else {
+				d.logger.Infof("✅ Successfully received A2A card from %s", pi.ID)
+				// Update peer info with A2A card
+				d.mu.Lock()
+				if peerInfo, exists := d.foundPeers[pi.ID]; exists {
+					peerInfo.A2ACard = a2aCard
+				}
+				d.mu.Unlock()
+			}
 		}()
 	}
 }
@@ -249,6 +264,21 @@ func (d *Discovery) GetPeerInfo(peerID peer.ID) (*PeerInfo, bool) {
 
 	peerInfo, exists := d.foundPeers[peerID]
 	return peerInfo, exists
+}
+
+// GetPeerA2ACards returns A2A cards from all connected peers
+func (d *Discovery) GetPeerA2ACards() map[peer.ID]interface{} {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+
+	a2aCards := make(map[peer.ID]interface{})
+	for peerID, peerInfo := range d.foundPeers {
+		if peerInfo.A2ACard != nil {
+			a2aCards[peerID] = peerInfo.A2ACard
+		}
+	}
+
+	return a2aCards
 }
 
 func (d *Discovery) ConnectToBootstrapPeers(bootstrapPeers []string) error {

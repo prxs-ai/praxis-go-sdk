@@ -532,7 +532,7 @@ These debugging commands provide comprehensive visibility into agent state and n
 - [README.md](file://README.md#L0-L176)
 - [agent.yaml](file://configs/agent.yaml#L0-L118)
 
-**Referenced Files in This Document**   
+**Referenced Files in This Document**
 - [agent.yaml](file://configs/agent.yaml)
 - [config.go](file://internal/config/config.go)
 - [types.go](file://internal/config/types.go)

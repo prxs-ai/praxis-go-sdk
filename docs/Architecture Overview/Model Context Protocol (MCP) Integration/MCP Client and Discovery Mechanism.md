@@ -129,7 +129,7 @@ func (s *ToolDiscoveryService) DiscoverToolsFromServer(ctx context.Context, serv
             },
         },
     }
-    
+
     // Step 2: List available tools
     toolsRequest := map[string]interface{}{
         "jsonrpc": "2.0",
@@ -261,10 +261,10 @@ if tool.InputSchema.Properties != nil {
         if !ok {
             continue
         }
-        
+
         propType, _ := propMap["type"].(string)
         propDesc, _ := propMap["description"].(string)
-        
+
         // Add parameter based on type
         switch propType {
         case "string":
@@ -339,7 +339,7 @@ These fallback tools use the same proxy pattern as discovered tools, forwarding 
 // registerFallbackTools registers hardcoded tools as fallback when discovery fails
 func (a *PraxisAgent) registerFallbackTools(addr string, remoteEngine contracts.ExecutionEngine) {
     a.logger.Warn("Using fallback tool registration for backward compatibility")
-    
+
     // Hardcoded common tools
     commonTools := []struct {
         name string
@@ -351,7 +351,7 @@ func (a *PraxisAgent) registerFallbackTools(addr string, remoteEngine contracts.
         {"list_directory", "List directory contents from external filesystem", []string{"path"}},
         {"create_directory", "Create a directory in external filesystem", []string{"path"}},
     }
-    
+
     for _, tool := range commonTools {
         // Create tool specification and handler
         // Register with MCP server
@@ -363,7 +363,7 @@ func (a *PraxisAgent) registerFallbackTools(addr string, remoteEngine contracts.
 - [internal/agent/agent.go](file://internal/agent/agent.go#L1199-L1398)
 - [internal/mcp/transport.go](file://internal/mcp/transport.go#L250-L294)
 
-**Referenced Files in This Document**   
+**Referenced Files in This Document**
 - [internal/mcp/discovery.go](file://internal/mcp/discovery.go)
 - [internal/mcp/client.go](file://internal/mcp/client.go)
 - [internal/p2p/discovery.go](file://internal/p2p/discovery.go)

@@ -118,39 +118,39 @@ The RemoteMCPEngine is responsible for executing tool contracts on remote MCP se
 ```mermaid
 classDiagram
 class RemoteMCPEngine {
-+transportManager *TransportManager
-+Execute(ctx Context, contract ToolContract, args Map) (String, Error)
++*TransportManager : transportManager
++Execute(ctx: Context, contract: ToolContract, args: Map) : (String, Error)
 }
 class TransportManager {
-+clients Map[String, MCPClientWrapper]
-+factory *ClientFactory
-+RegisterSSEEndpoint(name, url, headers)
-+RegisterHTTPEndpoint(name, url, headers)
-+RegisterSTDIOEndpoint(name, command, args)
-+GetClient(name) (*MCPClientWrapper, Error)
-+CallRemoteTool(ctx, clientName, toolName, args) (*CallToolResult, Error)
++MCPClientWrapper] : clients Map[String,
++*ClientFactory : factory
++RegisterSSEEndpoint(name: url, headers)
++RegisterHTTPEndpoint(name: url, headers)
++RegisterSTDIOEndpoint(name: command, args)
++GetClient(name) : (MCPClientWrapper, Error)
++CallRemoteTool(ctx: clientName, toolName: args) : (CallToolResult, Error)
 +Close()
 }
 class ResilientSSEClient {
-+baseURL String
-+headers Map[String, String]
-+client *client.Client
-+ctx Context
-+cancel CancelFunc
-+reconnectCh Channel
-+connect() Error
++String : baseURL
++String] : headers Map[String,
++*client.Client : client
++Context : ctx
++CancelFunc : cancel
++Channel : reconnectCh
++connect() : Error
 +reconnectLoop()
-+CallTool(ctx, req CallToolRequest) (*CallToolResult, Error)
-+Close() Error
++CallTool(ctx: CallToolRequest, req: CallToolRequest) : (CallToolResult, Error)
++Close() : Error
 }
 class StreamableHTTPClientPool {
-+clients Channel[*MCPClientWrapper]
-+factory Func() *MCPClientWrapper
-+maxSize Int
-+baseURL String
-+Get() *MCPClientWrapper
-+Put(c *MCPClientWrapper)
-+CallTool(ctx, name, args) (*CallToolResult, Error)
++Channel[*MCPClientWrapper] : clients
++factory Func() : MCPClientWrapper
++Int : maxSize
++String : baseURL
++Get() : MCPClientWrapper
++Put(c: MCPClientWrapper)
++CallTool(ctx: name, args) : (CallToolResult, Error)
 +Close()
 }
 RemoteMCPEngine --> TransportManager : "uses"
@@ -420,14 +420,14 @@ func NewStreamableHTTPClientPool(baseURL string, maxSize int, logger *logrus.Log
         baseURL: baseURL,
         logger:  logger,
     }
-    
+
     // Pre-create clients up to maxSize
     for i := 0; i < maxSize; i++ {
         if client := pool.factory(); client != nil {
             pool.clients <- client
         }
     }
-    
+
     return pool
 }
 ```
@@ -579,7 +579,7 @@ Debugging steps:
 
 The Remote MCP Engine provides a robust framework for distributed task execution across a network of agents. By combining protocol abstraction, intelligent routing, and AI-driven orchestration, it enables complex workflows that leverage the capabilities of multiple specialized agents. The system's modular architecture, resilient communication patterns, and flexible configuration options make it suitable for a wide range of distributed computing scenarios. Future enhancements could include more sophisticated load balancing, advanced circuit breaking, and enhanced security features to support production deployments at scale.
 
-**Referenced Files in This Document**   
+**Referenced Files in This Document**
 - [remote_engine.go](file://internal/mcp/remote_engine.go#L1-L52)
 - [transport.go](file://internal/mcp/transport.go#L1-L294)
 - [orchestrator.go](file://internal/dsl/orchestrator.go#L1-L1171)

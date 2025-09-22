@@ -301,7 +301,7 @@ Common issues and resolution strategies:
 ## Conclusion
 The DSL Processing system provides a robust framework for natural language interaction with distributed agents. By combining structured DSL syntax with LLM-powered orchestration, it supports both simple commands and complex workflows. Key features include caching, parallel execution, and comprehensive error handling. Configuration options allow tuning for performance and reliability. Future improvements could include dynamic LLM model selection and enhanced error recovery strategies.
 
-**Referenced Files in This Document**   
+**Referenced Files in This Document**
 - [analyzer.go](file://internal/dsl/analyzer.go#L0-L544)
 - [orchestrator.go](file://internal/dsl/orchestrator.go#L0-L44)
 - [client.go](file://internal/llm/client.go#L40-L72)
