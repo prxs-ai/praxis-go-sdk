@@ -18,7 +18,7 @@
 
 Provides a simple health check to verify the agent is running and responsive.
 
-**HTTP Method**: `GET`  
+**HTTP Method**: `GET`
 **URL Path**: `/health`
 
 ### Request Headers
@@ -57,7 +57,7 @@ curl -X GET http://localhost:8000/health
 
 Retrieves the agent's card information, which contains metadata about the agent's capabilities, skills, and configuration.
 
-**HTTP Method**: `GET`  
+**HTTP Method**: `GET`
 **URL Path**: `/agent/card`
 
 ### Request Headers
@@ -152,7 +152,7 @@ curl -X GET http://localhost:8000/agent/card
 
 The agent's configuration is accessible through the agent card endpoint. The configuration is initialized from environment variables and contains settings for ports, logging, and feature flags.
 
-**HTTP Method**: `GET`  
+**HTTP Method**: `GET`
 **URL Path**: `/agent/card`
 
 ### Configuration Parameters
@@ -174,7 +174,7 @@ The configuration is retrieved through the `GetConfigFromEnv()` function and use
 
 Triggers execution of a DSL (Domain Specific Language) request or an A2A JSON-RPC request. Supports both legacy DSL format and modern A2A protocol.
 
-**HTTP Method**: `POST`  
+**HTTP Method**: `POST`
 **URL Path**: `/execute`
 
 ### Request Headers
@@ -295,7 +295,7 @@ Endpoints that implement the Agent-to-Agent (A2A) protocol for task management a
 
 ### Message Send Endpoint
 
-**HTTP Method**: `POST`  
+**HTTP Method**: `POST`
 **URL Path**: `/a2a/message/send`
 
 #### Request Body Schema
@@ -338,7 +338,7 @@ curl -X POST http://localhost:8000/a2a/message/send \
 
 ### Tasks Get Endpoint
 
-**HTTP Method**: `POST`  
+**HTTP Method**: `POST`
 **URL Path**: `/a2a/tasks/get`
 
 #### Request Body Schema
@@ -362,7 +362,7 @@ curl -X POST http://localhost:8000/a2a/tasks/get \
 
 ### Tasks List Endpoint
 
-**HTTP Method**: `GET`  
+**HTTP Method**: `GET`
 **URL Path**: `/a2a/tasks`
 
 #### Response Format
@@ -402,7 +402,7 @@ Endpoints for peer-to-peer communication and tool invocation.
 
 ### List Peers Endpoint
 
-**HTTP Method**: `GET`  
+**HTTP Method**: `GET`
 **URL Path**: `/peers`
 
 #### Response Format
@@ -426,7 +426,7 @@ curl -X GET http://localhost:8000/peers
 
 ### Get P2P Cards Endpoint
 
-**HTTP Method**: `GET`  
+**HTTP Method**: `GET`
 **URL Path**: `/p2p/cards`
 
 #### Response Format
@@ -452,7 +452,7 @@ curl -X GET http://localhost:8000/p2p/cards
 
 ### Invoke P2P Tool Endpoint
 
-**HTTP Method**: `POST`  
+**HTTP Method**: `POST`
 **URL Path**: `/p2p/tool`
 
 #### Request Body Schema
@@ -505,7 +505,7 @@ Endpoints for monitoring and debugging the agent.
 
 ### MCP Tools Endpoint
 
-**HTTP Method**: `GET`  
+**HTTP Method**: `GET`
 **URL Path**: `/mcp/tools`
 
 #### Response
@@ -518,7 +518,7 @@ curl -X GET http://localhost:8000/mcp/tools
 
 ### Cache Statistics Endpoint
 
-**HTTP Method**: `GET`  
+**HTTP Method**: `GET`
 **URL Path**: `/cache/stats`
 
 #### Response
@@ -531,7 +531,7 @@ curl -X GET http://localhost:8000/cache/stats
 
 ### Clear Cache Endpoint
 
-**HTTP Method**: `DELETE`  
+**HTTP Method**: `DELETE`
 **URL Path**: `/cache`
 
 #### Response
@@ -544,7 +544,7 @@ curl -X DELETE http://localhost:8000/cache
 
 ### P2P Info Endpoint
 
-**HTTP Method**: `GET`  
+**HTTP Method**: `GET`
 **URL Path**: `/p2p/info`
 
 #### Response
@@ -598,7 +598,7 @@ When errors occur, the response follows the JSON-RPC error format:
 - [types.go](file://internal/a2a/types.go#L150-L159)
 - [agent.go](file://internal/agent/agent.go#L1347-L1365)
 
-**Referenced Files in This Document**   
+**Referenced Files in This Document**
 - [agent.go](file://internal/agent/agent.go#L511-L710)
 - [agent.go](file://internal/agent/agent.go#L717-L916)
 - [agent.go](file://internal/agent/agent.go#L1347-L1562)

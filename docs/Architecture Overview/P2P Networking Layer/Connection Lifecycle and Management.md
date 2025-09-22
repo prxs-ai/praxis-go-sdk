@@ -151,26 +151,26 @@ Concurrent stream management is handled naturally by libp2p and Go's concurrency
 ```mermaid
 classDiagram
 class P2PProtocolHandler {
-+host Host
-+logger Logger
-+peerCards map[peer.ID]*AgentCard
-+ourCard *AgentCard
-+mcpBridge *P2PMCPBridge
-+agent A2AAgent
-+mu sync.RWMutex
-+SetAgent(agent A2AAgent)
-+SetMCPBridge(bridge *P2PMCPBridge)
-+handleMCPStream(stream Stream)
-+handleCardStream(stream Stream)
-+handleToolStream(stream Stream)
-+handleA2AStream(stream Stream)
++Host : host
++Logger : logger
++map[peer.ID]*AgentCard : peerCards
++*AgentCard : ourCard
++*P2PMCPBridge : mcpBridge
++A2AAgent : agent
++sync.RWMutex : mu
++SetAgent(agent: A2AAgent)
++SetMCPBridge(bridge: P2PMCPBridge)
++handleMCPStream(stream: Stream)
++handleCardStream(stream: Stream)
++handleToolStream(stream: Stream)
++handleA2AStream(stream: Stream)
 }
 class A2AAgent {
 <<interface>>
-+DispatchA2ARequest(req JSONRPCRequest) JSONRPCResponse
++DispatchA2ARequest(req: JSONRPCRequest) : JSONRPCResponse
 }
 class P2PMCPBridge {
-+ProcessMCPRequest(request MCPRequest) MCPResponse
++ProcessMCPRequest(request: MCPRequest) : MCPResponse
 }
 P2PProtocolHandler --> A2AAgent : depends on
 P2PProtocolHandler --> P2PMCPBridge : uses
@@ -257,7 +257,7 @@ Based on the implementation, the following best practices are recommended:
 
 6. **Resource Management**: Be mindful of the number of concurrent streams and goroutines. Implement timeouts and limits where appropriate to prevent resource exhaustion.
 
-**Referenced Files in This Document**   
+**Referenced Files in This Document**
 - [protocol.go](file://internal/p2p/protocol.go#L1-L536)
 - [bridge.go](file://internal/p2p/bridge.go#L1-L472)
 - [discovery.go](file://internal/p2p/discovery.go#L1-L233)

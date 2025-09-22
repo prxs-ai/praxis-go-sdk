@@ -124,17 +124,17 @@ The MCP (Model Context Protocol) subsystem enables agents to expose and consume 
 ```mermaid
 classDiagram
 class MCPServer {
-+AddTool(tool Tool, handler ToolHandlerFunc)
-+AddResource(resource Resource, handler ResourceHandlerFunc)
-+StartSSE(port string)
++AddTool(tool: Tool, handler: ToolHandlerFunc)
++AddResource(resource: Resource, handler: ResourceHandlerFunc)
++StartSSE(port: string)
 }
 class RemoteMCPEngine {
--transportManager TransportManager
-+Execute(contract ToolContract, args map[string]interface{}) string
+-TransportManager : transportManager
++Execute(contract: ToolContract, args: Map<string, interface>) : string
 }
 class TransportManager {
-+RegisterSSEEndpoint(name, address string)
-+CallRemoteTool(ctx context.Context, clientName, toolName string, args map[string]interface{}) (*mcpTypes.PartialResponse, error)
++RegisterSSEEndpoint(name: string, address: string)
++CallRemoteTool(ctx: Context, clientName: string, toolName: string, args: Map<string, interface>) : (PartialResponse, error)
 }
 MCPServer --> TransportManager : uses
 RemoteMCPEngine --> TransportManager : uses
@@ -241,29 +241,29 @@ Common issues and their resolutions:
 - [client.go](file://internal/llm/client.go#L0-L199)
 
 ### LLM Client Not Enabled
-**Symptom**: "LLM client not enabled" in logs.  
-**Cause**: `OPENAI_API_KEY` environment variable not set.  
+**Symptom**: "LLM client not enabled" in logs.
+**Cause**: `OPENAI_API_KEY` environment variable not set.
 **Fix**: Set the API key: `export OPENAI_API_KEY=your_key_here`.
 
 ### Dagger Engine Initialization Failure
-**Symptom**: "Failed to initialize Dagger Engine" error.  
-**Cause**: Docker daemon not running or inaccessible.  
+**Symptom**: "Failed to initialize Dagger Engine" error.
+**Cause**: Docker daemon not running or inaccessible.
 **Fix**: Ensure Docker is installed and running: `sudo systemctl start docker`.
 
 ### P2P Connection Issues
-**Symptom**: Agents fail to discover each other.  
-**Cause**: Firewall blocking P2P ports or NAT traversal issues.  
+**Symptom**: Agents fail to discover each other.
+**Cause**: Firewall blocking P2P ports or NAT traversal issues.
 **Fix**: Open ports 9000-9010 or configure libp2p relay.
 
 ### MCP Tool Not Found
-**Symptom**: "Unknown engine 'dagger'" warning.  
-**Cause**: Tool engine not registered in config.  
+**Symptom**: "Unknown engine 'dagger'" warning.
+**Cause**: Tool engine not registered in config.
 **Fix**: Verify `engine` field in `configs/agent.yaml` is correct.
 
 ## Conclusion
 The PraxisAgent system presents a robust, scalable architecture for decentralized agent collaboration. By combining libp2p for P2P networking, MCP for tool sharing, and LLM-powered orchestration, it enables intelligent, autonomous agent networks. The use of Go ensures high performance and concurrency, while the event-driven design promotes loose coupling and extensibility. Future enhancements could include enhanced fault tolerance, encrypted payload support, and dynamic load balancing across agents.
 
-**Referenced Files in This Document**   
+**Referenced Files in This Document**
 - [agent.go](file://internal/agent/agent.go#L100-L500)
 - [task_manager.go](file://internal/a2a/task_manager.go#L0-L199)
 - [client.go](file://internal/llm/client.go#L0-L199)

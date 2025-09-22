@@ -367,7 +367,7 @@ The system prevents privilege escalation through:
 - [remote_engine.go](file://internal/mcp/remote_engine.go#L0-L52)
 - [agent.go](file://internal/agent/agent.go#L400-L450)
 
-**Referenced Files in This Document**   
+**Referenced Files in This Document**
 - [execution.go](file://internal/contracts/execution.go)
 - [engine.go](file://internal/dagger/engine.go)
 - [remote_engine.go](file://internal/mcp/remote_engine.go)

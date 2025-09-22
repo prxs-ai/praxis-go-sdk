@@ -25,34 +25,34 @@ The transport system implements a standardized interface that abstracts the unde
 ```mermaid
 classDiagram
 class TransportManager {
-+map[string]*MCPClientWrapper clients
-+*ClientFactory factory
-+*logrus.Logger logger
-+RegisterSSEEndpoint(name, url, headers)
-+RegisterHTTPEndpoint(name, url, headers)
-+RegisterSTDIOEndpoint(name, command, args)
-+GetClient(name) *MCPClientWrapper
-+CallRemoteTool(ctx, clientName, toolName, args)
++clients : Map<string, MCPClientWrapper>
++factory : ClientFactory
++logger : Logger
++RegisterSSEEndpoint(name: url, headers)
++RegisterHTTPEndpoint(name: url, headers)
++RegisterSTDIOEndpoint(name: command, args)
++GetClient(name) : MCPClientWrapper
++CallRemoteTool(ctx: clientName, toolName: args)
 +Close()
 }
 class ClientFactory {
-+map[string]ClientConfig configs
-+*logrus.Logger logger
-+RegisterConfig(name, config)
-+GetOrCreateClient(name) *MCPClientWrapper
++configs : Map<string, ClientConfig>
++logger : Logger
++RegisterConfig(name: config)
++GetOrCreateClient(name) : MCPClientWrapper
 +CloseAll()
 }
 class MCPClientWrapper {
-+*client.Client client
-+ClientType clientType
-+*mcp.InitializeResult serverInfo
-+*logrus.Logger logger
-+context.Context ctx
-+context.CancelFunc cancel
-+bool initialized
-+CallTool(ctx, name, args) *mcp.CallToolResult
-+Initialize(ctx) error
-+Close() error
++client : Client
++clientType : ClientType
++serverInfo : InitializeResult
++logger : Logger
++ctx : Context
++cancel : CancelFunc
++initialized : bool
++CallTool(ctx: name, args) : CallToolResult
++Initialize(ctx) : error
++Close() : error
 }
 TransportManager --> ClientFactory : "uses"
 ClientFactory --> MCPClientWrapper : "creates"
@@ -133,26 +133,26 @@ The system defines a common error structure that maps to JSON-RPC 2.0 error conv
 ```mermaid
 classDiagram
 class MCPError {
-+int Code
-+string Message
-+interface{} Data
++Code : int
++Message : string
++Data : interface
 }
 class P2PError {
-+int Code
-+string Message
++Code : int
++Message : string
 }
 class MCPResponse {
-+int ID
-+interface{} Result
-+*MCPError Error
++ID : int
++Result : interface
++Error : MCPError
 }
 class P2PMessage {
-+string Type
-+string ID
-+string Method
-+interface{} Params
-+interface{} Result
-+*P2PError Error
++Type : string
++ID : string
++Method : string
++Params : interface
++Result : interface
++Error : P2PError
 }
 MCPResponse --> MCPError : "contains"
 P2PMessage --> P2PError : "contains"
@@ -227,11 +227,11 @@ func (rsc *ResilientSSEClient) reconnectLoop() {
             return
         case <-rsc.reconnectCh:
             rsc.logger.Info("Attempting to reconnect SSE client...")
-            
+
             for attempt := 1; attempt <= 5; attempt++ {
                 if err := rsc.connect(); err != nil {
                     rsc.logger.Errorf("Reconnection attempt %d failed: %v", attempt, err)
-                    
+
                     backoff := time.Duration(attempt) * time.Second
                     select {
                     case <-time.After(backoff):
@@ -254,14 +254,14 @@ Connections are gracefully terminated through the `Close()` method, which cancel
 ```go
 func (rsc *ResilientSSEClient) Close() error {
     rsc.cancel()
-    
+
     rsc.mutex.Lock()
     defer rsc.mutex.Unlock()
-    
+
     if rsc.client != nil {
         return rsc.client.Close()
     }
-    
+
     return nil
 }
 ```
@@ -296,7 +296,7 @@ func NewP2PMCPBridge(host host.Host, mcpServer *mcp.MCPServerWrapper, logger *lo
 
     host.SetStreamHandler(MCPProtocolID, bridge.handleMCPStream)
     host.SetStreamHandler(CardProtocolID, bridge.handleCardStream)
-    
+
     return bridge
 }
 ```
@@ -563,7 +563,7 @@ The transport system's abstraction layer allows for easy switching between trans
 - [bridge.go](file://internal/p2p/bridge.go#L426-L470)
 - [types.go](file://internal/config/types.go#L137-L199)
 
-**Referenced Files in This Document**   
+**Referenced Files in This Document**
 - [transport.go](file://internal/mcp/transport.go)
 - [bridge.go](file://internal/p2p/bridge.go)
 - [types.go](file://internal/config/types.go)

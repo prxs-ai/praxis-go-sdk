@@ -124,9 +124,9 @@ The system also includes a WebSocket log hook that sends log entries to the Even
 ```mermaid
 classDiagram
 class LogConfig {
-+string Level
-+string Format
-+string OutputPath
++Level : string
++Format : string
++OutputPath : string
 }
 class Logger {
 +SetLevel(level)
@@ -260,7 +260,7 @@ The configuration system includes validation to ensure recovered configurations 
 - [internal/config/config.go](file://internal/config/config.go#L46-L94)
 - [configs/agent.yaml](file://configs/agent.yaml#L1-L119)
 
-**Referenced Files in This Document**   
+**Referenced Files in This Document**
 - [build-docker.sh](file://build-docker.sh)
 - [docker-compose.yml](file://docker-compose.yml)
 - [examples/docker-compose-golden.yml](file://examples/docker-compose-golden.yml)

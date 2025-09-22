@@ -110,14 +110,14 @@ After tokenization, the system parses the tokens into an Abstract Syntax Tree (A
 ```mermaid
 classDiagram
 class AST {
-+[]ASTNode Nodes
++Nodes : List<ASTNode>
 }
 class ASTNode {
-+NodeType Type
-+string Value
-+string ToolName
-+map[string]interface{} Args
-+[]ASTNode Children
++Type : NodeType
++Value : string
++ToolName : string
++Args : Map<string, interface>
++Children : List<ASTNode>
 }
 class NodeType {
 +NodeTypeCommand
@@ -364,14 +364,14 @@ func (o *OrchestratorAnalyzer) convertLLMPlanToAST(plan *llm.WorkflowPlan) (*AST
         if node.Type == "tool" && node.ToolName != "" {
             // Convert map[string]string to map[string]interface{} with better validation
             argsMap := make(map[string]interface{}, len(node.Args))
-            
+
             for k, v := range node.Args {
                 valStr := fmt.Sprintf("%v", v)
                 if strings.TrimSpace(valStr) == "" {
                     o.logger.Warnf("⚠️ Empty parameter value for %s in tool %s", k, node.ToolName)
                     continue // Skip empty parameters
                 }
-                
+
                 argsMap[k] = v // Keep original value type
             }
 
@@ -804,7 +804,7 @@ The integration of the A2A protocol for agent-to-agent communication and the MCP
 
 Future enhancements could include more sophisticated loop and conditional constructs, enhanced performance optimization through machine learning-based execution planning, and improved visualization tools for workflow debugging and analysis.
 
-**Referenced Files in This Document**   
+**Referenced Files in This Document**
 - [internal/dsl/orchestrator.go](file://internal/dsl/orchestrator.go)
 - [internal/workflow/workflow_orchestrator.go](file://internal/workflow/workflow_orchestrator.go)
 - [internal/llm/mcp_tool.go](file://internal/llm/mcp_tool.go)

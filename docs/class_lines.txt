@@ -1,0 +1,873 @@
++Agent : AgentConfig
++P2P : P2PConfig
++HTTP : HTTPConfig
++MCP : MCPBridgeConfig
++LLM : LLMConfig
++Logging : LogConfig
++Name : string
++Version : string
++Description : string
++URL : string
++SharedDir : string
++Tools : List<ToolConfig>
++ExternalMCPEndpoints : List<string>
++Enabled : bool
++Port : int
++Secure : bool
++Rendezvous : string
++EnableMDNS : bool
++EnableDHT : bool
++BootstrapNodes : List<string>
++Enabled : bool
++Port : int
++Host : string
++Enabled : bool
++Servers : List<MCPServerConfig>
++Limits : MCPLimits
++LogLevel : string
++Enabled : bool
++Provider : string
++APIKey : string
++Model : string
++MaxTokens : int
++Temperature : float32
++Timeout : Duration
++FunctionCalling : LLMFunctionConfig
++Caching : LLMCacheConfig
++RateLimiting : LLMRateConfig
++Level : string
++Format : string
++File : string
++Type : NodeType
++Value : string
++ToolName : string
++Args : Map<string, interface>
++Children : List<ASTNode>
++NodeTypeWorkflow : string
++NodeTypeTask : string
++NodeTypeAgent : string
++NodeTypeCall : string
++NodeTypeParallel : string
++NodeTypeSequence : string
++analyzer : Analyzer
++eventBus : EventBus
++llmClient : LLMClient
++AnalyzeWithOrchestration(ctx, dsl) : (interface, error)
++buildNetworkContext() : NetworkContext
++findAgentsForWorkflow(ctx, ast) : List<Map<string, interface>>
++publishProgress(stage, message, details) : void
++publishResult(command, result, workflow) : void
++logger : Logger
++agent : AgentInterface
++AnalyzeDSL(ctx, dsl) : (interface, error)
++tokenize(dsl) : List<string>
++parse(tokens) : (AST, error)
++eventBus : EventBus
++dslAnalyzer : Analyzer
++agentInterface : AgentInterface
++logger : Logger
++workflows : Map<string, WorkflowExecution>
++ExecuteWorkflow(ctx, workflowID, nodes, edges) : error
++GetWorkflowStatus(workflowID) : (Map<string, interface>, error)
++buildGraph(nodes, edges) : (WorkflowGraph, error)
++findEntryNodes(graph) : List<string>
++executeNode(ctx, execution, nodeID) : error
++ID : string
++Graph : WorkflowGraph
++Status : string
++StartTime : Time
++EndTime : Time
++Results : Map<string, interface>
++Nodes : Map<string, Node>
++Edges : List<Edge>
++Adjacency : Map<string, List<string>>
++ID : string
++Type : string
++Position : Map<string, int>
++Data : Map<string, interface>
++Status : NodeStatus
++ID : string
++Source : string
++Target : string
++Type : string
+<<enumeration>>
+pending
+running
+success
+error
++Nodes : List<ASTNode>
++Type : NodeType
++Value : string
++ToolName : string
++Args : Map<string, interface>
++Children : List<ASTNode>
++NodeTypeCommand
++NodeTypeWorkflow
++NodeTypeTask
++NodeTypeAgent
++NodeTypeCall
++NodeTypeParallel
++NodeTypeSequence
+-mu : RWMutex
+-handlers : Map<EventType, List<EventHandler>>
+-logger : Logger
+-eventChan : Chan<Event>
+-stopChan : Chan<struct>
++Subscribe(eventType, handler)
++SubscribeAll(handler)
++Publish(event)
++PublishAsync(eventType, payload)
++Stop()
++Type : EventType
++Payload : Map<string, interface>
+<<function>>
+EventHandler(event Event)
++*dagger.Client : client
++NewEngine(ctx context.Context) : (DaggerEngine, error)
++Close()
++Execute(ctx context.Context, contract ToolContract, args map[string]interface{}) : (string, error)
+<<interface>>
++Execute(ctx context.Context, contract ToolContract, args map[string]interface{}) : (string, error)
++*dagger.Client : client
++Execute(ctx context.Context, contract ToolContract, args map[string]interface{}) : (string, error)
++Close()
++string : Engine
++string : Name
++map[string]interface{} : EngineSpec
++*TransportManager : transportManager
++Execute(ctx context.Context, contract ToolContract, args map[string]interface{}) : (string, error)
++string : Engine
++string : Name
++map[string]interface{} : EngineSpec
++RegisterSSEEndpoint(name, address string, config *EndpointConfig)
++GetClient(name string) : SSEClient
++*TransportManager : transportManager
++Execute(ctx, contract, args) : (string, error)
++map[string]*MCPClientWrapper : clients
++*ClientFactory : factory
++RegisterSSEEndpoint(name, url, headers)
++RegisterHTTPEndpoint(name, url, headers)
++RegisterSTDIOEndpoint(name, command, args)
++CallRemoteTool(ctx, clientName, toolName, args) : (CallToolResult, error)
++GetClient(name) : (MCPClientWrapper, error)
++Close()
++*client.Client : client
++ClientType : clientType
++*InitializeResult : serverInfo
++*logrus.Logger : logger
++context.Context : ctx
++bool : initialized
++Initialize(ctx) : error
++CallTool(ctx, name, args) : (CallToolResult, error)
++Close() : error
++map[string]ClientConfig : configs
++map[string]*MCPClientWrapper : clients
++RegisterConfig(name, config)
++GetOrCreateClient(name) : (MCPClientWrapper, error)
++CloseAll()
++ClientType : Type
++string : Address
++string : Command
++[]string : Args
++map[string]string : Headers
++*logrus.Logger : Logger
+<<interface>>
++Execute(ctx, contract, args) : string, error
+-*dagger.Client : client
++Execute(ctx, contract, args) : string, error
++Close()
+-*TransportManager : transportManager
++Execute(ctx, contract, args) : string, error
+-map[string]ExecutionEngine : executionEngines
+-*TransportManager : transportManager
++handleExecuteTool()
++handleDaggerTool()
++string : Engine
++string : Name
++map[string]interface{} : EngineSpec
++server : MCPServer
++sseServer : SSEServer
++httpServer : StreamableHTTPServer
++logger : Logger
++agentName : string
++agentVersion : string
++toolHandlers : Map<string, ToolHandlerFunc>
++registeredTools : List<Tool>
++NewMCPServer(config ServerConfig) : MCPServerWrapper
++AddTool(tool mcpTypes.Tool, handler server.ToolHandlerFunc) : void
++AddResource(resource mcpTypes.Resource, handler server.ResourceHandlerFunc) : void
++AddPrompt(prompt mcpTypes.Prompt, handler server.PromptHandlerFunc) : void
++StartSSE(port string) : error
++StartHTTP(port string) : error
++StartSTDIO() : error
++Shutdown(ctx context.Context) : error
++FindToolHandler(toolName string) : ToolHandlerFunc
++HasTool(toolName string) : bool
++GetRegisteredTools() : List<Tool>
++Name : string
++Version : string
++Transport : TransportType
++Port : string
++Logger : Logger
++EnableTools : bool
++EnableResources : bool
++EnablePrompts : bool
++TransportSTDIO
++TransportSSE
++TransportHTTP
++clients : Map<string, MCPClientWrapper>
++factory : ClientFactory
++logger : Logger
++mu : RWMutex
++NewTransportManager(logger *logrus.Logger) : TransportManager
++RegisterSSEEndpoint(name, url string, headers map[string]string) : void
++RegisterHTTPEndpoint(name, url string, headers map[string]string) : void
++RegisterSTDIOEndpoint(name, command string, args []string) : void
++GetClient(name string) : (MCPClientWrapper, error)
++CallRemoteTool(ctx context.Context, clientName, toolName string, args map[string]interface{}) : (CallToolResult, error)
++Close() : void
++baseURL : string
++headers : Map<string, string>
++client : Client
++ctx : Context
++cancel : CancelFunc
++reconnectCh : Chan<struct>
++mutex : RWMutex
++logger : Logger
++NewResilientSSEClient(baseURL string, headers map[string]string, logger *logrus.Logger) : ResilientSSEClient
++connect() : error
++reconnectLoop() : void
++CallTool(ctx context.Context, req mcp.CallToolRequest) : (CallToolResult, error)
++Close() : error
++clients : Chan<MCPClientWrapper>
++func() : MCPClientWrapper factory
++maxSize : int
++baseURL : string
++logger : Logger
++NewStreamableHTTPClientPool(baseURL string, maxSize int, logger *logrus.Logger) : StreamableHTTPClientPool
++Get() : MCPClientWrapper
++Put(c *MCPClientWrapper) : void
++CallTool(ctx context.Context, name string, args map[string]interface{}) : (CallToolResult, error)
++Close() : void
++client : Client
++clientType : ClientType
++serverInfo : InitializeResult
++logger : Logger
++ctx : Context
++cancel : CancelFunc
++mu : RWMutex
++initialized : bool
++Initialize(ctx context.Context) : error
++ListTools(ctx context.Context) : (ListToolsResult, error)
++CallTool(ctx context.Context, name string, args map[string]interface{}) : (CallToolResult, error)
++ListResources(ctx context.Context) : (ListResourcesResult, error)
++ReadResource(ctx context.Context, uri string) : (ReadResourceResult, error)
++ListPrompts(ctx context.Context) : (ListPromptsResult, error)
++GetPrompt(ctx context.Context, name string, args map[string]string) : (GetPromptResult, error)
++Close() : error
++IsInitialized() : bool
++GetServerInfo() : InitializeResult
++Type : ClientType
++Address : string
++Command : string
++Args : List<string>
++Headers : Map<string, string>
++Logger : Logger
++configs : Map<string, ClientConfig>
++clients : Map<string, MCPClientWrapper>
++mu : RWMutex
++logger : Logger
++NewClientFactory(logger *logrus.Logger) : ClientFactory
++RegisterConfig(name string, config ClientConfig) : void
++GetOrCreateClient(name string) : (MCPClientWrapper, error)
++CloseAll() : void
++mu : RWMutex
++handlers : Map<EventType, List<EventHandler>>
++logger : Logger
++eventChan : Chan<Event>
++stopChan : Chan<struct>
++NewEventBus(logger *logrus.Logger) : EventBus
++Subscribe(eventType EventType, handler EventHandler) : void
++SubscribeAll(handler EventHandler) : void
++Publish(event Event) : void
++PublishAsync(eventType EventType, payload map[string]interface{}) : void
++processEvents() : void
++handleEvent(event Event) : void
++Stop() : void
++PublishDSLProgress(stage, message string, details map[string]interface{}) : void
++PublishNodeStatusUpdate(workflowID, nodeID, status string) : void
++PublishWorkflowLog(workflowID, level, message, source, nodeID string) : void
++PublishWorkflowComplete(workflowID string, result map[string]interface{}) : void
++PublishWorkflowError(workflowID, message, nodeID string) : void
++Type : EventType
++Payload : Map<string, interface>
+<<function>>
+EventHandler(event Event)
++*TransportManager : transportManager
++Execute(ctx Context, contract ToolContract, args Map) : (String, Error)
++MCPClientWrapper] : clients Map[String
++*ClientFactory : factory
++RegisterSSEEndpoint(name, url, headers)
++RegisterHTTPEndpoint(name, url, headers)
++RegisterSTDIOEndpoint(name, command, args)
++GetClient(name) : (MCPClientWrapper, Error)
++CallRemoteTool(ctx, clientName, toolName, args) : (CallToolResult, Error)
++Close()
++String : baseURL
++String] : headers Map[String
++*client.Client : client
++Context : ctx
++CancelFunc : cancel
++Channel : reconnectCh
++connect() : Error
++reconnectLoop()
++CallTool(ctx, req CallToolRequest) : (CallToolResult, Error)
++Close() : Error
++Channel[*MCPClientWrapper] : clients
++factory Func() : MCPClientWrapper
++Int : maxSize
++String : baseURL
++Get() : MCPClientWrapper
++Put(c *MCPClientWrapper)
++CallTool(ctx, name, args) : (CallToolResult, Error)
++Close()
++string : Engine
++string : Name
++map[string]interface{} : EngineSpec
++Execute(ctx context.Context, contract ToolContract, args map[string]interface{}) : (string, error)
++clients : Map<string, MCPClientWrapper>
++factory : ClientFactory
++logger : Logger
++RegisterSSEEndpoint(name, url, headers)
++RegisterHTTPEndpoint(name, url, headers)
++RegisterSTDIOEndpoint(name, command, args)
++GetClient(name) : MCPClientWrapper
++CallRemoteTool(ctx, clientName, toolName, args)
++Close()
++configs : Map<string, ClientConfig>
++logger : Logger
++RegisterConfig(name, config)
++GetOrCreateClient(name) : MCPClientWrapper
++CloseAll()
++client : Client
++clientType : ClientType
++serverInfo : InitializeResult
++logger : Logger
++ctx : Context
++cancel : CancelFunc
++initialized : bool
++CallTool(ctx, name, args) : CallToolResult
++Initialize(ctx) : error
++Close() : error
++Code : int
++Message : string
++Data : interface
++Code : int
++Message : string
++ID : int
++Result : interface
++Error : MCPError
++Type : string
++ID : string
++Method : string
++Params : interface
++Result : interface
++Error : P2PError
++*server.MCPServer : server
++*server.SSEServer : sseServer
++*server.StreamableHTTPServer : httpServer
++*logrus.Logger : logger
++string : agentName
++string : agentVersion
++map[string]server.ToolHandlerFunc : toolHandlers
++[]mcpTypes.Tool : registeredTools
++NewMCPServer(config ServerConfig) : MCPServerWrapper
++AddTool(tool mcpTypes.Tool, handler server.ToolHandlerFunc)
++FindToolHandler(toolName string) : ToolHandlerFunc
++HasTool(toolName string) : bool
++GetRegisteredTools() : List<Tool>
++StartSSE(port string) : error
++StartHTTP(port string) : error
++StartSTDIO() : error
++Shutdown(ctx context.Context) : error
++string : Name
++string : Version
++TransportType : Transport
++string : Port
++*logrus.Logger : Logger
++bool : EnableTools
++bool : EnableResources
++bool : EnablePrompts
++TransportSTDIO
++TransportSSE
++TransportHTTP
++*TransportManager : transportManager
++NewRemoteMCPEngine(tm *TransportManager) : RemoteMCPEngine
++Execute(ctx context.Context, contract ToolContract, args map[string]interface{}) : (string, error)
++map[string]*MCPClientWrapper : clients
++*ClientFactory : factory
++*logrus.Logger : logger
++RegisterSSEEndpoint(name, url string, headers map[string]string)
++GetClient(name string) : (MCPClientWrapper, error)
++CallRemoteTool(ctx context.Context, clientName, toolName string, args map[string]interface{}) : (CallToolResult, error)
+<<interface>>
++Execute(ctx context.Context, contract ToolContract, args map[string]interface{}) : (string, error)
++Name : string
++Description : string
++URL : string
++Version : string
++ProtocolVersion : string
++Provider : AgentProvider
++Capabilities : AgentCapabilities
++Skills : List<AgentSkill>
++SecuritySchemes : Map<string, interface>
++SupportedTransports : List<string>
++Metadata : interface
++Name : string
++Version : string
++Description : string
++URL : string
++Organization : string
++Streaming : bool
++PushNotifications : bool
++StateTransition : bool
++ID : string
++Name : string
++Description : string
++Tags : List<string>
++Examples : List<string>
++InputModes : List<string>
++OutputModes : List<string>
++host : Host
++mcpServer : MCPServerWrapper
++transportMgr : TransportManager
++peerClients : Map<ID, MCPClientWrapper>
++logger : Logger
++ctx : Context
++cancel : CancelFunc
++mu : RWMutex
++handleMCPStream(stream)
++handleCardStream(stream)
++ProcessMCPRequest(request)
++ConnectToPeer(peerID)
++CallPeerTool(ctx, peerID, toolName, args)
++ListPeers(ctx)
++SendMessage(ctx, peerIDStr, message)
++GetAgentCard(peerID)
++getAgentCard()
++Close()
++host : Host
++logger : Logger
++handlers : Map<ID, StreamHandler>
++peerCards : Map<ID, AgentCard>
++ourCard : AgentCard
++mcpBridge : P2PMCPBridge
++agent : A2AAgent
++mu : RWMutex
++handleMCPStream(stream)
++handleCardStream(stream)
++handleToolStream(stream)
++RequestCard(ctx, peerID)
++InvokeTool(ctx, peerID, toolName, args)
++SendMCPRequest(ctx, peerID, request)
++GetPeerCards()
++processMCPMessage(msg)
++listTools()
++invokeTool(params)
++processTool(request)
++SetAgentCard(card)
++getOurCard()
++Host : host
++Logger : logger
++map[peer.ID]*AgentCard : peerCards
++*AgentCard : ourCard
++*P2PMCPBridge : mcpBridge
++A2AAgent : agent
++sync.RWMutex : mu
++SetAgent(agent A2AAgent)
++SetMCPBridge(bridge *P2PMCPBridge)
++handleMCPStream(stream Stream)
++handleCardStream(stream Stream)
++handleToolStream(stream Stream)
++handleA2AStream(stream Stream)
+<<interface>>
++DispatchA2ARequest(req JSONRPCRequest) : JSONRPCResponse
++ProcessMCPRequest(request MCPRequest) : MCPResponse
++Host : host
++Logger : logger
++Map[ProtocolID]StreamHandler : handlers
++Map[PeerID]AgentCard : peerCards
++AgentCard : ourCard
++P2PMCPBridge : mcpBridge
++A2AAgent : agent
++SetMCPBridge(bridge)
++SetAgent(agent)
++handleMCPStream(stream)
++handleCardStream(stream)
++handleToolStream(stream)
++handleA2AStream(stream)
++string : Name
++string : Version
++string : PeerID
++string[] : Capabilities
++ToolSpec[] : Tools
++int64 : Timestamp
++string : Name
++string : Description
++ToolParameter[] : Parameters
++string : Name
++string : Type
++string : Description
++bool : Required
++string : Type
++string : ID
++string : Method
++interface{} : Params
++interface{} : Result
++P2PError : Error
++int : Code
++string : Message
++Host : host
++Logger : logger
++AgentCard~ : peerCards Map~PeerID
++AgentCard : ourCard
++P2PMCPBridge : mcpBridge
++A2AAgent : agent
++SetMCPBridge(bridge)
++SetAgent(agent)
++handleMCPStream(stream)
++handleCardStream(stream)
++handleToolStream(stream)
++handleA2AStream(stream)
++RequestCard(ctx, peerID)
++InvokeTool(ctx, peerID, name, args)
++string : Name
++string : Version
++string : PeerID
++[]string : Capabilities
++[]ToolSpec : Tools
++int64 : Timestamp
++string : Name
++string : Description
++[]ToolParameter : Parameters
++string : Name
++string : Type
++string : Description
++bool : Required
++string : Type
++string : ID
++string : Method
++interface{} : Params
++interface{} : Result
++P2PError : Error
++int : Code
++string : Message
++Host : host
++MCPServerWrapper : mcpServer
++MCPClientWrapper~ : peerClients Map~PeerID
++ProcessMCPRequest(request)
++handleMCPStream(stream)
++handleCardStream(stream)
++ConnectToPeer(peerID)
++CallPeerTool(ctx, peerID, name, args)
++ListPeers(ctx)
++SendMessage(ctx, peerID, message)
++int : ID
++string : Method
++interface{}~ : Params Map~string
++int : ID
++interface{} : Result
++MCPError : Error
++int : Code
++string : Message
++interface{} : Data
++Stream : stream
++Send(data)
++Receive()
++Close()
++AddTool(tool Tool, handler ToolHandlerFunc)
++AddResource(resource Resource, handler ResourceHandlerFunc)
++StartSSE(port string)
+-TransportManager : transportManager
++Execute(contract ToolContract, args map[string]interface{}) : string
++RegisterSSEEndpoint(name, address string)
++CallRemoteTool(ctx context.Context, clientName, toolName string, args map[string]interface{}) : (PartialResponse, error)
++*server.MCPServer : server
++*server.SSEServer : sseServer
++*server.StreamableHTTPServer : httpServer
++*logrus.Logger : logger
++string : agentName
++string : agentVersion
++map[string]server.ToolHandlerFunc : toolHandlers
++[]mcpTypes.Tool : registeredTools
++AddTool(tool mcpTypes.Tool, handler server.ToolHandlerFunc)
++FindToolHandler(toolName string) : ToolHandlerFunc
++HasTool(toolName string) : bool
++GetRegisteredTools() : List<Tool>
++AddResource(resource mcpTypes.Resource, handler server.ResourceHandlerFunc)
++AddPrompt(prompt mcpTypes.Prompt, handler server.PromptHandlerFunc)
++StartSSE(port string) : error
++StartHTTP(port string) : error
++StartSTDIO() : error
++Shutdown(ctx context.Context) : error
++string : Name
++string : Version
++TransportType : Transport
++string : Port
++*logrus.Logger : Logger
++bool : EnableTools
++bool : EnableResources
++bool : EnablePrompts
+<<enumeration>>
+TransportSTDIO
+TransportSSE
+TransportHTTP
++*client.Client : client
++ClientType : clientType
++*mcp.InitializeResult : serverInfo
++*logrus.Logger : logger
++context.Context : ctx
++context.CancelFunc : cancel
++sync.RWMutex : mu
++bool : initialized
++Initialize(ctx context.Context) : error
++ListTools(ctx context.Context) : (ListToolsResult, error)
++CallTool(ctx context.Context, name string, args map[string]interface{}) : (CallToolResult, error)
++ListResources(ctx context.Context) : (ListResourcesResult, error)
++ReadResource(ctx context.Context, uri string) : (ReadResourceResult, error)
++ListPrompts(ctx context.Context) : (ListPromptsResult, error)
++GetPrompt(ctx context.Context, name string, args map[string]string) : (GetPromptResult, error)
++Close() : error
++IsInitialized() : bool
++GetServerInfo() : InitializeResult
++ClientType : Type
++string : Address
++string : Command
++[]string : Args
++map[string]string : Headers
++*logrus.Logger : Logger
+<<enumeration>>
+ClientTypeSTDIO
+ClientTypeStreamableHTTP
+ClientTypeSSE
+ClientTypeInProcess
++map[string]*MCPClientWrapper : clients
++*ClientFactory : factory
++*logrus.Logger : logger
++sync.RWMutex : mu
++RegisterSSEEndpoint(name, url string, headers map[string]string)
++RegisterHTTPEndpoint(name, url string, headers map[string]string)
++RegisterSTDIOEndpoint(name, command string, args []string)
++GetClient(name string) : (MCPClientWrapper, error)
++CallRemoteTool(ctx context.Context, clientName, toolName string, args map[string]interface{}) : (CallToolResult, error)
++Close()
++map[string]ClientConfig : configs
++map[string]*MCPClientWrapper : clients
++sync.RWMutex : mu
++*logrus.Logger : logger
++RegisterConfig(name string, config ClientConfig)
++GetOrCreateClient(name string) : (MCPClientWrapper, error)
++CloseAll()
++string : baseURL
++map[string]string : headers
++*client.Client : client
++context.Context : ctx
++context.CancelFunc : cancel
++struct{} : reconnectCh chan
++sync.RWMutex : mutex
++*logrus.Logger : logger
++connect() : error
++reconnectLoop()
++CallTool(ctx context.Context, req mcp.CallToolRequest) : (CallToolResult, error)
++Close() : error
++string : Engine
++string : Name
++map[string]interface{} : EngineSpec
+<<interface>>
++Execute(ctx context.Context, contract ToolContract, args map[string]interface{}) : (string, error)
++Execute(ctx context.Context, contract ToolContract, args map[string]interface{}) : (string, error)
++Execute(ctx context.Context, contract ToolContract, args map[string]interface{}) : (string, error)
++SendMessage(ctx, peerID, message)
++ListPeers(ctx)
+-Host : host
+-MCPServer : mcpServer
+-Logger : logger
++InvokeTool(ctx, peerID, toolName, args)
++SetMCPBridge(bridge)
++SetAgentCard(card)
+-handleToolStream(stream)
+-handleMCPStream(stream)
+-handleCardStream(stream)
++Host : host
++PeerInfo~ : foundPeers Map~PeerID
++[]PeerHandler : peerHandlers
++P2PProtocolHandler : protocolHandler
++Start() : error
++Stop() : error
++HandlePeerFound(pi AddrInfo)
++GetConnectedPeers() : List<PeerInfo>
++PeerID : ID
++[]Multiaddr : Addrs
++Time : FoundAt
++Time : LastSeen
++AgentCard : AgentCard
++bool : IsConnected
++Host : host
++AgentCard~ : peerCards Map~PeerID
++AgentCard : ourCard
++SetMCPBridge(bridge P2PMCPBridge)
++RequestCard(ctx Context, peerID PeerID) : (AgentCard, error)
++InvokeTool(ctx Context, peerID PeerID, toolName string, args Map~string, interface{}~) : (ToolResponse, error)
++string : Name
++string : Version
++string : PeerID
++[]string : Capabilities
++[]ToolSpec : Tools
++int64 : Timestamp
++string : Name
++string : Description
++[]ToolParameter : Parameters
+<<interface>>
++Execute(ctx Context, contract ToolContract, args Map~string, interface{}~) : (string, error)
++string : Engine
++string : Name
++interface{}~ : EngineSpec Map~string
++TransportManager : transportManager
++Execute(ctx Context, contract ToolContract, args Map~string, interface{}~) : (string, error)
++*dagger.Client : client
++Execute(ctx Context, contract ToolContract, args Map~string, interface{}~) : (string, error)
++Name : string
++Description : string
++URL : string
++Version : string
++ProtocolVersion : string
++Provider : AgentProvider
++Capabilities : AgentCapabilities
++Skills : List<AgentSkill>
++SecuritySchemes : Map<string, interface>
++SupportedTransports : List<string>
++Metadata : interface
++Name : string
++Version : string
++Description : string
++URL : string
++Organization : string
++Streaming : bool
++PushNotifications : bool
++StateTransition : bool
++ID : string
++Name : string
++Description : string
++Tags : List<string>
++Examples : List<string>
++InputModes : List<string>
++OutputModes : List<string>
++Engine : string
++Name : string
++EngineSpec : Map<string, interface>
++Execute(ctx, contract, args) : (string, error)
++Skills : List<AgentSkill>
++ID : string
++Name : string
++Role : string
++Parts : List<Part>
++MessageID : string
++TaskID : string
++ContextID : string
++Kind : string
++Kind : string
++Text : string
++File : File
++Data : interface
++Name : string
++MimeType : string
++Bytes : string
++URI : string
++ID : string
++History : List<Message>
++Level : string
++Format : string
++OutputPath : string
++SetLevel(level)
++SetFormatter(formatter)
++SetOutput(writer)
++Levels()
++Fire(entry)
++name : string
++version : string
++host : Host
++discovery : Discovery
++mcpServer : MCPServerWrapper
++p2pBridge : P2PMCPBridge
++p2pProtocol : P2PProtocolHandler
++dslAnalyzer : Analyzer
++orchestrator : WorkflowOrchestrator
++httpServer : Engine
++websocketGateway : WebSocketGateway
++eventBus : EventBus
++taskManager : TaskManager
++ctx : Context
++cancel : CancelFunc
++wg : WaitGroup
++card : AgentCard
++transportManager : TransportManager
++executionEngines : Map<string, ExecutionEngine>
++appConfig : AppConfig
++Start() : error
++Stop() : error
++initializeP2P() : error
++initializeHTTP()
++initializeDSL()
++initializeMCP() : error
++Name : string
++Version : string
++PeerID : string
++Capabilities : List<string>
++Tools : List<ToolSpec>
++Timestamp : int64
++Name : string
++Description : string
++Parameters : List<ToolParameter>
++Name : string
++Type : string
++Description : string
++Required : bool
++tasks : Map<string, Task>
++eventBus : EventBus
++logger : Logger
++CreateTask(Message) : Task
++GetTask(string) : (Task, bool)
++UpdateTaskStatus(string, string, *Message)
++AddArtifactToTask(string, Artifact)
++AddMessageToHistory(string, Message)
++ListTasks() : Map<string, Task>
++ID : string
++ContextID : string
++Status : TaskStatus
++History : List<Message>
++Artifacts : List<Artifact>
++Kind : string
++State : string
++Timestamp : string
++Message : Message
++MessageID : string
++TaskID : string
++ContextID : string
++AgentID : string
++Content : string
++Role : string
++Timestamp : string
++Name : string
++Type : string
++URI : string
++Description : string
++Timestamp : string
++int : MCP_PID
++string : AGENT1_URL
++string : AGENT2_URL
++string : List<TEST_RESULTS>
++print_test(name)
++print_success(msg)
++print_error(msg)
++wait_for_service(url, name, timeout)
++createMockMCPServer(t *testing.T, name string, toolNames []string) : Server

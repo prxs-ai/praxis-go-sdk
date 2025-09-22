@@ -75,27 +75,27 @@ The execution engine architecture implements a strategy pattern through a centra
 classDiagram
 class ExecutionEngine {
 <<interface>>
-+Execute(ctx, contract, args) string, error
++Execute(ctx: contract, args) : string, error
 }
 class DaggerEngine {
--client *dagger.Client
-+Execute(ctx, contract, args) string, error
+-*dagger.Client : client
++Execute(ctx: contract, args) : string, error
 +Close()
 }
 class RemoteMCPEngine {
--transportManager *TransportManager
-+Execute(ctx, contract, args) string, error
+-*TransportManager : transportManager
++Execute(ctx: contract, args) : string, error
 }
 class PraxisAgent {
--executionEngines map[string]ExecutionEngine
--transportManager *TransportManager
+-map[string]ExecutionEngine : executionEngines
+-*TransportManager : transportManager
 +handleExecuteTool()
 +handleDaggerTool()
 }
 class ToolContract {
-+Engine string
-+Name string
-+EngineSpec map[string]interface{}
++string : Engine
++string : Name
++map[string]interface{} : EngineSpec
 }
 ExecutionEngine <|-- DaggerEngine
 ExecutionEngine <|-- RemoteMCPEngine
@@ -297,7 +297,7 @@ Common issues and their solutions for the execution engine abstraction:
 ## Conclusion
 The execution engine abstraction layer provides a robust foundation for secure and flexible tool execution in the Praxis Go SDK. By implementing a factory pattern that dynamically selects between Dagger (local containerized) and Remote MCP (distributed) execution engines, the system achieves a balance of security, performance, and scalability. The standardized `ExecutionEngine` interface ensures consistent behavior across backends, while lazy initialization and fallback strategies enhance reliability. This architecture enables the platform to support both isolated local execution and distributed collaboration, making it adaptable to various deployment scenarios and use cases.
 
-**Referenced Files in This Document**   
+**Referenced Files in This Document**
 - [execution.go](file://internal/contracts/execution.go)
 - [engine.go](file://internal/dagger/engine.go)
 - [remote_engine.go](file://internal/mcp/remote_engine.go)

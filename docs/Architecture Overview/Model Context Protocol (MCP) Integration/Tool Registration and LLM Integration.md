@@ -53,12 +53,12 @@ The system uses `ToolContract` structures to map Go function signatures to JSON-
 ```mermaid
 classDiagram
 class ToolContract {
-+Engine string
-+Name string
-+EngineSpec map[string]interface{}
++string : Engine
++string : Name
++map[string]interface{} : EngineSpec
 }
 class ExecutionEngine {
-+Execute(ctx context.Context, contract ToolContract, args map[string]interface{}) (string, error)
++Execute(ctx: Context, contract: ToolContract, args: Map<string, interface>) : (string, error)
 }
 ToolContract --> ExecutionEngine : "executed by"
 ```
@@ -202,7 +202,7 @@ Security considerations include:
 
 The architecture ensures that all tool executions occur within the established MCP framework, leveraging its built-in security model and execution controls rather than allowing direct LLM access to system functions.
 
-**Referenced Files in This Document**   
+**Referenced Files in This Document**
 - [agent.go](file://internal/agent/agent.go#L329-L366)
 - [server.go](file://internal/mcp/server.go#L60-L97)
 - [client.go](file://internal/llm/client.go#L68-L121)

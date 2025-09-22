@@ -87,38 +87,38 @@ The `AgentCard` is serialized to JSON for transmission and deserialized upon rec
 ```mermaid
 classDiagram
 class AgentCard {
-+string Name
-+string Description
-+string URL
-+string Version
-+string ProtocolVersion
-+AgentProvider Provider
-+AgentCapabilities Capabilities
-+[]AgentSkill Skills
-+map[string]interface{} SecuritySchemes
-+[]string SupportedTransports
-+interface{} Metadata
++Name : string
++Description : string
++URL : string
++Version : string
++ProtocolVersion : string
++Provider : AgentProvider
++Capabilities : AgentCapabilities
++Skills : List<AgentSkill>
++SecuritySchemes : Map<string, interface>
++SupportedTransports : List<string>
++Metadata : interface
 }
 class AgentProvider {
-+string Name
-+string Version
-+string Description
-+string URL
-+string Organization
++Name : string
++Version : string
++Description : string
++URL : string
++Organization : string
 }
 class AgentCapabilities {
-+*bool Streaming
-+*bool PushNotifications
-+*bool StateTransition
++Streaming : bool
++PushNotifications : bool
++StateTransition : bool
 }
 class AgentSkill {
-+string ID
-+string Name
-+string Description
-+[]string Tags
-+[]string Examples
-+[]string InputModes
-+[]string OutputModes
++ID : string
++Name : string
++Description : string
++Tags : List<string>
++Examples : List<string>
++InputModes : List<string>
++OutputModes : List<string>
 }
 AgentCard --> AgentProvider : "has"
 AgentCard --> AgentCapabilities : "has"
@@ -222,19 +222,19 @@ The `ToolContract` is referenced by the `AgentCard` through the `Skills` field, 
 ```mermaid
 classDiagram
 class ToolContract {
-+string Engine
-+string Name
-+map[string]interface{} EngineSpec
++Engine : string
++Name : string
++EngineSpec : Map<string, interface>
 }
 class ExecutionEngine {
-+Execute(ctx, contract, args) (string, error)
++Execute(ctx: contract, args) : (string, error)
 }
 class AgentCard {
-+[]AgentSkill Skills
++Skills : List<AgentSkill>
 }
 class AgentSkill {
-+string ID
-+string Name
++ID : string
++Name : string
 }
 ToolContract --|> ExecutionEngine : "executed by"
 AgentCard --> AgentSkill : "has"
@@ -491,28 +491,28 @@ Messages are added to a task's `History` array as the conversation progresses. T
 ```mermaid
 classDiagram
 class Message {
-+string Role
-+[]Part Parts
-+string MessageID
-+string TaskID
-+string ContextID
-+string Kind
++Role : string
++Parts : List<Part>
++MessageID : string
++TaskID : string
++ContextID : string
++Kind : string
 }
 class Part {
-+string Kind
-+string Text
-+File File
-+interface{} Data
++Kind : string
++Text : string
++File : File
++Data : interface
 }
 class File {
-+string Name
-+string MimeType
-+string Bytes
-+string URI
++Name : string
++MimeType : string
++Bytes : string
++URI : string
 }
 class Task {
-+string ID
-+[]Message History
++ID : string
++History : List<Message>
 }
 Message --> Part : "contains"
 Part --> File : "references"
@@ -796,7 +796,7 @@ The serialization system is designed to be:
 
 This approach ensures that data can flow seamlessly between different parts of the system while maintaining data integrity and type safety.
 
-**Referenced Files in This Document**   
+**Referenced Files in This Document**
 - [agent.go](file://internal/agent/agent.go#L0-L1563)
 - [card.go](file://internal/agent/card.go#L0-L41)
 - [execution.go](file://internal/contracts/execution.go#L0-L15)

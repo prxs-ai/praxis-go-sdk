@@ -323,7 +323,7 @@ Key strengths include:
 
 Future enhancements could include task persistence, distributed locking, and enhanced security features.
 
-**Referenced Files in This Document**   
+**Referenced Files in This Document**
 - [test_a2a_full_docker.sh](file://test_a2a_full_docker.sh)
 - [internal/agent/agent.go](file://internal/agent/agent.go)
 - [internal/a2a/task_manager.go](file://internal/a2a/task_manager.go)

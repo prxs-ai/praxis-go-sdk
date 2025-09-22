@@ -109,19 +109,19 @@ The analyzer supports multiple node types for different workflow constructs:
 ```mermaid
 classDiagram
 class ASTNode {
-+NodeType Type
-+string Value
-+string ToolName
-+map[string]interface{} Args
-+[]ASTNode Children
++Type : NodeType
++Value : string
++ToolName : string
++Args : Map<string, interface>
++Children : List<ASTNode>
 }
 class NodeType {
-+string NodeTypeWorkflow
-+string NodeTypeTask
-+string NodeTypeAgent
-+string NodeTypeCall
-+string NodeTypeParallel
-+string NodeTypeSequence
++NodeTypeWorkflow : string
++NodeTypeTask : string
++NodeTypeAgent : string
++NodeTypeCall : string
++NodeTypeParallel : string
++NodeTypeSequence : string
 }
 ASTNode --> NodeType : "has type"
 ```
@@ -274,7 +274,7 @@ Error messages include detailed context about failed operations, and the system 
 ## Conclusion
 The DSL Analyzer provides a robust foundation for executing domain-specific commands in a distributed agent network. Its dual-mode operation—supporting both traditional DSL parsing and AI-driven orchestration—makes it adaptable to various use cases. The component's modular design, comprehensive error handling, and performance optimizations ensure reliable operation in production environments. Future enhancements could include more sophisticated caching strategies, enhanced LLM plan validation, and improved error recovery mechanisms.
 
-**Referenced Files in This Document**   
+**Referenced Files in This Document**
 - [analyzer.go](file://internal/dsl/analyzer.go)
 - [orchestrator.go](file://internal/dsl/orchestrator.go)
 - [client.go](file://internal/llm/client.go)

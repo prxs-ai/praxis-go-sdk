@@ -142,33 +142,33 @@ The MCP server implementation in `server.go` exposes tools via SSE, HTTP, and ST
 ```mermaid
 classDiagram
 class MCPServerWrapper {
-+server *server.MCPServer
-+sseServer *server.SSEServer
-+httpServer *server.StreamableHTTPServer
-+logger *logrus.Logger
-+agentName string
-+agentVersion string
-+toolHandlers map[string]server.ToolHandlerFunc
-+registeredTools []mcpTypes.Tool
-+NewMCPServer(config ServerConfig) *MCPServerWrapper
-+AddTool(tool mcpTypes.Tool, handler server.ToolHandlerFunc)
-+FindToolHandler(toolName string) server.ToolHandlerFunc
-+HasTool(toolName string) bool
-+GetRegisteredTools() []mcpTypes.Tool
-+StartSSE(port string) error
-+StartHTTP(port string) error
-+StartSTDIO() error
-+Shutdown(ctx context.Context) error
++*server.MCPServer : server
++*server.SSEServer : sseServer
++*server.StreamableHTTPServer : httpServer
++*logrus.Logger : logger
++string : agentName
++string : agentVersion
++map[string]server.ToolHandlerFunc : toolHandlers
++[]mcpTypes.Tool : registeredTools
++NewMCPServer(config: ServerConfig) : MCPServerWrapper
++AddTool(tool: Tool, handler: ToolHandlerFunc)
++FindToolHandler(toolName: string) : ToolHandlerFunc
++HasTool(toolName: string) : bool
++GetRegisteredTools() : List<Tool>
++StartSSE(port: string) : error
++StartHTTP(port: string) : error
++StartSTDIO() : error
++Shutdown(ctx: Context) : error
 }
 class ServerConfig {
-+Name string
-+Version string
-+Transport TransportType
-+Port string
-+Logger *logrus.Logger
-+EnableTools bool
-+EnableResources bool
-+EnablePrompts bool
++string : Name
++string : Version
++TransportType : Transport
++string : Port
++*logrus.Logger : Logger
++bool : EnableTools
++bool : EnableResources
++bool : EnablePrompts
 }
 class TransportType {
 +TransportSTDIO
@@ -214,21 +214,21 @@ The adapter pattern in `remote_engine.go` bridges local execution engines with e
 ```mermaid
 classDiagram
 class RemoteMCPEngine {
-+transportManager *TransportManager
-+NewRemoteMCPEngine(tm *TransportManager) *RemoteMCPEngine
-+Execute(ctx context.Context, contract ToolContract, args map[string]interface{}) (string, error)
++*TransportManager : transportManager
++NewRemoteMCPEngine(tm: TransportManager) : RemoteMCPEngine
++Execute(ctx: Context, contract: ToolContract, args: Map<string, interface>) : (string, error)
 }
 class TransportManager {
-+clients map[string]*MCPClientWrapper
-+factory *ClientFactory
-+logger *logrus.Logger
-+RegisterSSEEndpoint(name, url string, headers map[string]string)
-+GetClient(name string) (*MCPClientWrapper, error)
-+CallRemoteTool(ctx context.Context, clientName, toolName string, args map[string]interface{}) (*mcp.CallToolResult, error)
++map[string]*MCPClientWrapper : clients
++*ClientFactory : factory
++*logrus.Logger : logger
++RegisterSSEEndpoint(name: string, url: string, headers: Map<string, string>)
++GetClient(name: string) : (MCPClientWrapper, error)
++CallRemoteTool(ctx: Context, clientName: string, toolName: string, args: Map<string, interface>) : (CallToolResult, error)
 }
 class ExecutionEngine {
 <<interface>>
-+Execute(ctx context.Context, contract ToolContract, args map[string]interface{}) (string, error)
++Execute(ctx: Context, contract: ToolContract, args: Map<string, interface>) : (string, error)
 }
 RemoteMCPEngine --> TransportManager : "uses"
 RemoteMCPEngine --|> ExecutionEngine : "implements"
@@ -346,7 +346,7 @@ Common issues with the MCP subsystem include connection failures, tool not found
 ## Conclusion
 The Model Context Protocol subsystem provides a robust framework for distributed tool execution and discovery. It supports multiple transport mechanisms, enables dynamic capability exposure, and integrates with LLM clients for natural language invocation. The adapter pattern allows seamless bridging between local execution engines and external MCP endpoints. The system is configurable for various network conditions and provides comprehensive error handling for unreliable environments. This architecture enables flexible and scalable agent-to-agent communication in distributed systems.
 
-**Referenced Files in This Document**   
+**Referenced Files in This Document**
 - [server.go](file://internal/mcp/server.go#L0-L327)
 - [client.go](file://internal/mcp/client.go#L0-L292)
 - [discovery.go](file://internal/mcp/discovery.go#L0-L226)

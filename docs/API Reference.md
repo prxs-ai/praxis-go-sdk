@@ -13,9 +13,9 @@
 The Praxis agent exposes HTTP endpoints for health checks, agent status, and configuration management. These endpoints are enabled via the `http` configuration block in `agent.yaml`.
 
 ### Health Check Endpoint
-**HTTP Method**: `GET`  
-**URL Pattern**: `/health`  
-**Authentication**: None  
+**HTTP Method**: `GET`
+**URL Pattern**: `/health`
+**Authentication**: None
 **Description**: Returns the operational status of the agent.
 
 **Response Schema (JSON)**:
@@ -42,9 +42,9 @@ curl http://localhost:8000/health
 ```
 
 ### Agent Status Endpoint
-**HTTP Method**: `GET`  
-**URL Pattern**: `/status`  
-**Authentication**: None  
+**HTTP Method**: `GET`
+**URL Pattern**: `/status`
+**Authentication**: None
 **Description**: Returns detailed agent status including configuration and active components.
 
 **Response Schema (JSON)**:
@@ -105,9 +105,9 @@ curl http://localhost:8000/status
 ```
 
 ### Configuration Management Endpoint
-**HTTP Method**: `GET`  
-**URL Pattern**: `/config`  
-**Authentication**: None  
+**HTTP Method**: `GET`
+**URL Pattern**: `/config`
+**Authentication**: None
 **Description**: Returns the current agent configuration as defined in `agent.yaml`.
 
 **Response Schema (JSON)**:
@@ -218,9 +218,9 @@ Gateway->>Client : Send dslResult event
 The Praxis agent supports MCP (Modular Control Plane) servers for tool discovery and invocation. External MCP endpoints are configured in `agent.yaml`.
 
 ### Tool Discovery
-**HTTP Method**: `GET`  
-**URL Pattern**: `/mcp/discover`  
-**Authentication**: None  
+**HTTP Method**: `GET`
+**URL Pattern**: `/mcp/discover`
+**Authentication**: None
 **Description**: Returns list of available tools from local and external MCP servers.
 
 **Response Schema (JSON)**:
@@ -259,9 +259,9 @@ curl http://localhost:8000/mcp/discover
 ```
 
 ### Tool Invocation
-**HTTP Method**: `POST`  
-**URL Pattern**: `/mcp/invoke/{toolName}`  
-**Authentication**: None  
+**HTTP Method**: `POST`
+**URL Pattern**: `/mcp/invoke/{toolName}`
+**Authentication**: None
 **Description**: Execute a registered tool with provided parameters.
 
 **Request Schema (JSON)**:
@@ -376,7 +376,7 @@ V --> W[Close Connection]
 - [websocket_gateway.go](file://internal/api/websocket_gateway.go#L0-L199)
 - [agent.yaml](file://configs/agent.yaml#L1-L118)
 
-**Referenced Files in This Document**   
+**Referenced Files in This Document**
 - [agent.yaml](file://configs/agent.yaml)
 - [websocket_gateway.go](file://internal/api/websocket_gateway.go)
 - [event_bus.go](file://internal/bus/event_bus.go)

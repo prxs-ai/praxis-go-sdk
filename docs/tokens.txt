@@ -1,0 +1,99 @@
+*AgentCard: Architecture Overview/P2P Networking Layer/Agent Card Exchange and Capability Negotiation.md, Project Overview.md
+*AgentInterface: Architecture Overview/DSL Processing Engine/DSL Orchestrator.md
+*Analyzer: Architecture Overview/DSL Processing Engine/DSL Orchestrator.md
+*ClientFactory: Architecture Overview/Model Context Protocol (MCP) Integration/MCP Server Implementation.md, Architecture Overview/Model Context Protocol (MCP) Integration/Transport Adapters and Protocol Support.md
+*MCPError: Architecture Overview/Model Context Protocol (MCP) Integration/Transport Adapters and Protocol Support.md
+*MCPServerWrapper: Architecture Overview/P2P Networking Layer/Agent Card Exchange and Capability Negotiation.md
+*Message: Project Overview.md
+*P2PError: Architecture Overview/Model Context Protocol (MCP) Integration/Transport Adapters and Protocol Support.md
+*P2PMCPBridge: Architecture Overview/P2P Networking Layer/Agent Card Exchange and Capability Negotiation.md
+*TransportManager: Architecture Overview/P2P Networking Layer/Agent Card Exchange and Capability Negotiation.md
+*WorkflowGraph: Architecture Overview/DSL Processing Engine/DSL Orchestrator.md
+*a2a.TaskManager: Project Overview.md
+*api.WebSocketGateway: Project Overview.md
+*appconfig.AppConfig: Project Overview.md
+*bool: Architecture Overview/P2P Networking Layer/Agent Card Exchange and Capability Negotiation.md, Data Models.md
+*bus.EventBus: Architecture Overview/DSL Processing Engine/DSL Orchestrator.md, Project Overview.md
+*client.Client: Architecture Overview/Model Context Protocol (MCP) Integration/MCP Server Implementation.md, Architecture Overview/Model Context Protocol (MCP) Integration/Transport Adapters and Protocol Support.md
+*dsl.Analyzer: Architecture Overview/DSL Processing Engine/DSL Orchestrator.md, Project Overview.md
+*gin.Engine: Project Overview.md
+*llm.LLMClient: Architecture Overview/DSL Processing Engine/DSL Orchestrator.md
+*logrus.Logger: Architecture Overview/DSL Processing Engine/DSL Orchestrator.md, Architecture Overview/Model Context Protocol (MCP) Integration/MCP Server Implementation.md, Architecture Overview/Model Context Protocol (MCP) Integration/Transport Adapters and Protocol Support.md
+*mcp.InitializeResult: Architecture Overview/Model Context Protocol (MCP) Integration/MCP Server Implementation.md, Architecture Overview/Model Context Protocol (MCP) Integration/Transport Adapters and Protocol Support.md
+*mcp.MCPServerWrapper: Project Overview.md
+*mcp.TransportManager: Project Overview.md
+*p2p.Discovery: Project Overview.md
+*p2p.P2PMCPBridge: Project Overview.md
+*p2p.P2PProtocolHandler: Project Overview.md
+*server.MCPServer: Architecture Overview/Model Context Protocol (MCP) Integration/MCP Server Implementation.md
+*server.SSEServer: Architecture Overview/Model Context Protocol (MCP) Integration/MCP Server Implementation.md
+*server.StreamableHTTPServer: Architecture Overview/Model Context Protocol (MCP) Integration/MCP Server Implementation.md
+*time.Time: Architecture Overview/DSL Processing Engine/DSL Orchestrator.md
+*workflow.WorkflowOrchestrator: Project Overview.md
+AddArtifactToTask(string,: Project Overview.md
+AddMessageToHistory(string,: Project Overview.md
+AgentSkill[]: Architecture Overview/P2P Networking Layer/Agent Card Exchange and Capability Negotiation.md
+AnalyzeDSL(ctx,: Architecture Overview/DSL Processing Engine/DSL Orchestrator.md
+AnalyzeWithOrchestration(ctx,: Architecture Overview/DSL Processing Engine/DSL Orchestrator.md
+CallPeerTool(ctx,: Architecture Overview/P2P Networking Layer.md, Architecture Overview/P2P Networking Layer/Agent Card Exchange and Capability Negotiation.md
+CallRemoteTool(ctx,: Architecture Overview/Execution Engine Abstraction/Remote MCP Execution Engine.md, Architecture Overview/Model Context Protocol (MCP) Integration/Remote MCP Engine Integration.md, Architecture Overview/Model Context Protocol (MCP) Integration/Transport Adapters and Protocol Support.md
+CallTool(ctx,: Architecture Overview/Execution Engine Abstraction/Remote MCP Execution Engine.md, Architecture Overview/Model Context Protocol (MCP) Integration/Remote MCP Engine Integration.md, Architecture Overview/Model Context Protocol (MCP) Integration/Transport Adapters and Protocol Support.md
+Execute(ctx,: Architecture Overview/Execution Engine Abstraction.md, Architecture Overview/Execution Engine Abstraction/Remote MCP Execution Engine.md, Data Models.md
+ExecuteWorkflow(ctx,: Architecture Overview/DSL Processing Engine/DSL Orchestrator.md
+InvokeTool(ctx,: Architecture Overview/P2P Networking Layer.md, Architecture Overview/P2P Networking Layer/Agent Card Exchange and Capability Negotiation.md, Core Services/P2P Networking.md
+PublishAsync(eventType,: Architecture Overview/Event Bus and Messaging System.md
+PublishDSLProgress(stage,: Architecture Overview/Model Context Protocol (MCP) Integration/MCP Server Implementation.md
+PublishNodeStatusUpdate(workflowID,: Architecture Overview/Model Context Protocol (MCP) Integration/MCP Server Implementation.md
+PublishWorkflowError(workflowID,: Architecture Overview/Model Context Protocol (MCP) Integration/MCP Server Implementation.md
+PublishWorkflowLog(workflowID,: Architecture Overview/Model Context Protocol (MCP) Integration/MCP Server Implementation.md
+RegisterConfig(name,: Architecture Overview/Execution Engine Abstraction/Remote MCP Execution Engine.md, Architecture Overview/Model Context Protocol (MCP) Integration/Transport Adapters and Protocol Support.md
+RegisterHTTPEndpoint(name,: Architecture Overview/Execution Engine Abstraction/Remote MCP Execution Engine.md, Architecture Overview/Model Context Protocol (MCP) Integration/MCP Server Implementation.md, Architecture Overview/Model Context Protocol (MCP) Integration/Remote MCP Engine Integration.md
+RegisterSSEEndpoint(name,: Architecture Overview.md, Architecture Overview/Execution Engine Abstraction/Execution Engine Interface Contract.md, Architecture Overview/Execution Engine Abstraction/Remote MCP Execution Engine.md
+RegisterSTDIOEndpoint(name,: Architecture Overview/Execution Engine Abstraction/Remote MCP Execution Engine.md, Architecture Overview/Model Context Protocol (MCP) Integration/MCP Server Implementation.md, Architecture Overview/Model Context Protocol (MCP) Integration/Remote MCP Engine Integration.md
+RequestCard(ctx,: Architecture Overview/P2P Networking Layer.md, Architecture Overview/P2P Networking Layer/Agent Card Exchange and Capability Negotiation.md
+SendMCPRequest(ctx,: Architecture Overview/P2P Networking Layer/Agent Card Exchange and Capability Negotiation.md
+SendMessage(ctx,: Architecture Overview/P2P Networking Layer.md, Architecture Overview/P2P Networking Layer/Agent Card Exchange and Capability Negotiation.md, Core Services/P2P Networking.md
+Subscribe(eventType,: Architecture Overview/Event Bus and Messaging System.md
+TEST_RESULTS[]: Testing Strategy.md
+UpdateTaskStatus(string,: Project Overview.md
+[]*Edge: Architecture Overview/DSL Processing Engine/DSL Orchestrator.md
+[]ASTNode: Architecture Overview/DSL Processing Engine/DSL Analyzer.md, Architecture Overview/DSL Processing Engine/Workflow Resolution and Execution.md
+[]AgentSkill: Data Models.md
+[]Artifact: Project Overview.md
+[]MCPServerConfig: Agent Configuration.md
+[]Message: Data Models.md, Project Overview.md
+[]Part: Data Models.md
+[]ToolConfig: Agent Configuration.md
+[]ToolParameter: Project Overview.md
+[]ToolSpec: Project Overview.md
+[]mcpTypes.Tool: Architecture Overview/Model Context Protocol (MCP) Integration/MCP Server Implementation.md
+[]string: Agent Configuration.md, Architecture Overview/Model Context Protocol (MCP) Integration/MCP Server Implementation.md, Data Models.md
+buildGraph(nodes,: Architecture Overview/DSL Processing Engine/DSL Orchestrator.md
+context.CancelFunc: Architecture Overview/Model Context Protocol (MCP) Integration/MCP Server Implementation.md, Architecture Overview/Model Context Protocol (MCP) Integration/Transport Adapters and Protocol Support.md, Architecture Overview/P2P Networking Layer/Agent Card Exchange and Capability Negotiation.md
+context.Context: Architecture Overview/Model Context Protocol (MCP) Integration/MCP Server Implementation.md, Architecture Overview/Model Context Protocol (MCP) Integration/Transport Adapters and Protocol Support.md, Architecture Overview/P2P Networking Layer/Agent Card Exchange and Capability Negotiation.md
+executeNode(ctx,: Architecture Overview/DSL Processing Engine/DSL Orchestrator.md
+findAgentsForWorkflow(ctx,: Architecture Overview/DSL Processing Engine/DSL Orchestrator.md
+host.Host: Architecture Overview/P2P Networking Layer/Agent Card Exchange and Capability Negotiation.md, Project Overview.md
+map[EventType][]EventHandler: Architecture Overview/Model Context Protocol (MCP) Integration/MCP Server Implementation.md
+map[peer.ID]*AgentCard: Architecture Overview/P2P Networking Layer/Agent Card Exchange and Capability Negotiation.md
+map[peer.ID]*MCPClientWrapper: Architecture Overview/P2P Networking Layer/Agent Card Exchange and Capability Negotiation.md
+map[protocol.ID]StreamHandler: Architecture Overview/P2P Networking Layer/Agent Card Exchange and Capability Negotiation.md
+map[string]*MCPClientWrapper: Architecture Overview/Model Context Protocol (MCP) Integration/MCP Server Implementation.md, Architecture Overview/Model Context Protocol (MCP) Integration/Transport Adapters and Protocol Support.md
+map[string]*Node: Architecture Overview/DSL Processing Engine/DSL Orchestrator.md
+map[string]*Task: Project Overview.md
+map[string]*WorkflowExecution: Architecture Overview/DSL Processing Engine/DSL Orchestrator.md
+map[string]ClientConfig: Architecture Overview/Model Context Protocol (MCP) Integration/MCP Server Implementation.md, Architecture Overview/Model Context Protocol (MCP) Integration/Transport Adapters and Protocol Support.md
+map[string][]string: Architecture Overview/DSL Processing Engine/DSL Orchestrator.md
+map[string]contracts.ExecutionEngine: Project Overview.md
+map[string]int: Architecture Overview/DSL Processing Engine/DSL Orchestrator.md
+map[string]interface{}: Architecture Overview/DSL Processing Engine/DSL Analyzer.md, Architecture Overview/DSL Processing Engine/DSL Orchestrator.md, Architecture Overview/DSL Processing Engine/Workflow Resolution and Execution.md
+map[string]server.ToolHandlerFunc: Architecture Overview/Model Context Protocol (MCP) Integration/MCP Server Implementation.md
+map[string]string: Architecture Overview/Model Context Protocol (MCP) Integration/MCP Server Implementation.md
+publishProgress(stage,: Architecture Overview/DSL Processing Engine/DSL Orchestrator.md
+publishResult(command,: Architecture Overview/DSL Processing Engine/DSL Orchestrator.md
+string[]: Architecture Overview/P2P Networking Layer/Agent Card Exchange and Capability Negotiation.md, Project Overview.md
+sync.RWMutex: Architecture Overview/Model Context Protocol (MCP) Integration/MCP Server Implementation.md, Architecture Overview/P2P Networking Layer/Agent Card Exchange and Capability Negotiation.md
+sync.WaitGroup: Project Overview.md
+time.Duration: Agent Configuration.md
+time.Time: Architecture Overview/DSL Processing Engine/DSL Orchestrator.md
+wait_for_service(url,: Testing Strategy.md

@@ -3,11 +3,11 @@
 
 
 ## Table of Contents
-1. [Unit Testing Strategies](#unit-testing-strategies)  
-2. [Integration Testing for Component Interactions](#integration-testing-for-component-interactions)  
-3. [End-to-End Testing with test_a2a_full_docker.sh](#end-to-end-testing-with-test_a2a_full_dockersh)  
-4. [Test Pyramid and Code Coverage Goals](#test-pyramid-and-code-coverage-goals)  
-5. [Testing Event-Driven and Asynchronous Components](#testing-event-driven-and-asynchronous-components)  
+1. [Unit Testing Strategies](#unit-testing-strategies)
+2. [Integration Testing for Component Interactions](#integration-testing-for-component-interactions)
+3. [End-to-End Testing with test_a2a_full_docker.sh](#end-to-end-testing-with-test_a2a_full_dockersh)
+4. [Test Pyramid and Code Coverage Goals](#test-pyramid-and-code-coverage-goals)
+5. [Testing Event-Driven and Asynchronous Components](#testing-event-driven-and-asynchronous-components)
 6. [Test Fixtures and Mock Implementations](#test-fixtures-and-mock-implementations)
 
 ## Unit Testing Strategies
@@ -27,10 +27,10 @@ E --> F["Verify --key value formatting"]
 F --> G["Ensure correct command length"]
 ```
 
-**Diagram sources**  
+**Diagram sources**
 - [engine_test.go](file://internal/dagger/engine_test.go#L229-L288)
 
-**Section sources**  
+**Section sources**
 - [engine_test.go](file://internal/dagger/engine_test.go#L229-L288)
 
 ### MCP Discovery Unit Testing
@@ -58,12 +58,12 @@ MockServer->>Service : {"method" : "tools/list", ...}
 Service->>Test : []DiscoveredTool
 ```
 
-**Diagram sources**  
-- [discovery_test.go](file://internal/mcp/discovery_test.go#L0-L185)  
+**Diagram sources**
+- [discovery_test.go](file://internal/mcp/discovery_test.go#L0-L185)
 - [discovery.go](file://internal/mcp/discovery.go#L0-L89)
 
-**Section sources**  
-- [discovery_test.go](file://internal/mcp/discovery_test.go#L0-L185)  
+**Section sources**
+- [discovery_test.go](file://internal/mcp/discovery_test.go#L0-L185)
 - [discovery.go](file://internal/mcp/discovery.go#L0-L89)
 
 ## Integration Testing for Component Interactions
@@ -95,8 +95,8 @@ The workflow includes:
 3. Agent discovering tools via `/mcp` endpoint
 4. Executing tool calls (e.g., file read/write)
 
-**Section sources**  
-- [test_a2a_full_docker.sh](file://test_a2a_full_docker.sh#L127-L146)  
+**Section sources**
+- [test_a2a_full_docker.sh](file://test_a2a_full_docker.sh#L127-L146)
 - [discovery.go](file://internal/mcp/discovery.go#L41-L89)
 
 ## End-to-End Testing with test_a2a_full_docker.sh
@@ -117,7 +117,7 @@ G --> H["Verify Inter-Agent Communication"]
 H --> I["Generate Final Report"]
 ```
 
-**Diagram sources**  
+**Diagram sources**
 - [test_a2a_full_docker.sh](file://test_a2a_full_docker.sh#L0-L832)
 
 The script follows a structured sequence:
@@ -134,7 +134,7 @@ The script follows a structured sequence:
 - **Inter-Agent Communication**: Agent 1 delegates work to Agent 2 via A2A protocol
 - **Legacy DSL Compatibility**: Tests conversion of legacy DSL requests to A2A tasks
 
-**Section sources**  
+**Section sources**
 - [test_a2a_full_docker.sh](file://test_a2a_full_docker.sh#L0-L832)
 
 ## Test Pyramid and Code Coverage Goals
@@ -157,8 +157,8 @@ The test suite emphasizes:
 - **Observability**: Detailed logging and final JSON report generation
 - **Reproducibility**: Self-contained Docker environment
 
-**Section sources**  
-- [engine_test.go](file://internal/dagger/engine_test.go)  
+**Section sources**
+- [engine_test.go](file://internal/dagger/engine_test.go)
 - [test_a2a_full_docker.sh](file://test_a2a_full_docker.sh)
 
 ## Testing Event-Driven and Asynchronous Components
@@ -192,8 +192,8 @@ The `websocket_gateway_test.go` file contains tests for WebSocket communication,
 
 These tests use Go's `httptest` package to simulate WebSocket clients and verify event propagation.
 
-**Section sources**  
-- [test_a2a_full_docker.sh](file://test_a2a_full_docker.sh#L344-L386)  
+**Section sources**
+- [test_a2a_full_docker.sh](file://test_a2a_full_docker.sh#L344-L386)
 - [websocket_gateway_test.go](file://internal/api/websocket_gateway_test.go)
 
 ## Test Fixtures and Mock Implementations
@@ -237,30 +237,30 @@ It uses temporary files (e.g., `/tmp/current_task_id`) to share state between te
 ```mermaid
 classDiagram
 class TestFixture {
-+MCP_PID int
-+AGENT1_URL string
-+AGENT2_URL string
-+TEST_RESULTS[] string
++int : MCP_PID
++string : AGENT1_URL
++string : AGENT2_URL
++string : List<TEST_RESULTS>
 +print_test(name)
 +print_success(msg)
 +print_error(msg)
-+wait_for_service(url, name, timeout)
++wait_for_service(url: name, timeout)
 }
 class MockServer {
-+createMockMCPServer(t *testing.T, name string, toolNames []string) *httptest.Server
++createMockMCPServer(t: T, name: string, toolNames: List<string>) : Server
 }
 TestFixture --> MockServer : uses
 ```
 
-**Diagram sources**  
-- [test_a2a_full_docker.sh](file://test_a2a_full_docker.sh#L0-L832)  
+**Diagram sources**
+- [test_a2a_full_docker.sh](file://test_a2a_full_docker.sh#L0-L832)
 - [discovery_test.go](file://internal/mcp/discovery_test.go#L138-L185)
 
-**Section sources**  
-- [test_a2a_full_docker.sh](file://test_a2a_full_docker.sh#L0-L832)  
+**Section sources**
+- [test_a2a_full_docker.sh](file://test_a2a_full_docker.sh#L0-L832)
 - [discovery_test.go](file://internal/mcp/discovery_test.go#L138-L185)
 
-**Referenced Files in This Document**   
+**Referenced Files in This Document**
 - [engine_test.go](file://internal/dagger/engine_test.go#L0-L318)
 - [discovery_test.go](file://internal/mcp/discovery_test.go#L0-L185)
 - [discovery.go](file://internal/mcp/discovery.go#L0-L89)

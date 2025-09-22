@@ -162,14 +162,14 @@ The `DaggerEngine` provides local execution capabilities using the Dagger.io pla
 ```mermaid
 classDiagram
 class DaggerEngine {
-+client *dagger.Client
-+Execute(ctx context.Context, contract ToolContract, args map[string]interface{}) (string, error)
++*dagger.Client : client
++Execute(ctx: Context, contract: ToolContract, args: Map<string, interface>) : (string, error)
 +Close()
 }
 class ToolContract {
-+Engine string
-+Name string
-+EngineSpec map[string]interface{}
++string : Engine
++string : Name
++map[string]interface{} : EngineSpec
 }
 DaggerEngine --> ToolContract : "executes"
 DaggerEngine --> "dagger.Client" : "uses"
@@ -233,17 +233,17 @@ The `RemoteMCPEngine` enables execution on remote servers via the Model Context 
 ```mermaid
 classDiagram
 class RemoteMCPEngine {
-+transportManager *TransportManager
-+Execute(ctx context.Context, contract ToolContract, args map[string]interface{}) (string, error)
++*TransportManager : transportManager
++Execute(ctx: Context, contract: ToolContract, args: Map<string, interface>) : (string, error)
 }
 class ToolContract {
-+Engine string
-+Name string
-+EngineSpec map[string]interface{}
++string : Engine
++string : Name
++map[string]interface{} : EngineSpec
 }
 class TransportManager {
-+RegisterSSEEndpoint(name, address string, config *EndpointConfig)
-+GetClient(name string) SSEClient
++RegisterSSEEndpoint(name: string, address: string, config: EndpointConfig)
++GetClient(name: string) : SSEClient
 }
 RemoteMCPEngine --> ToolContract : "executes"
 RemoteMCPEngine --> TransportManager : "uses"
@@ -525,16 +525,16 @@ func (e *CustomEngine) Execute(ctx context.Context, contract contracts.ToolContr
     if !ok || endpoint == "" {
         return "", fmt.Errorf("custom engine spec missing 'endpoint' for tool '%s'", contract.Name)
     }
-    
+
     // Additional validation and processing
     // ...
-    
+
     // Perform the actual execution
     result, err := e.performExecution(ctx, contract, args)
     if err != nil {
         return "", fmt.Errorf("custom engine execution failed: %w", err)
     }
-    
+
     return result, nil
 }
 ```
@@ -559,7 +559,7 @@ func NewCustomEngine(config *EngineConfig) (*CustomEngine, error) {
     if err != nil {
         return nil, fmt.Errorf("failed to create API client: %w", err)
     }
-    
+
     return &CustomEngine{
         config: config,
         client: client,
@@ -599,7 +599,7 @@ By following these guidelines, you can create custom engine implementations that
 - [remote_engine.go](file://internal/mcp/remote_engine.go#L0-L37)
 - [agent.go](file://internal/agent/agent.go#L400-L600)
 
-**Referenced Files in This Document**   
+**Referenced Files in This Document**
 - [execution.go](file://internal/contracts/execution.go)
 - [types.go](file://internal/a2a/types.go)
 - [engine.go](file://internal/dagger/engine.go)

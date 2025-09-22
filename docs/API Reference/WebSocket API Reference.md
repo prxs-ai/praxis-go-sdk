@@ -510,7 +510,7 @@ client.sendChatMessage('Hello, Praxis agent!');
 - [websocket_gateway.go](file://internal/api/websocket_gateway.go#L259-L306)
 - [websocket_gateway_test.go](file://internal/api/websocket_gateway_test.go#L111-L164)
 
-**Referenced Files in This Document**   
+**Referenced Files in This Document**
 - [websocket_gateway.go](file://internal/api/websocket_gateway.go)
 - [event_bus.go](file://internal/bus/event_bus.go)
 - [agent.go](file://internal/agent/agent.go)

@@ -130,34 +130,34 @@ The MCP server implementation wraps the underlying `github.com/mark3labs/mcp-go/
 ```mermaid
 classDiagram
 class MCPServerWrapper {
-+server *server.MCPServer
-+sseServer *server.SSEServer
-+httpServer *server.StreamableHTTPServer
-+logger *logrus.Logger
-+agentName string
-+agentVersion string
-+toolHandlers map[string]server.ToolHandlerFunc
-+registeredTools []mcpTypes.Tool
-+AddTool(tool mcpTypes.Tool, handler server.ToolHandlerFunc)
-+FindToolHandler(toolName string) server.ToolHandlerFunc
-+HasTool(toolName string) bool
-+GetRegisteredTools() []mcpTypes.Tool
-+AddResource(resource mcpTypes.Resource, handler server.ResourceHandlerFunc)
-+AddPrompt(prompt mcpTypes.Prompt, handler server.PromptHandlerFunc)
-+StartSSE(port string) error
-+StartHTTP(port string) error
-+StartSTDIO() error
-+Shutdown(ctx context.Context) error
++*server.MCPServer : server
++*server.SSEServer : sseServer
++*server.StreamableHTTPServer : httpServer
++*logrus.Logger : logger
++string : agentName
++string : agentVersion
++map[string]server.ToolHandlerFunc : toolHandlers
++[]mcpTypes.Tool : registeredTools
++AddTool(tool: Tool, handler: ToolHandlerFunc)
++FindToolHandler(toolName: string) : ToolHandlerFunc
++HasTool(toolName: string) : bool
++GetRegisteredTools() : List<Tool>
++AddResource(resource: Resource, handler: ResourceHandlerFunc)
++AddPrompt(prompt: Prompt, handler: PromptHandlerFunc)
++StartSSE(port: string) : error
++StartHTTP(port: string) : error
++StartSTDIO() : error
++Shutdown(ctx: Context) : error
 }
 class ServerConfig {
-+Name string
-+Version string
-+Transport TransportType
-+Port string
-+Logger *logrus.Logger
-+EnableTools bool
-+EnableResources bool
-+EnablePrompts bool
++string : Name
++string : Version
++TransportType : Transport
++string : Port
++*logrus.Logger : Logger
++bool : EnableTools
++bool : EnableResources
++bool : EnablePrompts
 }
 class TransportType {
 <<enumeration>>
@@ -201,32 +201,32 @@ The MCP client implementation provides a wrapper around the underlying MCP clien
 ```mermaid
 classDiagram
 class MCPClientWrapper {
-+client *client.Client
-+clientType ClientType
-+serverInfo *mcp.InitializeResult
-+logger *logrus.Logger
-+ctx context.Context
-+cancel context.CancelFunc
-+mu sync.RWMutex
-+initialized bool
-+Initialize(ctx context.Context) error
-+ListTools(ctx context.Context) (*mcp.ListToolsResult, error)
-+CallTool(ctx context.Context, name string, args map[string]interface{}) (*mcp.CallToolResult, error)
-+ListResources(ctx context.Context) (*mcp.ListResourcesResult, error)
-+ReadResource(ctx context.Context, uri string) (*mcp.ReadResourceResult, error)
-+ListPrompts(ctx context.Context) (*mcp.ListPromptsResult, error)
-+GetPrompt(ctx context.Context, name string, args map[string]string) (*mcp.GetPromptResult, error)
-+Close() error
-+IsInitialized() bool
-+GetServerInfo() *mcp.InitializeResult
++*client.Client : client
++ClientType : clientType
++*mcp.InitializeResult : serverInfo
++*logrus.Logger : logger
++context.Context : ctx
++context.CancelFunc : cancel
++sync.RWMutex : mu
++bool : initialized
++Initialize(ctx: Context) : error
++ListTools(ctx: Context) : (ListToolsResult, error)
++CallTool(ctx: Context, name: string, args: Map<string, interface>) : (CallToolResult, error)
++ListResources(ctx: Context) : (ListResourcesResult, error)
++ReadResource(ctx: Context, uri: string) : (ReadResourceResult, error)
++ListPrompts(ctx: Context) : (ListPromptsResult, error)
++GetPrompt(ctx: Context, name: string, args: Map<string, string>) : (GetPromptResult, error)
++Close() : error
++IsInitialized() : bool
++GetServerInfo() : InitializeResult
 }
 class ClientConfig {
-+Type ClientType
-+Address string
-+Command string
-+Args []string
-+Headers map[string]string
-+Logger *logrus.Logger
++ClientType : Type
++string : Address
++string : Command
++[]string : Args
++map[string]string : Headers
++*logrus.Logger : Logger
 }
 class ClientType {
 <<enumeration>>
@@ -278,39 +278,39 @@ The transport layer provides abstraction over different communication methods an
 ```mermaid
 classDiagram
 class TransportManager {
-+clients map[string]*MCPClientWrapper
-+factory *ClientFactory
-+logger *logrus.Logger
-+mu sync.RWMutex
-+RegisterSSEEndpoint(name, url string, headers map[string]string)
-+RegisterHTTPEndpoint(name, url string, headers map[string]string)
-+RegisterSTDIOEndpoint(name, command string, args []string)
-+GetClient(name string) (*MCPClientWrapper, error)
-+CallRemoteTool(ctx context.Context, clientName, toolName string, args map[string]interface{}) (*mcp.CallToolResult, error)
++map[string]*MCPClientWrapper : clients
++*ClientFactory : factory
++*logrus.Logger : logger
++sync.RWMutex : mu
++RegisterSSEEndpoint(name: string, url: string, headers: Map<string, string>)
++RegisterHTTPEndpoint(name: string, url: string, headers: Map<string, string>)
++RegisterSTDIOEndpoint(name: string, command: string, args: List<string>)
++GetClient(name: string) : (MCPClientWrapper, error)
++CallRemoteTool(ctx: Context, clientName: string, toolName: string, args: Map<string, interface>) : (CallToolResult, error)
 +Close()
 }
 class ClientFactory {
-+configs map[string]ClientConfig
-+clients map[string]*MCPClientWrapper
-+mu sync.RWMutex
-+logger *logrus.Logger
-+RegisterConfig(name string, config ClientConfig)
-+GetOrCreateClient(name string) (*MCPClientWrapper, error)
++map[string]ClientConfig : configs
++map[string]*MCPClientWrapper : clients
++sync.RWMutex : mu
++*logrus.Logger : logger
++RegisterConfig(name: string, config: ClientConfig)
++GetOrCreateClient(name: string) : (MCPClientWrapper, error)
 +CloseAll()
 }
 class ResilientSSEClient {
-+baseURL string
-+headers map[string]string
-+client *client.Client
-+ctx context.Context
-+cancel context.CancelFunc
-+reconnectCh chan struct{}
-+mutex sync.RWMutex
-+logger *logrus.Logger
-+connect() error
++string : baseURL
++map[string]string : headers
++*client.Client : client
++context.Context : ctx
++context.CancelFunc : cancel
++struct{} : reconnectCh chan
++sync.RWMutex : mutex
++*logrus.Logger : logger
++connect() : error
 +reconnectLoop()
-+CallTool(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error)
-+Close() error
++CallTool(ctx: Context, req: CallToolRequest) : (CallToolResult, error)
++Close() : error
 }
 TransportManager --> ClientFactory : "contains"
 TransportManager --> ResilientSSEClient : "uses for SSE"
@@ -435,19 +435,19 @@ The `ToolContract` struct defines a language-agnostic API contract for tools, sp
 ```mermaid
 classDiagram
 class ToolContract {
-+Engine string
-+Name string
-+EngineSpec map[string]interface{}
++string : Engine
++string : Name
++map[string]interface{} : EngineSpec
 }
 class ExecutionEngine {
 <<interface>>
-+Execute(ctx context.Context, contract ToolContract, args map[string]interface{}) (string, error)
++Execute(ctx: Context, contract: ToolContract, args: Map<string, interface>) : (string, error)
 }
 class DaggerEngine {
-+Execute(ctx context.Context, contract ToolContract, args map[string]interface{}) (string, error)
++Execute(ctx: Context, contract: ToolContract, args: Map<string, interface>) : (string, error)
 }
 class RemoteMCPEngine {
-+Execute(ctx context.Context, contract ToolContract, args map[string]interface{}) (string, error)
++Execute(ctx: Context, contract: ToolContract, args: Map<string, interface>) : (string, error)
 }
 ToolContract --> ExecutionEngine : "executed by"
 ExecutionEngine <|-- DaggerEngine
@@ -649,7 +649,7 @@ Common issues and their solutions:
 
 ### Connection Failures
 **Symptoms**: Client initialization fails, tool calls return connection errors
-**Causes**: 
+**Causes**:
 - Server not running or unreachable
 - Incorrect URL or port
 - Network firewall blocking connections
@@ -663,7 +663,7 @@ Common issues and their solutions:
 
 ### Version Incompatibility
 **Symptoms**: Protocol errors, unrecognized methods, invalid responses
-**Causes**: 
+**Causes**:
 - Client and server using different MCP protocol versions
 - Incompatible tool specifications
 
@@ -707,7 +707,7 @@ server.AddTool(tool, handler)
 ## Conclusion
 The MCP Protocol implementation in the Praxis Go SDK provides a robust foundation for agent-to-agent communication with support for multiple transport methods, dynamic service discovery, and LLM-powered workflow generation. The modular architecture separates concerns between server, client, transport, and discovery components, enabling flexible deployment and extension. Key strengths include connection resilience, thread safety, and seamless integration with external systems through standardized contracts. The configuration system allows fine-tuning of performance and reliability parameters, while comprehensive error handling ensures graceful degradation in failure scenarios.
 
-**Referenced Files in This Document**   
+**Referenced Files in This Document**
 - [server.go](file://internal/mcp/server.go)
 - [client.go](file://internal/mcp/client.go)
 - [transport.go](file://internal/mcp/transport.go)

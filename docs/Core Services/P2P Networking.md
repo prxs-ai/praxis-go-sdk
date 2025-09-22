@@ -60,7 +60,7 @@ The `Discovery` component uses libp2p's autorelay and peer discovery features to
 ```go
 func (a *PraxisAgent) initializeP2P() error {
     // ... libp2p host creation ...
-    
+
     // Initialize discovery
     discovery, err := p2p.NewDiscovery(host, a.logger)
     if err != nil {
@@ -196,14 +196,14 @@ The P2P bridge facilitates inter-agent data flow by connecting the libp2p networ
 ```mermaid
 classDiagram
 class P2PMCPBridge {
-+SendMessage(ctx, peerID, message)
++SendMessage(ctx: peerID, message)
 +ListPeers(ctx)
--host Host
--mcpServer MCPServer
--logger Logger
+-Host : host
+-MCPServer : mcpServer
+-Logger : logger
 }
 class P2PProtocolHandler {
-+InvokeTool(ctx, peerID, toolName, args)
++InvokeTool(ctx: peerID, toolName: args)
 +SetMCPBridge(bridge)
 +SetAgentCard(card)
 -handleToolStream(stream)
@@ -350,7 +350,7 @@ Common networking issues and their solutions:
 
 ### NAT Traversal and Firewall Restrictions
 **Issue**: Agents behind NAT cannot be discovered or connected to
-**Solution**: 
+**Solution**:
 - Enable libp2p autorelay: `libp2p.EnableRelay()`
 - Configure port forwarding on routers
 - Use bootstrap peers in public networks
@@ -391,7 +391,7 @@ Diagnostic endpoints are available for troubleshooting:
 - [discovery.go](file://internal/p2p/discovery.go)
 - [protocol.go](file://internal/p2p/protocol.go)
 
-**Referenced Files in This Document**   
+**Referenced Files in This Document**
 - [agent.go](file://internal/agent/agent.go#L0-L1563)
 - [card.go](file://internal/agent/card.go#L0-L40)
 - [discovery.go](file://internal/p2p/discovery.go)
