@@ -31,44 +31,44 @@ The Remote MCP Execution Engine follows a modular architecture centered around t
 ```mermaid
 classDiagram
 class RemoteMCPEngine {
-+transportManager *TransportManager
-+Execute(ctx, contract, args) (string, error)
++*TransportManager : transportManager
++Execute(ctx: contract, args) : (string, error)
 }
 class TransportManager {
-+clients map[string]*MCPClientWrapper
-+factory *ClientFactory
-+RegisterSSEEndpoint(name, url, headers)
-+RegisterHTTPEndpoint(name, url, headers)
-+RegisterSTDIOEndpoint(name, command, args)
-+CallRemoteTool(ctx, clientName, toolName, args) (*CallToolResult, error)
-+GetClient(name) (*MCPClientWrapper, error)
++map[string]*MCPClientWrapper : clients
++*ClientFactory : factory
++RegisterSSEEndpoint(name: url, headers)
++RegisterHTTPEndpoint(name: url, headers)
++RegisterSTDIOEndpoint(name: command, args)
++CallRemoteTool(ctx: clientName, toolName: args) : (CallToolResult, error)
++GetClient(name) : (MCPClientWrapper, error)
 +Close()
 }
 class MCPClientWrapper {
-+client *client.Client
-+clientType ClientType
-+serverInfo *InitializeResult
-+logger *logrus.Logger
-+ctx context.Context
-+initialized bool
-+Initialize(ctx) error
-+CallTool(ctx, name, args) (*CallToolResult, error)
-+Close() error
++*client.Client : client
++ClientType : clientType
++*InitializeResult : serverInfo
++*logrus.Logger : logger
++context.Context : ctx
++bool : initialized
++Initialize(ctx) : error
++CallTool(ctx: name, args) : (CallToolResult, error)
++Close() : error
 }
 class ClientFactory {
-+configs map[string]ClientConfig
-+clients map[string]*MCPClientWrapper
-+RegisterConfig(name, config)
-+GetOrCreateClient(name) (*MCPClientWrapper, error)
++map[string]ClientConfig : configs
++map[string]*MCPClientWrapper : clients
++RegisterConfig(name: config)
++GetOrCreateClient(name) : (MCPClientWrapper, error)
 +CloseAll()
 }
 class ClientConfig {
-+Type ClientType
-+Address string
-+Command string
-+Args []string
-+Headers map[string]string
-+Logger *logrus.Logger
++ClientType : Type
++string : Address
++string : Command
++[]string : Args
++map[string]string : Headers
++*logrus.Logger : Logger
 }
 RemoteMCPEngine --> TransportManager : "uses"
 TransportManager --> ClientFactory : "delegates"
@@ -223,9 +223,9 @@ func TestRemoteMCPEngine_Execute_MissingAddress(t *testing.T) {
         Name:   "test_tool",
         EngineSpec: map[string]interface{}{},
     }
-    
+
     result, err := engine.Execute(ctx, contract, args)
-    
+
     assert.Error(t, err)
     assert.Contains(t, err.Error(), "missing 'address'")
 }
@@ -343,7 +343,7 @@ Key strengths include:
 
 This architecture enables Praxis agents to form a distributed ecosystem of interoperable tools and services.
 
-**Referenced Files in This Document**   
+**Referenced Files in This Document**
 - [remote_engine.go](file://internal/mcp/remote_engine.go#L1-L52)
 - [remote_engine_test.go](file://internal/mcp/remote_engine_test.go#L1-L63)
 - [transport.go](file://internal/mcp/transport.go#L1-L294)

@@ -324,7 +324,7 @@ Gateway->>Client : Send event via WebSocket
 This section addresses frequent setup issues and their resolutions.
 
 ### Port Conflicts
-**Issue**: "port already in use" errors when starting the agent.  
+**Issue**: "port already in use" errors when starting the agent.
 **Solution**: Change the port in `agent.yaml` or via environment variables:
 ```yaml
 http:
@@ -339,7 +339,7 @@ export P2P_PORT=4002
 ```
 
 ### Docker Permissions
-**Issue**: Permission denied when accessing Docker socket.  
+**Issue**: Permission denied when accessing Docker socket.
 **Solution**: Ensure your user is in the `docker` group:
 ```bash
 sudo usermod -aG docker $USER
@@ -347,7 +347,7 @@ sudo usermod -aG docker $USER
 Log out and back in for changes to take effect.
 
 ### Configuration Syntax Errors
-**Issue**: "Failed to load configuration" due to YAML syntax errors.  
+**Issue**: "Failed to load configuration" due to YAML syntax errors.
 **Solution**: Validate `agent.yaml` using a YAML linter. Common issues include:
 - Incorrect indentation
 - Missing quotes around strings with special characters
@@ -356,14 +356,14 @@ Log out and back in for changes to take effect.
 Use `yamllint configs/agent.yaml` to detect issues.
 
 ### Missing OPENAI_API_KEY
-**Issue**: Natural language processing fails silently.  
+**Issue**: Natural language processing fails silently.
 **Solution**: Set the API key in `.env` or environment:
 ```bash
 export OPENAI_API_KEY=your_key_here
 ```
 
 ### WebSocket Connection Failures
-**Issue**: WebSocket connection rejected.  
+**Issue**: WebSocket connection rejected.
 **Solution**: Check if `WEBSOCKET_PORT` matches the client connection and ensure no firewall is blocking the port.
 
 **Section sources**
@@ -371,7 +371,7 @@ export OPENAI_API_KEY=your_key_here
 - [configs/agent.yaml](file://configs/agent.yaml#L1-L119)
 - [pkg/utils/env.go](file://pkg/utils/env.go#L1-L54)
 
-**Referenced Files in This Document**   
+**Referenced Files in This Document**
 - [main.go](file://agent/main.go)
 - [env.go](file://pkg/utils/env.go)
 - [logging.go](file://pkg/utils/logging.go)

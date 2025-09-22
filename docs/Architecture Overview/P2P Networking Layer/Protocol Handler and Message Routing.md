@@ -68,13 +68,13 @@ The handler maintains several key data structures:
 ```mermaid
 classDiagram
 class P2PProtocolHandler {
-+host Host
-+logger Logger
-+handlers Map[ProtocolID]StreamHandler
-+peerCards Map[PeerID]AgentCard
-+ourCard AgentCard
-+mcpBridge P2PMCPBridge
-+agent A2AAgent
++Host : host
++Logger : logger
++Map[ProtocolID]StreamHandler : handlers
++Map[PeerID]AgentCard : peerCards
++AgentCard : ourCard
++P2PMCPBridge : mcpBridge
++A2AAgent : agent
 +SetMCPBridge(bridge)
 +SetAgent(agent)
 +handleMCPStream(stream)
@@ -83,35 +83,35 @@ class P2PProtocolHandler {
 +handleA2AStream(stream)
 }
 class AgentCard {
-+Name string
-+Version string
-+PeerID string
-+Capabilities string[]
-+Tools ToolSpec[]
-+Timestamp int64
++string : Name
++string : Version
++string : PeerID
++string[] : Capabilities
++ToolSpec[] : Tools
++int64 : Timestamp
 }
 class ToolSpec {
-+Name string
-+Description string
-+Parameters ToolParameter[]
++string : Name
++string : Description
++ToolParameter[] : Parameters
 }
 class ToolParameter {
-+Name string
-+Type string
-+Description string
-+Required bool
++string : Name
++string : Type
++string : Description
++bool : Required
 }
 class P2PMessage {
-+Type string
-+ID string
-+Method string
-+Params interface{}
-+Result interface{}
-+Error P2PError
++string : Type
++string : ID
++string : Method
++interface{} : Params
++interface{} : Result
++P2PError : Error
 }
 class P2PError {
-+Code int
-+Message string
++int : Code
++string : Message
 }
 P2PProtocolHandler --> AgentCard : "maintains"
 P2PProtocolHandler --> ToolSpec : "uses"
@@ -177,13 +177,13 @@ func (h *P2PProtocolHandler) handleMCPStream(stream network.Stream) {
     defer stream.Close()
     decoder := json.NewDecoder(stream)
     encoder := json.NewEncoder(stream)
-    
+
     for {
         var msg P2PMessage
         if err := decoder.Decode(&msg); err != nil {
             break
         }
-        
+
         response := h.processMCPMessage(msg)
         encoder.Encode(response)
     }
@@ -306,16 +306,16 @@ host.SetStreamHandler(ProtocolTool, handler.handleToolStream)
 func (h *P2PProtocolHandler) handleToolStream(stream network.Stream) {
     var request ToolRequest
     json.NewDecoder(stream).Decode(&request)
-    
+
     result, err := h.processTool(request)
-    
+
     response := ToolResponse{
         ID: request.ID,
         Result: result,
         Error: err,
         Duration: time.Since(time.Unix(request.Timestamp, 0)).Milliseconds(),
     }
-    
+
     json.NewEncoder(stream).Encode(response)
 }
 ```
@@ -360,7 +360,7 @@ for {
     if err := decoder.Decode(&msg); err != nil {
         break
     }
-    
+
     response := h.processMCPMessage(msg)
     encoder.Encode(response)
 }
@@ -509,7 +509,7 @@ I --> J[Return to Client]
 - [internal/p2p/protocol.go](file://internal/p2p/protocol.go#L100-L200)
 - [internal/agent/agent.go](file://internal/agent/agent.go#L800-L1000)
 
-**Referenced Files in This Document**   
+**Referenced Files in This Document**
 - [internal/a2a/types.go](file://internal/a2a/types.go)
 - [internal/agent/agent.go](file://internal/agent/agent.go)
 - [internal/p2p/protocol.go](file://internal/p2p/protocol.go)

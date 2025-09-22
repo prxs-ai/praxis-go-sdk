@@ -126,14 +126,14 @@ The `DaggerEngine` struct provides secure, containerized tool execution by imple
 ```mermaid
 classDiagram
 class DaggerEngine {
-+client *dagger.Client
-+NewEngine(ctx context.Context) (*DaggerEngine, error)
++*dagger.Client : client
++NewEngine(ctx: Context) : (DaggerEngine, error)
 +Close()
-+Execute(ctx context.Context, contract ToolContract, args map[string]interface{}) (string, error)
++Execute(ctx: Context, contract: ToolContract, args: Map<string, interface>) : (string, error)
 }
 class ExecutionEngine {
 <<interface>>
-+Execute(ctx context.Context, contract ToolContract, args map[string]interface{}) (string, error)
++Execute(ctx: Context, contract: ToolContract, args: Map<string, interface>) : (string, error)
 }
 DaggerEngine ..|> ExecutionEngine : implements
 ```
@@ -308,7 +308,7 @@ func containsNetworkError(err error) bool {
 		"failed to resolve",
 		"failed to connect",
 	}
-	
+
 	for _, netErr := range networkErrors {
 		if containsIgnoreCase(errStr, netErr) {
 			return true
@@ -361,7 +361,7 @@ The engine's design follows best practices for containerized execution, with car
 
 For optimal performance, users should select appropriate container images, minimize mounted directories, and monitor resource usage. The system's modular architecture allows for easy extension and integration with additional execution engines as needed.
 
-**Referenced Files in This Document**   
+**Referenced Files in This Document**
 - [engine.go](file://internal/dagger/engine.go#L1-L183)
 - [engine_test.go](file://internal/dagger/engine_test.go#L1-L318)
 - [execution.go](file://internal/contracts/execution.go#L1-L15)

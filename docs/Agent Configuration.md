@@ -22,58 +22,58 @@ The agent configuration is defined in YAML format and structured around several 
 ```mermaid
 classDiagram
 class AppConfig {
-+AgentConfig Agent
-+P2PConfig P2P
-+HTTPConfig HTTP
-+MCPBridgeConfig MCP
-+LLMConfig LLM
-+LogConfig Logging
++Agent : AgentConfig
++P2P : P2PConfig
++HTTP : HTTPConfig
++MCP : MCPBridgeConfig
++LLM : LLMConfig
++Logging : LogConfig
 }
 class AgentConfig {
-+string Name
-+string Version
-+string Description
-+string URL
-+string SharedDir
-+[]ToolConfig Tools
-+[]string ExternalMCPEndpoints
++Name : string
++Version : string
++Description : string
++URL : string
++SharedDir : string
++Tools : List<ToolConfig>
++ExternalMCPEndpoints : List<string>
 }
 class P2PConfig {
-+bool Enabled
-+int Port
-+bool Secure
-+string Rendezvous
-+bool EnableMDNS
-+bool EnableDHT
-+[]string BootstrapNodes
++Enabled : bool
++Port : int
++Secure : bool
++Rendezvous : string
++EnableMDNS : bool
++EnableDHT : bool
++BootstrapNodes : List<string>
 }
 class HTTPConfig {
-+bool Enabled
-+int Port
-+string Host
++Enabled : bool
++Port : int
++Host : string
 }
 class MCPBridgeConfig {
-+bool Enabled
-+[]MCPServerConfig Servers
-+MCPLimits Limits
-+string LogLevel
++Enabled : bool
++Servers : List<MCPServerConfig>
++Limits : MCPLimits
++LogLevel : string
 }
 class LLMConfig {
-+bool Enabled
-+string Provider
-+string APIKey
-+string Model
-+int MaxTokens
-+float32 Temperature
-+time.Duration Timeout
-+LLMFunctionConfig FunctionCalling
-+LLMCacheConfig Caching
-+LLMRateConfig RateLimiting
++Enabled : bool
++Provider : string
++APIKey : string
++Model : string
++MaxTokens : int
++Temperature : float32
++Timeout : Duration
++FunctionCalling : LLMFunctionConfig
++Caching : LLMCacheConfig
++RateLimiting : LLMRateConfig
 }
 class LogConfig {
-+string Level
-+string Format
-+string File
++Level : string
++Format : string
++File : string
 }
 AppConfig --> AgentConfig : "contains"
 AppConfig --> P2PConfig : "contains"
@@ -694,7 +694,7 @@ This ensures that configurations are valid before deployment.
 - [config.go](file://internal/config/config.go)
 - [env.go](file://pkg/utils/env.go)
 
-**Referenced Files in This Document**   
+**Referenced Files in This Document**
 - [agent.yaml](file://configs/agent.yaml)
 - [agent1_golden.yaml](file://configs/agent1_golden.yaml)
 - [agent_with_mcp_discovery.yaml](file://configs/agent_with_mcp_discovery.yaml)

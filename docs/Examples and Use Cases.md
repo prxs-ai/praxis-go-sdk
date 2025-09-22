@@ -115,7 +115,7 @@ Cleanup --> End([Tests Complete])
 - [test_a2a_full_docker.sh](file://test_a2a_full_docker.sh)
 - [task_manager.go](file://internal/a2a/task_manager.go)
 
-**Referenced Files in This Document**   
+**Referenced Files in This Document**
 - [start-mcp-filesystem.sh](file://examples/start-mcp-filesystem.sh)
 - [mcp-filesystem-server.go](file://examples/mcp-filesystem-server.go)
 - [test_a2a_full_docker.sh](file://test_a2a_full_docker.sh)
