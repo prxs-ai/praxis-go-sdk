@@ -110,7 +110,7 @@ func (c *LLMClient) GenerateWorkflowFromNaturalLanguage(ctx context.Context, use
 	}
 
 	systemPrompt := c.buildSystemPrompt(networkContext)
-	
+
 	// Validate systemPrompt is not empty
 	if strings.TrimSpace(systemPrompt) == "" {
 		c.logger.Error("System prompt is empty, using fallback")
@@ -118,7 +118,7 @@ func (c *LLMClient) GenerateWorkflowFromNaturalLanguage(ctx context.Context, use
 	}
 
 	c.logger.Debugf("🤖 System prompt length: %d, User request length: %d", len(systemPrompt), len(userRequest))
-	
+
 	req := openai.ChatCompletionRequest{
 		Model:     openai.GPT4o,
 		MaxTokens: 4096,
@@ -222,12 +222,12 @@ func (c *LLMClient) buildSystemPrompt(ctx *NetworkContext) string {
 		toolsDocumentation.WriteString("Usage: agent_id=local, tool_name=fallback_tool\n\n")
 	}
 
-    return fmt.Sprintf("You are an intelligent AI ORCHESTRATOR for a distributed P2P agent network.\n\n"+
-        "YOUR ROLE:\n"+
-        "- Understand any user message as a task request (NO 'CALL' keyword needed)\n"+
-        "- Select the BEST agent and tool for each task\n"+
-        "- Route tasks to the most appropriate agent based on capabilities\n"+
-        "- Create efficient workflows using available tools\n\n"+
+	return fmt.Sprintf("You are an intelligent AI ORCHESTRATOR for a distributed P2P agent network.\n\n"+
+		"YOUR ROLE:\n"+
+		"- Understand any user message as a task request (NO 'CALL' keyword needed)\n"+
+		"- Select the BEST agent and tool for each task\n"+
+		"- Route tasks to the most appropriate agent based on capabilities\n"+
+		"- Create efficient workflows using available tools\n\n"+
 		"AGENT SELECTION CRITERIA:\n"+
 		"1. Tool availability - Does the agent have the required tool?\n"+
 		"2. Agent specialization - Some agents may be specialized for certain tasks\n"+
@@ -418,7 +418,7 @@ Tweets:
 %s
 
 Provide a 3-4 paragraph summary in a professional tone.`, len(tweetTexts), strings.Join(tweetTexts, "\n\n"))
-	
+
 	// Validate prompt is not empty
 	if strings.TrimSpace(prompt) == "" {
 		return "", fmt.Errorf("generated prompt is empty")
@@ -430,7 +430,7 @@ Provide a 3-4 paragraph summary in a professional tone.`, len(tweetTexts), strin
 	}
 
 	c.logger.Debugf("🤖 Tweet summary - System message length: %d, Prompt length: %d", len(systemMessage), len(prompt))
-	
+
 	req := openai.ChatCompletionRequest{
 		Model: openai.GPT4oMini,
 		Messages: []openai.ChatCompletionMessage{

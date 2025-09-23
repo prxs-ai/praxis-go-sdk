@@ -535,11 +535,10 @@ func (a *PraxisAgent) initializeAgentCard() {
 			Description: "Praxis Agent Framework",
 		},
 		Capabilities: AgentCapabilities{
-			Streaming:         boolPtr(true),
-			PushNotifications: boolPtr(false),
-			StateTransition:   boolPtr(true),
+			Streaming:              boolPtr(true),
+			PushNotifications:      boolPtr(false),
+			StateTransitionHistory: boolPtr(true),
 		},
-		SupportedTransports: []string{"https", "p2p", "websocket"},
 		SecuritySchemes: map[string]interface{}{
 			"none": map[string]interface{}{
 				"type": "none",
@@ -998,15 +997,24 @@ func (a *PraxisAgent) discoverAndRegisterExternalTools(ctx context.Context) {
 	for _, addr := range endpoints {
 		a.logger.Infof("🔗 Discovering tools from external MCP server at %s", addr)
 
-		// Register the endpoint in TransportManager first
-		a.transportManager.RegisterSSEEndpoint(addr, addr, nil)
+		serverName := addr.Name
+		serverURL := addr.URL
 
+		var sseHeaders map[string]string
+		if len(addr.Headers) > 0 {
+			sseHeaders = make(map[string]string, len(addr.Headers))
+			for k, v := range addr.Headers {
+				sseHeaders[k] = v
+			}
+		}
+		// Register the endpoint in TransportManager first
+		a.transportManager.RegisterSSEEndpoint(serverName, serverURL, sseHeaders)
 		// Discover tools using the discovery service
-		discoveredTools, err := discoveryService.DiscoverToolsFromServer(ctx, addr)
+		discoveredTools, err := discoveryService.DiscoverToolsFromServer(ctx, serverURL)
 		if err != nil {
-			a.logger.Errorf("Failed to discover tools from %s: %v", addr, err)
+			a.logger.Errorf("Failed to discover tools from %s: %v", serverURL, err)
 			// Fallback to hardcoded tools for backward compatibility
-			a.registerFallbackTools(addr, remoteEngine)
+			a.registerFallbackTools(serverURL, remoteEngine)
 			continue
 		}
 
