@@ -310,6 +310,23 @@ func (gw *WebSocketGateway) handleDSLCommand(client *Client, payload map[string]
 		Params:  toStringAnyMap(payload["params"]),
 		Secrets: toStringStringMap(payload["secrets"]),
 	}
+
+	// Log param keys (never values) and whether secrets were provided
+	gw.logger.WithFields(logrus.Fields{
+		"paramKeys":  mapKeys(ps.Params),
+		"hasSecrets": len(ps.Secrets) > 0,
+	}).Info("DSL_COMMAND: params received")
+
+	// Surface this in the UI console
+	if workflowID, _ := payload["workflowId"].(string); workflowID != "" {
+		gw.eventBus.PublishWorkflowLog(
+			workflowID,
+			"info",
+			fmt.Sprintf("🧩 Params received (keys only): %v", mapKeys(ps.Params)),
+			"gateway",
+			"", // no node id
+		)
+	}
 	// Safe even if empty; avoids secret leakage in logs
 	if gw.orchestratorAnalyzer != nil {
 		gw.orchestratorAnalyzer.SetParams(ps)
@@ -372,6 +389,11 @@ func (gw *WebSocketGateway) handleExecuteWorkflow(client *Client, payload map[st
 	params := toStringAnyMap(payload["params"])
 	secrets := toStringStringMap(payload["secrets"])
 
+	gw.logger.WithFields(logrus.Fields{
+		"paramKeys":  mapKeys(params),
+		"hasSecrets": len(secrets) > 0,
+	}).Info("EXECUTE_WORKFLOW: params received")
+
 	// First check if we have the full workflow object with an ID
 	if workflow, ok := payload["workflow"].(map[string]interface{}); ok {
 		if workflowID, ok := workflow["id"].(string); ok {
@@ -386,6 +408,14 @@ func (gw *WebSocketGateway) handleExecuteWorkflow(client *Client, payload map[st
 						"workflowId": workflowID,
 					},
 				})
+
+				gw.eventBus.PublishWorkflowLog(
+					workflowID,
+					"info",
+					fmt.Sprintf("🧩 Params received (keys only): %v", mapKeys(params)),
+					"gateway",
+					"",
+				)
 
 				ctx := context.Background()
 				go func() {
@@ -469,6 +499,14 @@ func (gw *WebSocketGateway) handleExecuteWorkflow(client *Client, payload map[st
 			"workflowId": workflowID,
 		},
 	})
+
+	gw.eventBus.PublishWorkflowLog(
+		workflowID,
+		"info",
+		fmt.Sprintf("🧩 Params received (keys only): %v", mapKeys(params)),
+		"gateway",
+		"",
+	)
 
 	// Execute workflow if orchestrator is available
 	if gw.orchestrator != nil {
@@ -738,4 +776,12 @@ func toStringStringMap(v interface{}) map[string]string {
 		}
 	}
 	return out
+}
+
+func mapKeys(m map[string]interface{}) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
 }
