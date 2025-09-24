@@ -174,4 +174,3 @@ See the `/docs` folder for detailed documentation:
 ## 📄 License
 
 MIT License - see LICENSE file for details.
-
