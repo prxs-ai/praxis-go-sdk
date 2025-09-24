@@ -93,13 +93,13 @@
 
 ### Major New Features
 
-#### **Container-Based Tool Execution with Dagger** 
+#### **Container-Based Tool Execution with Dagger**
 - **Twitter Scraper**: Scrape tweets from any Twitter account using Apify API
   - Configurable tweet count
   - Structured JSON output with tweet metadata, engagement stats
   - Secure API key management through environment variables
 - **Telegram Bot Integration**: Post messages to Telegram channels programmatically
-  - Support for custom channels or default channel configuration  
+  - Support for custom channels or default channel configuration
   - Real-time message delivery with confirmation responses
   - Perfect for notifications, alerts, and automated reporting
 - **Python Analytics Engine**: Execute custom Python scripts in isolated containers
@@ -151,7 +151,7 @@
 
 - **Configuration Parsing**: Fixed YAML configuration loading issues
 - **A2A Card Handler**: Resolved agent card exchange and local function registration
-- **P2P Discovery**: Fixed peer discovery mechanism reliability  
+- **P2P Discovery**: Fixed peer discovery mechanism reliability
 - **API Security**: Removed unsafe API server calls and improved authentication
 - **Processing Time**: Fixed incorrect type handling for processing time metrics
 
@@ -176,7 +176,7 @@
 - **MCP Library Migration**: Updated from custom MCP implementation to `mark3labs/mcp-go`
   - Existing MCP configurations may need minor adjustments
   - See migration guide in documentation
-  
+
 ### Upgrade Guide
 
 1. **Update Configuration**: Review your `configs/agent.yaml` for new options
