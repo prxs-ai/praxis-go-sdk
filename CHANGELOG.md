@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/prxs-ai/praxis-go-sdk/compare/v0.2.1...v0.2.2) (2025-09-24)
+
+
+### Bug Fixes
+
+* address ([#17](https://github.com/prxs-ai/praxis-go-sdk/issues/17)) ([ccf1b04](https://github.com/prxs-ai/praxis-go-sdk/commit/ccf1b04a2cf0536793cc5103ff26d439b54f73fa))
+
 ## [0.2.1](https://github.com/prxs-ai/praxis-go-sdk/compare/v0.2.0...v0.2.1) (2025-09-22)
 
 ### Major New Features
