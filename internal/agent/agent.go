@@ -374,7 +374,6 @@ func (a *PraxisAgent) registerDynamicTools() {
 }
 
 
-// createGenericHandler создает универсальный обработчик для любого движка.
 func (a *PraxisAgent) createGenericHandler(toolCfg appconfig.ToolConfig) server.ToolHandlerFunc {
 	return func(ctx context.Context, req mcpTypes.CallToolRequest) (*mcpTypes.CallToolResult, error) {
 		args := req.GetArguments()
@@ -401,7 +400,6 @@ func (a *PraxisAgent) createGenericHandler(toolCfg appconfig.ToolConfig) server.
 			}
 		}
 
-		// 2. Создаем контракт из конфигурации
 		contract := contracts.ToolContract{
 			Engine:     engineName,
 			Name:       toolCfg.Name,
