@@ -21,9 +21,9 @@ const (
 	EventChatMessage EventType = "chatMessage"
 
 	// A2A Events
-	EventTaskCreated      EventType = "taskCreated"
-	EventTaskStatusUpdate EventType = "taskStatusUpdate"
-	EventArtifactAdded    EventType = "artifactAdded"
+	EventTaskCreated       EventType = "taskCreated"
+	EventTaskStatusUpdate  EventType = "taskStatusUpdate"
+	EventArtifactAdded     EventType = "artifactAdded"
 )
 
 type Event struct {

@@ -14,9 +14,9 @@ import (
 func TestRemoteMCPEngine_ImplementsInterface(t *testing.T) {
 	tm := NewTransportManager(nil)
 	defer tm.Close()
-
+	
 	engine := NewRemoteMCPEngine(tm)
-
+	
 	// Проверяем, что RemoteMCPEngine реализует интерфейс ExecutionEngine
 	var _ contracts.ExecutionEngine = engine
 	assert.NotNil(t, engine)
@@ -27,26 +27,26 @@ func TestRemoteMCPEngine_ImplementsInterface(t *testing.T) {
 func TestRemoteMCPEngine_Execute_MissingAddress(t *testing.T) {
 	tm := NewTransportManager(nil)
 	defer tm.Close()
-
+	
 	engine := NewRemoteMCPEngine(tm)
 	ctx := context.Background()
-
+	
 	// Контракт без адреса
 	contract := contracts.ToolContract{
-		Engine:     "remote-mcp",
-		Name:       "test_tool",
+		Engine: "remote-mcp",
+		Name:   "test_tool",
 		EngineSpec: map[string]interface{}{
 			// Address отсутствует намеренно
 		},
 	}
-
+	
 	args := map[string]interface{}{
 		"tool_name": "test_tool",
 		"param1":    "value1",
 	}
-
+	
 	result, err := engine.Execute(ctx, contract, args)
-
+	
 	assert.Error(t, err)
 	assert.Empty(t, result)
 	assert.Contains(t, err.Error(), "missing 'address'")
@@ -56,9 +56,9 @@ func TestRemoteMCPEngine_Execute_MissingAddress(t *testing.T) {
 func TestNewRemoteMCPEngine(t *testing.T) {
 	tm := NewTransportManager(nil)
 	defer tm.Close()
-
+	
 	engine := NewRemoteMCPEngine(tm)
-
+	
 	require.NotNil(t, engine)
 	assert.Equal(t, tm, engine.transportManager)
 }

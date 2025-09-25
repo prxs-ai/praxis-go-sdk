@@ -20,3 +20,4 @@ CREATE INDEX IF NOT EXISTS idx_agents_address ON agents (address_caip10);
 CREATE INDEX IF NOT EXISTS idx_agents_trust_models ON agents USING GIN (trust_models);
 CREATE INDEX IF NOT EXISTS idx_agents_skills ON agents USING GIN (skills);
 CREATE INDEX IF NOT EXISTS idx_agents_capabilities ON agents USING GIN (capabilities);
+

@@ -14,9 +14,9 @@ def main():
     parser = argparse.ArgumentParser(description='Twitter scraper for Dagger using Apify API')
     parser.add_argument('--username', type=str, help='Twitter username/handle to scrape (without @)')
     parser.add_argument('--tweets_count', type=int, default=50, help='Number of tweets to scrape (default: 50)')
-
+    
     args = parser.parse_args()
-
+    
     # Support username from environment (for container engines passing env vars)
     username = args.username or os.environ.get('username') or os.environ.get('USERNAME') or os.environ.get('TWITTER_USERNAME')
     if not username:
@@ -25,7 +25,7 @@ def main():
             "message": "No username provided. Use --username parameter or set env var 'username'/'USERNAME'/'TWITTER_USERNAME'."
         }))
         return
-
+    
     # Get Apify API token from environment (do not hardcode tokens)
     apify_token = ""
     if not apify_token:
@@ -34,14 +34,14 @@ def main():
             "message": "APIFY_API_TOKEN environment variable not set"
         }))
         return
-
+    
     try:
         # Initialize the ApifyClient
         client = ApifyClient(apify_token)
-
+        
         # Clean username (remove @ if present)
         username = username.lstrip('@')
-
+        
         # Select actor and prepare input
         actor_id = os.environ.get('APIFY_ACTOR_ID', '').strip()
         tweets_desired = int(os.environ.get('tweets_count', args.tweets_count))
@@ -79,30 +79,30 @@ def main():
                 "profilesDesired": 1,
                 "proxyConfig": proxy_config,
             }
-
+        
         print(json.dumps({
             "status": "processing",
             "message": f"🐦 Scraping {args.tweets_count} tweets from @{username}..."
         }))
-
+        
         # Run the Actor and wait for it to finish
         run = client.actor(actor_id).call(run_input=run_input, timeout_secs=300)
-
+        
         # Fetch results from the dataset
         dataset_id = run.get("defaultDatasetId")
         items = list(client.dataset(dataset_id).iterate_items()) if dataset_id else []
-
+        
         if not items:
             print(json.dumps({
                 "status": "error",
                 "message": f"No data found for username @{username}. Check if the username exists and is public."
             }))
             return
-
+        
         # Separate tweets and profile data
         tweets = []
         profile_data = None
-
+        
         for item in items:
             # Profile-like data
             if item.get('type') == 'profile' or 'followersCount' in item:
@@ -136,10 +136,10 @@ def main():
                     'reply_count': replies_val,
                     'url': url_val
                 })
-
+        
         # Create timestamp for file naming
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-
+        
         # Prepare full data for JSON export
         full_data = {
             'metadata': {
@@ -151,7 +151,7 @@ def main():
             'profile': profile_data,
             'tweets': tweets
         }
-
+        
         # Save full data to JSON file
         reports_dir = "/shared/reports"
         os.makedirs(reports_dir, exist_ok=True)
@@ -161,10 +161,10 @@ def main():
 
         with open(json_filepath, 'w', encoding='utf-8') as f:
             json.dump(full_data, f, ensure_ascii=False, indent=2)
-
+        
         # Prepare summary for UI chat
         summary_tweets = tweets[:5]  # Show first 5 tweets in summary
-
+        
         result = {
             "status": "success",
             "message": f"✅ Successfully scraped {len(tweets)} tweets from @{username}",
@@ -180,13 +180,13 @@ def main():
                 "download_url": f"{os.environ.get('AGENT_BASE_URL', 'http://localhost:8000')}/reports/{json_filename}"
             }
         }
-
+        
     except Exception as e:
         result = {
             "status": "error",
             "message": f"Error scraping Twitter data: {str(e)}"
         }
-
+    
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 if __name__ == "__main__":

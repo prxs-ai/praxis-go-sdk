@@ -1,14 +1,15 @@
 agent:
   name: "praxis-agent-1"
   version: "1.0.0"
-  description: "Orchestrator Agent with Dagger Tools"
+  description: "Orchestrator Agent with Dagger and Computer-Use Tools"
   url: "http://localhost:8000"
   shared_dir: "./shared"
-
-  # No external MCP endpoints - Agent 1 only has Dagger tools
-  external_mcp_endpoints: []
-
-  # Only Dagger tools for Agent-1
+  
+  # External MCP endpoints discovered automatically on startup
+  external_mcp_endpoints:
+    - "http://host.docker.internal:8013/mcp"  # CUA HTTP proxy (translates to SSE)
+  
+  # Locally declared tools (Dagger workloads + remote computer-use proxy)
   tools:
     - name: "python_analyzer"
       description: "Analyzes data using an external Python script"
@@ -21,7 +22,7 @@ agent:
       meta:
         daggerImage: "python:3.11-slim"
         daggerCommand: ["python", "/shared/analyzer.py"]
-
+    
     - name: "twitter_scraper"
       description: "Scrapes tweets from Twitter/X using Apify API - provide username without @ symbol"
       engine: "dagger"
@@ -37,6 +38,17 @@ agent:
       meta:
         daggerImage: "praxis-python:latest"
         daggerCommand: ["python", "/shared/twitter_scraper.py"]
+
+    - name: "run_cua_task"
+      description: "Performs desktop actions via the Computer-Use Agent. Provide the instruction in the 'task' parameter, e.g. 'открой вкладку в Chrome'."
+      engine: "remote-mcp"
+      params:
+        - name: "task"
+          type: "string"
+          description: "Natural language instruction for the computer-use agent"
+          required: "true"
+      engineSpec:
+        address: "http://host.docker.internal:8013/mcp"
 
 p2p:
   enabled: true

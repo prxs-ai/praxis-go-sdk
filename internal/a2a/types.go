@@ -112,17 +112,17 @@ type TasksCancelParams struct {
 
 // A2A Agent Card extensions (full specification)
 type A2AAgentCard struct {
-	Name                string                 `json:"name"`
-	Version             string                 `json:"version"`
-	ProtocolVersion     string                 `json:"protocolVersion"`
-	URL                 string                 `json:"url"`
-	Description         string                 `json:"description"`
-	Skills              []A2ASkill             `json:"skills"`
-	Capabilities        A2ACapabilities        `json:"capabilities"`
-	SecuritySchemes     map[string]interface{} `json:"securitySchemes,omitempty"`
-	SupportedTransports []string               `json:"supportedTransports"`
-	Provider            *A2AProvider           `json:"provider,omitempty"`
-	Metadata            interface{}            `json:"metadata,omitempty"`
+	Name               string                 `json:"name"`
+	Version            string                 `json:"version"`
+	ProtocolVersion    string                 `json:"protocolVersion"`
+	URL                string                 `json:"url"`
+	Description        string                 `json:"description"`
+	Skills             []A2ASkill             `json:"skills"`
+	Capabilities       A2ACapabilities        `json:"capabilities"`
+	SecuritySchemes    map[string]interface{} `json:"securitySchemes,omitempty"`
+	SupportedTransports []string              `json:"supportedTransports"`
+	Provider           *A2AProvider           `json:"provider,omitempty"`
+	Metadata           interface{}            `json:"metadata,omitempty"`
 }
 
 // A2ASkill represents an agent skill

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
@@ -113,19 +112,16 @@ func validateMCPServer(server *MCPServerConfig) error {
 		return fmt.Errorf("MCP server name cannot be empty")
 	}
 
-	switch server.Transport {
-	case "stdio", "sse", "http":
-		// valid transports
-	default:
-		return fmt.Errorf("MCP server transport must be 'stdio', 'sse', or 'http', got '%s'", server.Transport)
+	if server.Transport != "stdio" && server.Transport != "sse" {
+		return fmt.Errorf("MCP server transport must be 'stdio' or 'sse', got '%s'", server.Transport)
 	}
 
 	if server.Transport == "stdio" && server.Command == "" {
 		return fmt.Errorf("command is required for stdio transport in MCP server '%s'", server.Name)
 	}
 
-	if (server.Transport == "sse" || server.Transport == "http") && server.URL == "" {
-		return fmt.Errorf("URL is required for %s transport in MCP server '%s'", server.Transport, server.Name)
+	if server.Transport == "sse" && server.URL == "" {
+		return fmt.Errorf("URL is required for sse transport in MCP server '%s'", server.Name)
 	}
 
 	return nil
@@ -167,9 +163,6 @@ func applyEnvironmentOverrides(config *AppConfig) {
 
 	// MCP overrides
 	config.MCP.Enabled = utils.BoolFromEnv("MCP_ENABLED", config.MCP.Enabled)
-	if transport := os.Getenv("MCP_TRANSPORT"); transport != "" {
-		config.MCP.Transport = strings.ToLower(transport)
-	}
 
 	// LLM overrides
 	config.LLM.Enabled = utils.BoolFromEnv("LLM_ENABLED", config.LLM.Enabled)

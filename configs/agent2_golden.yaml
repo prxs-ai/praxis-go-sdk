@@ -4,11 +4,11 @@ agent:
   description: "Filesystem Agent with External MCP Tools"
   url: "http://localhost:8001"
   shared_dir: "./shared"
-
+  
   # External MCP server for filesystem operations
   external_mcp_endpoints:
     - "http://localhost:8080"  # External filesystem MCP server
-
+  
   # No local tools - Agent-2 only uses external MCP tools
   tools: []
 

@@ -1,15 +1,15 @@
 package dsl
 
 import (
-	"context"
-	"encoding/json"
-	"fmt"
-	"os"
-	"path/filepath"
-	"regexp"
-	"strconv"
-	"strings"
-	"time"
+    "encoding/json"
+    "context"
+    "fmt"
+    "os"
+    "path/filepath"
+    "regexp"
+    "strconv"
+    "strings"
+    "time"
 
 	"github.com/praxis/praxis-go-sdk/internal/bus"
 	"github.com/praxis/praxis-go-sdk/internal/llm"
@@ -36,11 +36,6 @@ func NewOrchestratorAnalyzer(logger *logrus.Logger, agent AgentInterface, eventB
 	}
 }
 
-// SetParams forwards default parameters into embedded Analyzer (used before Analyze/Execute)
-func (o *OrchestratorAnalyzer) SetParams(ps *ParamStore) {
-	o.Analyzer.SetParams(ps)
-}
-
 // AnalyzeWithOrchestration analyzes DSL and builds dynamic workflow
 func (o *OrchestratorAnalyzer) AnalyzeWithOrchestration(ctx context.Context, dsl string) (interface{}, error) {
 	o.logger.Infof("Orchestrator analyzing request: %s", dsl)
@@ -58,13 +53,13 @@ func (o *OrchestratorAnalyzer) AnalyzeWithOrchestration(ctx context.Context, dsl
 		o.publishProgress("analyzing", "AI is analyzing your request...", map[string]interface{}{
 			"request": dsl,
 		})
-
+		
 		// Add small delay to show progress
 		time.Sleep(500 * time.Millisecond)
 
 		// Build network context for LLM
 		networkContext := o.buildNetworkContext()
-
+		
 		// Publish discovering stage
 		o.publishProgress("discovering", "Discovering available agents...", map[string]interface{}{
 			"agentCount": len(networkContext.Agents),
@@ -85,7 +80,7 @@ func (o *OrchestratorAnalyzer) AnalyzeWithOrchestration(ctx context.Context, dsl
 			"analyzing": true,
 		})
 		time.Sleep(500 * time.Millisecond)
-
+		
 		// Generate workflow plan using LLM
 		o.publishProgress("generating", "Generating workflow plan...", map[string]interface{}{})
 		plan, err := o.llmClient.GenerateWorkflowFromNaturalLanguage(ctx, dsl, networkContext)
@@ -108,7 +103,7 @@ func (o *OrchestratorAnalyzer) AnalyzeWithOrchestration(ctx context.Context, dsl
 
 		// Convert LLM plan to AST and workflow
 		ast, workflow = o.convertLLMPlanToAST(plan)
-
+		
 		// Publish complete stage (but don't execute yet)
 		o.publishProgress("complete", "Workflow ready for execution", map[string]interface{}{
 			"nodes": len(plan.Nodes),
@@ -156,19 +151,19 @@ func (o *OrchestratorAnalyzer) AnalyzeWithOrchestration(ctx context.Context, dsl
 
 	// DON'T execute immediately - just publish the workflow for approval
 	// The frontend will send an executeWorkflow command when user clicks Execute
-
+	
 	// Generate workflow ID if not present
 	if workflow["id"] == nil {
 		workflow["id"] = fmt.Sprintf("workflow_%d", time.Now().UnixNano())
 	}
 	workflowID := workflow["id"].(string)
-
-	// Publish workflow immediately (before execution)
+	
+	// Publish workflow immediately (before execution) 
 	o.publishResult(dsl, nil, workflow)
-
+	
 	// Store the AST and workflow for later execution
 	o.storeWorkflowForExecution(workflowID, ast, workflow, dsl)
-
+	
 	// Don't execute anything - wait for Execute button
 	return workflow, nil
 }
@@ -412,113 +407,113 @@ func (o *OrchestratorAnalyzer) publishAgentSelection(agentInfo map[string]interf
 }
 
 func (o *OrchestratorAnalyzer) publishResult(command string, result interface{}, workflow map[string]interface{}) {
-	if o.eventBus == nil {
-		return
-	}
+    if o.eventBus == nil {
+        return
+    }
 
-	// Add delay to ensure previous messages are sent separately
-	time.Sleep(50 * time.Millisecond)
+    // Add delay to ensure previous messages are sent separately
+    time.Sleep(50 * time.Millisecond)
 
-	event := bus.Event{
-		Type: bus.EventDSLResult,
-		Payload: map[string]interface{}{
-			"command":            command,
-			"result":             result,
-			"success":            true,
-			"workflow":           workflow, // For new execute button
-			"workflowSuggestion": workflow, // Keep for backwards compatibility
-		},
-	}
+    event := bus.Event{
+        Type: bus.EventDSLResult,
+        Payload: map[string]interface{}{
+            "command":            command,
+            "result":             result,
+            "success":            true,
+            "workflow":           workflow,  // For new execute button
+            "workflowSuggestion": workflow,  // Keep for backwards compatibility
+        },
+    }
 
-	o.eventBus.Publish(event)
+    o.eventBus.Publish(event)
+    
+    // Check if this was a twitter_scraper command and handle it
+    if strings.Contains(strings.ToLower(command), "tweet") || strings.Contains(strings.ToLower(command), "twitter") {
+        go o.handleTwitterScraperResult(command)
+    }
 
-	// Check if this was a twitter_scraper command and handle it
-	if strings.Contains(strings.ToLower(command), "tweet") || strings.Contains(strings.ToLower(command), "twitter") {
-		go o.handleTwitterScraperResult(command)
-	}
-
-	// Try to extract artifacts (e.g., saved JSON path) from tool results and publish a chat message with a download link
-	// The twitter scraper prints a JSON payload with data.saved_to and optionally data.download_url
-	go func(res interface{}) {
-		defer func() { _ = recover() }()
-		rmap, ok := res.(map[string]interface{})
-		if !ok {
-			return
-		}
-		results, ok := rmap["results"].([]interface{})
-		if !ok || len(results) == 0 {
-			return
-		}
-		for _, item := range results {
-			imap, ok := item.(map[string]interface{})
-			if !ok {
-				continue
-			}
-			rawResult, ok := imap["result"].(string)
-			if !ok || rawResult == "" {
-				continue
-			}
-			// Parse JSON safely
-			var parsed map[string]interface{}
-			if err := json.Unmarshal([]byte(rawResult), &parsed); err != nil {
-				continue
-			}
-			data, _ := parsed["data"].(map[string]interface{})
-			if data == nil {
-				continue
-			}
-			filename, _ := data["saved_to"].(string)
-			downloadURL, _ := data["download_url"].(string)
-			datasetURL, _ := data["apify_dataset_url"].(string)
-			username, _ := data["username"].(string)
-			tweetsCount, _ := data["tweets_count"].(float64)
-			latestTweets, _ := data["latest_tweets"]
-
-			if filename == "" && downloadURL == "" && datasetURL == "" {
-				continue
-			}
-			// Build fallback download URL if not provided by tool
-			if downloadURL == "" && filename != "" {
-				downloadURL = fmt.Sprintf("http://localhost:8000/reports/%s", filename)
-			}
-
-			// Send tool_result message for UI to render ToolResultCard
-			o.eventBus.Publish(bus.Event{
-				Type: bus.EventChatMessage,
-				Payload: map[string]interface{}{
-					"type":    "tool_result",
-					"content": fmt.Sprintf("Twitter scraping complete for @%s", username),
-					"sender":  "assistant",
-					"metadata": map[string]interface{}{
-						"toolName":    "twitter_scraper",
-						"fileName":    filename,
-						"downloadUrl": downloadURL,
-						"datasetUrl":  datasetURL,
-						"username":    username,
-						"tweetsFound": tweetsCount,
-						"preview":     latestTweets,
-					},
-				},
-			})
-
-			o.logger.Infof("✅ Published tool_result for Twitter scraper - @%s", username)
-
-			// Start async summarization if we have tweets
-			if o.llmClient != nil && o.llmClient.IsEnabled() {
-				go o.generateAndSendSummary(filename, username)
-			}
-		}
-	}(result)
+    // Try to extract artifacts (e.g., saved JSON path) from tool results and publish a chat message with a download link
+    // The twitter scraper prints a JSON payload with data.saved_to and optionally data.download_url
+    go func(res interface{}) {
+        defer func() { _ = recover() }()
+        rmap, ok := res.(map[string]interface{})
+        if !ok {
+            return
+        }
+        results, ok := rmap["results"].([]interface{})
+        if !ok || len(results) == 0 {
+            return
+        }
+        for _, item := range results {
+            imap, ok := item.(map[string]interface{})
+            if !ok {
+                continue
+            }
+            rawResult, ok := imap["result"].(string)
+            if !ok || rawResult == "" {
+                continue
+            }
+            // Parse JSON safely
+            var parsed map[string]interface{}
+            if err := json.Unmarshal([]byte(rawResult), &parsed); err != nil {
+                continue
+            }
+            data, _ := parsed["data"].(map[string]interface{})
+            if data == nil {
+                continue
+            }
+            filename, _ := data["saved_to"].(string)
+            downloadURL, _ := data["download_url"].(string)
+            datasetURL, _ := data["apify_dataset_url"].(string)
+            username, _ := data["username"].(string)
+            tweetsCount, _ := data["tweets_count"].(float64)
+            latestTweets, _ := data["latest_tweets"]
+            
+            if filename == "" && downloadURL == "" && datasetURL == "" {
+                continue
+            }
+            // Build fallback download URL if not provided by tool
+            if downloadURL == "" && filename != "" {
+                downloadURL = fmt.Sprintf("http://localhost:8000/reports/%s", filename)
+            }
+            
+            // Send tool_result message for UI to render ToolResultCard
+            o.eventBus.Publish(bus.Event{
+                Type: bus.EventChatMessage,
+                Payload: map[string]interface{}{
+                    "type":    "tool_result",
+                    "content": fmt.Sprintf("Twitter scraping complete for @%s", username),
+                    "sender":  "assistant",
+                    "metadata": map[string]interface{}{
+                        "toolName":     "twitter_scraper",
+                        "fileName":     filename,
+                        "downloadUrl":  downloadURL,
+                        "datasetUrl":   datasetURL,
+                        "username":     username,
+                        "tweetsFound":  tweetsCount,
+                        "preview":      latestTweets,
+                    },
+                },
+            })
+            
+            o.logger.Infof("✅ Published tool_result for Twitter scraper - @%s", username)
+            
+            // Start async summarization if we have tweets
+            if o.llmClient != nil && o.llmClient.IsEnabled() {
+                go o.generateAndSendSummary(filename, username)
+            }
+        }
+    }(result)
 }
 
 // handleTwitterScraperResult finds the latest Twitter JSON file and sends it to UI
 func (o *OrchestratorAnalyzer) handleTwitterScraperResult(command string) {
 	// Wait a bit for file to be written
 	time.Sleep(2 * time.Second)
-
+	
 	// Extract tweet count from command if specified
 	tweetCount := o.extractTweetCountFromCommand(command)
-
+	
 	// Find the latest Twitter JSON file
 	reportsDir := "/app/shared/reports"
 	files, err := os.ReadDir(reportsDir)
@@ -526,32 +521,32 @@ func (o *OrchestratorAnalyzer) handleTwitterScraperResult(command string) {
 		o.logger.Errorf("Failed to read reports directory: %v", err)
 		return
 	}
-
+	
 	// Find latest twitter_*.json file
 	var latestFile os.DirEntry
 	var latestTime time.Time
-
+	
 	for _, file := range files {
 		if !strings.HasPrefix(file.Name(), "twitter_") || !strings.HasSuffix(file.Name(), ".json") {
 			continue
 		}
-
+		
 		info, err := file.Info()
 		if err != nil {
 			continue
 		}
-
+		
 		if info.ModTime().After(latestTime) {
 			latestTime = info.ModTime()
 			latestFile = file
 		}
 	}
-
+	
 	if latestFile == nil {
 		o.logger.Warn("No Twitter JSON files found in reports directory")
 		return
 	}
-
+	
 	// Read and parse the file
 	filePath := filepath.Join(reportsDir, latestFile.Name())
 	fileContent, err := os.ReadFile(filePath)
@@ -559,19 +554,19 @@ func (o *OrchestratorAnalyzer) handleTwitterScraperResult(command string) {
 		o.logger.Errorf("Failed to read file %s: %v", filePath, err)
 		return
 	}
-
+	
 	// Parse JSON
 	var reportData map[string]interface{}
 	if err := json.Unmarshal(fileContent, &reportData); err != nil {
 		o.logger.Errorf("Failed to parse JSON from %s: %v", latestFile.Name(), err)
 		return
 	}
-
+	
 	// Extract metadata
 	metadata, _ := reportData["metadata"].(map[string]interface{})
 	username, _ := metadata["username"].(string)
 	tweetsFound, _ := metadata["tweets_found"].(float64)
-
+	
 	// Extract preview (first 5 tweets)
 	var preview []interface{}
 	if tweets, ok := reportData["tweets"].([]interface{}); ok && len(tweets) > 0 {
@@ -581,12 +576,12 @@ func (o *OrchestratorAnalyzer) handleTwitterScraperResult(command string) {
 		}
 		preview = tweets[:limit]
 	}
-
+	
 	// Build download URL
 	downloadURL := fmt.Sprintf("http://localhost:8000/reports/%s", latestFile.Name())
-
+	
 	o.logger.Infof("📄 Found latest Twitter file: %s for @%s with %v tweets", latestFile.Name(), username, tweetsFound)
-
+	
 	// Send tool_result message for UI to render ToolResultCard
 	o.eventBus.Publish(bus.Event{
 		Type: bus.EventChatMessage,
@@ -595,18 +590,18 @@ func (o *OrchestratorAnalyzer) handleTwitterScraperResult(command string) {
 			"content": fmt.Sprintf("Twitter scraping complete for @%s", username),
 			"sender":  "assistant",
 			"metadata": map[string]interface{}{
-				"toolName":    "twitter_scraper",
-				"fileName":    latestFile.Name(),
-				"downloadUrl": downloadURL,
-				"username":    username,
-				"tweetsFound": tweetsFound,
-				"preview":     preview,
+				"toolName":     "twitter_scraper",
+				"fileName":     latestFile.Name(),
+				"downloadUrl":  downloadURL,
+				"username":     username,
+				"tweetsFound":  tweetsFound,
+				"preview":      preview,
 			},
 		},
 	})
-
+	
 	o.logger.Infof("✅ Published tool_result for Twitter scraper - @%s", username)
-
+	
 	// Start async summarization if we have tweets and LLM is enabled
 	if tweets, ok := reportData["tweets"].([]interface{}); ok && len(tweets) > 0 {
 		if o.llmClient != nil && o.llmClient.IsEnabled() {
@@ -615,24 +610,29 @@ func (o *OrchestratorAnalyzer) handleTwitterScraperResult(command string) {
 	}
 }
 
+// generateSummaryAndSend generates and sends summary for tweets
+func (o *OrchestratorAnalyzer) generateSummaryAndSend(username string, tweets []interface{}) {
+	o.generateSummaryAndSendWithCount(username, tweets, len(tweets))
+}
+
 // generateSummaryAndSendWithCount generates and sends summary for a specific number of tweets
 func (o *OrchestratorAnalyzer) generateSummaryAndSendWithCount(username string, tweets []interface{}, count int) {
 	ctx := context.Background()
-
+	
 	// Use the specified count or all tweets if count is 0
 	if count <= 0 || count > len(tweets) {
 		count = len(tweets)
 	}
-
+	
 	o.logger.Infof("🤖 Generating AI summary for %d tweets (out of %d) from @%s", count, len(tweets), username)
-
+	
 	// Generate summary using LLM with count
 	summary, err := o.llmClient.SummarizeTweetsWithCount(ctx, tweets, count)
 	if err != nil {
 		o.logger.Errorf("Failed to generate summary: %v", err)
 		return
 	}
-
+	
 	// Send summary as a follow-up message
 	o.eventBus.Publish(bus.Event{
 		Type: bus.EventChatMessage,
@@ -642,14 +642,14 @@ func (o *OrchestratorAnalyzer) generateSummaryAndSendWithCount(username string, 
 			"sender":  "assistant",
 		},
 	})
-
+	
 	o.logger.Infof("✅ Published AI summary for @%s", username)
 }
 
 // generateAndSendSummary reads the JSON file and generates a summary using LLM
 func (o *OrchestratorAnalyzer) generateAndSendSummary(filename string, username string) {
 	ctx := context.Background()
-
+	
 	// Read the JSON file
 	filePath := fmt.Sprintf("/app/shared/reports/%s", filename)
 	fileContent, err := os.ReadFile(filePath)
@@ -657,30 +657,30 @@ func (o *OrchestratorAnalyzer) generateAndSendSummary(filename string, username 
 		o.logger.Errorf("Failed to read file %s: %v", filePath, err)
 		return
 	}
-
+	
 	// Parse JSON
 	var reportData map[string]interface{}
 	if err := json.Unmarshal(fileContent, &reportData); err != nil {
 		o.logger.Errorf("Failed to parse JSON from %s: %v", filename, err)
 		return
 	}
-
+	
 	// Extract tweets
 	tweets, ok := reportData["tweets"].([]interface{})
 	if !ok || len(tweets) == 0 {
 		o.logger.Warn("No tweets found in report")
 		return
 	}
-
+	
 	o.logger.Infof("Generating summary for %d tweets from @%s", len(tweets), username)
-
+	
 	// Generate summary using LLM
 	summary, err := o.llmClient.SummarizeTweets(ctx, tweets)
 	if err != nil {
 		o.logger.Errorf("Failed to generate summary: %v", err)
 		return
 	}
-
+	
 	// Send summary as a follow-up message
 	o.eventBus.Publish(bus.Event{
 		Type: bus.EventChatMessage,
@@ -690,7 +690,7 @@ func (o *OrchestratorAnalyzer) generateAndSendSummary(filename string, username 
 			"sender":  "assistant",
 		},
 	})
-
+	
 	o.logger.Infof("✅ Published tweet summary for @%s", username)
 }
 
@@ -698,7 +698,7 @@ func (o *OrchestratorAnalyzer) generateAndSendSummary(filename string, username 
 func (o *OrchestratorAnalyzer) extractTweetCountFromCommand(command string) int {
 	// Try to extract number from patterns like "latest 20", "last 30", etc.
 	lowerCmd := strings.ToLower(command)
-
+	
 	// Regular expression to match patterns like "latest 20", "last 30", "20 tweets", etc.
 	patterns := []string{
 		`latest\s+(\d+)`,
@@ -707,7 +707,7 @@ func (o *OrchestratorAnalyzer) extractTweetCountFromCommand(command string) int 
 		`top\s+(\d+)`,
 		`first\s+(\d+)`,
 	}
-
+	
 	for _, pattern := range patterns {
 		re := regexp.MustCompile(pattern)
 		matches := re.FindStringSubmatch(lowerCmd)
@@ -718,7 +718,7 @@ func (o *OrchestratorAnalyzer) extractTweetCountFromCommand(command string) int 
 			}
 		}
 	}
-
+	
 	// Default to 0 (which means use all tweets)
 	return 0
 }
@@ -793,12 +793,12 @@ func (o *OrchestratorAnalyzer) buildNetworkContext() *llm.NetworkContext {
 // getLocalTools returns list of tools available locally with full specifications
 func (o *OrchestratorAnalyzer) getLocalTools() []p2p.ToolSpec {
 	tools := []p2p.ToolSpec{}
-
+	
 	// Get ALL registered tools from the agent, including Dagger tools
 	if agentWithTools, ok := o.agent.(interface{ GetLocalTools() []string }); ok {
 		toolNames := agentWithTools.GetLocalTools()
 		o.logger.Infof("🔍 Found %d registered tools in agent", len(toolNames))
-
+		
 		for _, toolName := range toolNames {
 			// Create ToolSpec for each registered tool
 			toolSpec := p2p.ToolSpec{
@@ -806,7 +806,7 @@ func (o *OrchestratorAnalyzer) getLocalTools() []p2p.ToolSpec {
 				Description: fmt.Sprintf("Tool: %s", toolName),
 				Parameters:  []p2p.ToolParameter{},
 			}
-
+			
 			// Add specific descriptions and parameters for known tools
 			switch toolName {
 			case "analyze_dsl":
@@ -843,7 +843,7 @@ func (o *OrchestratorAnalyzer) getLocalTools() []p2p.ToolSpec {
 					{Name: "username", Type: "string", Description: "Twitter username to test (without @ symbol)", Required: true},
 				}
 			}
-
+			
 			tools = append(tools, toolSpec)
 		}
 	} else {
@@ -890,7 +890,7 @@ func (o *OrchestratorAnalyzer) convertLLMPlanToAST(plan *llm.WorkflowPlan) (*AST
 		if node.Type == "tool" && node.ToolName != "" {
 			// Convert map[string]string to map[string]interface{} with better validation
 			argsMap := make(map[string]interface{}, len(node.Args))
-
+			
 			for k, v := range node.Args {
 				// Handle special cases and type conversions
 				// Convert interface{} to string for validation
@@ -899,7 +899,7 @@ func (o *OrchestratorAnalyzer) convertLLMPlanToAST(plan *llm.WorkflowPlan) (*AST
 					o.logger.Warnf("⚠️ Empty parameter value for %s in tool %s", k, node.ToolName)
 					continue // Skip empty parameters
 				}
-
+				
 				argsMap[k] = v // Keep original value type
 				o.logger.Infof("🔍 Converting LLM arg: %s = '%v'", k, v)
 			}
@@ -1047,9 +1047,9 @@ func (o *OrchestratorAnalyzer) ExecuteStoredWorkflow(ctx context.Context, workfl
 	if !exists {
 		return nil, fmt.Errorf("workflow %s not found", workflowID)
 	}
-
+	
 	o.logger.Infof("▶️ Executing stored workflow %s (command: %s)", workflowID, stored.dsl)
-
+	
 	// Check if this is a Twitter command - handle specially
 	if strings.Contains(strings.ToLower(stored.dsl), "tweet") || strings.Contains(strings.ToLower(stored.dsl), "twitter") {
 		// Execute and handle Twitter result
@@ -1057,22 +1057,22 @@ func (o *OrchestratorAnalyzer) ExecuteStoredWorkflow(ctx context.Context, workfl
 		if err != nil {
 			return nil, fmt.Errorf("execution failed: %v", err)
 		}
-
+		
 		// Handle Twitter scraper result
 		go o.handleTwitterScraperResult(stored.dsl)
-
+		
 		return result, nil
 	}
-
+	
 	// Execute the stored AST normally
 	result, err := o.executeWithOrchestration(ctx, stored.ast, stored.workflow)
 	if err != nil {
 		return nil, fmt.Errorf("execution failed: %v", err)
 	}
-
+	
 	// Clean up after execution
 	delete(storedWorkflows, workflowID)
-
+	
 	return result, nil
 }
 
@@ -1095,4 +1095,77 @@ func (o *OrchestratorAnalyzer) publishLLMAgentSelections(plan *llm.WorkflowPlan)
 			o.logger.Info(message)
 		}
 	}
+}
+
+// fallbackToDSLParsing falls back to traditional DSL parsing
+func (o *OrchestratorAnalyzer) fallbackToDSLParsing(ctx context.Context, dsl string) (interface{}, error) {
+	// Try to interpret as simple file creation
+	dsl = o.interpretAsSimpleCommand(dsl)
+
+	tokens := o.tokenize(dsl)
+	if len(tokens) == 0 {
+		return nil, fmt.Errorf("failed to tokenize DSL")
+	}
+
+	ast, err := o.parse(tokens)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse DSL: %w", err)
+	}
+
+	complexity := o.analyzeComplexity(ast)
+	workflow, err := o.buildWorkflow(ctx, ast, complexity)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build workflow: %w", err)
+	}
+
+	result, err := o.executeWithOrchestration(ctx, ast, workflow)
+	if err != nil {
+		return nil, err
+	}
+
+	o.publishResult(dsl, result, workflow)
+	return result, nil
+}
+
+// interpretAsSimpleCommand tries to interpret natural language as simple command
+func (o *OrchestratorAnalyzer) interpretAsSimpleCommand(input string) string {
+	lower := strings.ToLower(input)
+
+	// Extract filename from input if possible
+	extractFilename := func(parts []string) string {
+		for _, part := range parts {
+			if strings.Contains(part, ".") && !strings.HasPrefix(part, ".") {
+				return part
+			}
+		}
+		return "file.txt"
+	}
+
+	parts := strings.Fields(input)
+
+	// Simple pattern matching for common requests
+	if strings.Contains(lower, "create") && strings.Contains(lower, "file") {
+		filename := extractFilename(parts)
+		return fmt.Sprintf("CALL write_file %s \"File created by orchestrator\"", filename)
+	}
+
+	// Delete file
+	if strings.Contains(lower, "delete") || strings.Contains(lower, "remove") {
+		filename := extractFilename(parts)
+		return fmt.Sprintf("CALL delete_file %s", filename)
+	}
+
+	// Read file
+	if strings.Contains(lower, "read") || strings.Contains(lower, "show") || strings.Contains(lower, "display") {
+		filename := extractFilename(parts)
+		return fmt.Sprintf("CALL read_file %s", filename)
+	}
+
+	// List files
+	if strings.Contains(lower, "list") || strings.Contains(lower, "ls") || strings.Contains(lower, "dir") {
+		return "CALL list_files"
+	}
+
+	// Default to original input
+	return input
 }

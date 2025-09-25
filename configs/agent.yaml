@@ -5,14 +5,7 @@ agent:
   url: "http://localhost:8000"
   shared_dir: "./shared"
   external_mcp_endpoints:
-    - name: "context7"
-      url: "https://mcp.context7.com/mcp"
-      transport: "http"
-      headers:
-        CONTEXT7_API_KEY: "${CONTEXT7_API_KEY}"
-    - name: "host-mcp"
-      url: "http://host.docker.internal:3000/mcp"
-      transport: "sse"
+    - "http://host.docker.internal:8012/mcp"
   tools:
     - name: "python_analyzer"
       description: "Analyzes data using an external Python script"
@@ -26,21 +19,12 @@ agent:
         command: ["python", "/shared/analyzer.py"]
         mounts:
           ./shared: /shared
-    - name: "greet_external"
-      description: "Calls a greeting tool on an external MCP server"
-      engine: "remote-mcp"
-      params:
-        - name: "name"
-          type: "string"
-          required: "true"
-      engineSpec:
-        address: "http://host.docker.internal:8080"
     - name: "twitter_scraper"
       description: "Scrape tweets from Twitter/X using Apify API - provide username without @ symbol"
       engine: "dagger"
       params:
         - name: "username"
-          type: "string"
+          type: "string" 
           description: "Twitter username to scrape (without @ symbol, e.g. 'elonmusk')"
           required: "true"
         - name: "tweets_count"

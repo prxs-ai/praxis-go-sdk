@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: praxis-agent-1
+    container_name: praxis-agent-11
     ports:
       - "8000:8000"  # HTTP API
       - "8090:8090"  # WebSocket
@@ -44,7 +44,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: praxis-agent-2
+    container_name: praxis-agent-22
     ports:
       - "8001:8001"  # HTTP API
       - "8091:8091"  # WebSocket
@@ -78,6 +78,45 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-O-", "--quiet", "--tries=1", "http://127.0.0.1:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  praxis-agent-3:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: praxis-agent-33
+    command: ["./praxis-agent", "-config", "/app/configs/agent3.yaml"]
+    ports:
+      - "8002:8002"   # HTTP API
+      - "8093:8092"   # WebSocket (host 8093 -> container 8092) to avoid conflicts
+      - "4003:4003"   # P2P
+      - "9003:9002"   # SSE (host 9003 -> container 9002) to avoid conflicts
+    environment:
+      - AGENT_NAME=praxis-agent-3
+      - AGENT_VERSION=1.0.0
+      - HTTP_PORT=8002
+      - WEBSOCKET_PORT=8092
+      - P2P_PORT=4003
+      - SSE_PORT=9002
+      - MCP_ENABLED=true
+      - P2P_ENABLED=true
+      - MDNS_ENABLED=true
+      - LOG_LEVEL=debug
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - APIFY_API_TOKEN=${APIFY_API_TOKEN:-}
+    volumes:
+      - ./shared:/app/shared
+      - ./configs:/app/configs
+      - /var/run/docker.sock:/var/run/docker.sock # Docker socket for Dagger
+    networks:
+      - praxis-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "wget", "-O-", "--quiet", "--tries=1", "http://127.0.0.1:8002/health"]
       interval: 10s
       timeout: 5s
       retries: 3

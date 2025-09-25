@@ -22,15 +22,15 @@ func NewTaskManager(eb *bus.EventBus, logger *logrus.Logger) *TaskManager {
 	if logger == nil {
 		logger = logrus.New()
 	}
-
+	
 	tm := &TaskManager{
 		tasks:    make(map[string]*Task),
 		eventBus: eb,
 		logger:   logger,
 	}
-
+	
 	logger.Info("A2A TaskManager initialized successfully")
-
+	
 	return tm
 }
 
@@ -82,7 +82,7 @@ func (tm *TaskManager) CreateTask(msg Message) *Task {
 func (tm *TaskManager) GetTask(id string) (*Task, bool) {
 	tm.mu.RLock()
 	defer tm.mu.RUnlock()
-
+	
 	task, exists := tm.tasks[id]
 	return task, exists
 }
