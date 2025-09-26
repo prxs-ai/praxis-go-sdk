@@ -70,6 +70,28 @@ func wsReadUntilType(ws *websocket.Conn, want string, timeout time.Duration) (ma
 	return nil, fmt.Errorf("did not receive %s before timeout", want)
 }
 
+// wsReadUntilAnyType reads until one of the desired event types appears (order-agnostic)
+func wsReadUntilAnyType(ws *websocket.Conn, wants []string, timeout time.Duration) (map[string]interface{}, error) {
+	wantSet := make(map[string]struct{}, len(wants))
+	for _, w := range wants {
+		wantSet[w] = struct{}{}
+	}
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		_ = ws.SetReadDeadline(time.Now().Add(2 * time.Second))
+		var msg map[string]interface{}
+		if err := ws.ReadJSON(&msg); err != nil {
+			continue
+		}
+		if typ, _ := msg["type"].(string); typ != "" {
+			if _, ok := wantSet[typ]; ok {
+				return msg, nil
+			}
+		}
+	}
+	return nil, fmt.Errorf("did not receive any of %v before timeout", wants)
+}
+
 // INT-WS-01: Test WebSocketGateway message parsing and routing
 func TestWebSocketGateway_MessageRouting(t *testing.T) {
 	// Setup
@@ -109,22 +131,12 @@ func TestWebSocketGateway_MessageRouting(t *testing.T) {
 				"workflowId": "test-workflow-1",
 			},
 		}
+		assert.NoError(t, ws.WriteJSON(message))
 
-		err = ws.WriteJSON(message)
-		assert.NoError(t, err)
-
-		// Read responses - we might get dslProgress and dslResult
-		var response map[string]interface{}
-		err = ws.SetReadDeadline(time.Now().Add(5 * time.Second))
-		assert.NoError(t, err)
-
-		err = ws.ReadJSON(&response)
-		assert.NoError(t, err)
-
-		// Should receive either dslProgress or dslResult event
-		eventType := response["type"].(string)
-		assert.True(t, eventType == "dslProgress" || eventType == "dslResult")
-		assert.NotNil(t, response["payload"])
+		// Accept either dslResult or dslProgress; ignore workflowLog etc.
+		resp, err := wsReadUntilAnyType(ws, []string{"dslResult", "dslProgress"}, 5*time.Second)
+		assert.NoError(t, err, "expected dslResult or dslProgress event")
+		assert.NotNil(t, resp["payload"])
 	})
 
 	t.Run("EXECUTE_WORKFLOW routing", func(t *testing.T) {
@@ -152,22 +164,18 @@ func TestWebSocketGateway_MessageRouting(t *testing.T) {
 			},
 		}
 
-		err = ws.WriteJSON(message)
-		assert.NoError(t, err)
+		assert.NoError(t, ws.WriteJSON(message))
 
 		// Read response - might need to read multiple messages to find workflowStart
 		var response map[string]interface{}
 		var foundWorkflowStart bool
 
 		for i := 0; i < 3; i++ { // Try up to 3 messages
-			err = ws.SetReadDeadline(time.Now().Add(2 * time.Second))
-			assert.NoError(t, err)
+			_ = ws.SetReadDeadline(time.Now().Add(2 * time.Second))
 
-			err = ws.ReadJSON(&response)
-			if err != nil {
+			if err := ws.ReadJSON(&response); err != nil {
 				break
 			}
-
 			if response["type"] == "workflowStart" {
 				foundWorkflowStart = true
 				break
@@ -195,23 +203,18 @@ func TestWebSocketGateway_MessageRouting(t *testing.T) {
 				"sender":  "user",
 			},
 		}
-
-		err = ws.WriteJSON(message)
-		assert.NoError(t, err)
+		assert.NoError(t, ws.WriteJSON(message))
 
 		// Read response - might need to read multiple messages to find chatMessage
 		var response map[string]interface{}
 		var foundChatMessage bool
 
 		for i := 0; i < 3; i++ { // Try up to 3 messages
-			err = ws.SetReadDeadline(time.Now().Add(2 * time.Second))
-			assert.NoError(t, err)
+			_ = ws.SetReadDeadline(time.Now().Add(2 * time.Second))
 
-			err = ws.ReadJSON(&response)
-			if err != nil {
+			if err := ws.ReadJSON(&response); err != nil {
 				break
 			}
-
 			if response["type"] == "chatMessage" {
 				foundChatMessage = true
 				break
