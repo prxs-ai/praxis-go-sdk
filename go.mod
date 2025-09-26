@@ -7,11 +7,9 @@ toolchain go1.24.6
 require (
 	dagger.io/dagger v0.18.16
 	github.com/ethereum/go-ethereum v1.16.3
-	github.com/gin-contrib/cors v1.5.0
 	github.com/gin-gonic/gin v1.10.1
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.0
-	github.com/jackc/pgx/v5 v5.7.6
 	github.com/libp2p/go-libp2p v0.32.2
 	github.com/mark3labs/mcp-go v0.30.0
 	github.com/multiformats/go-multiaddr v0.12.0
@@ -72,9 +70,6 @@ require (
 	github.com/huin/goupnp v1.3.0 // indirect
 	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/ipfs/go-log/v2 v2.5.1 // indirect
-	github.com/jackc/pgpassfile v1.0.0 // indirect
-	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
-	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
 	github.com/jbenet/go-temp-err-catcher v0.1.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
