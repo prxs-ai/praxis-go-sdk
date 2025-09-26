@@ -1,13 +1,15 @@
 package mcp
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"strings"
 	"time"
 
-	"github.com/mark3labs/mcp-go/client"
-	clientTransport "github.com/mark3labs/mcp-go/client/transport"
 	mcpTypes "github.com/mark3labs/mcp-go/mcp"
 	"github.com/sirupsen/logrus"
 )
@@ -33,120 +35,112 @@ type DiscoveredTool struct {
 	ServerName  string                   `json:"server_name"`
 }
 
-// DiscoveryParams defines connection parameters for probing an MCP server.
-type DiscoveryParams struct {
-	URL       string
-	Headers   map[string]string
-	Transport TransportType
-}
+// DiscoverToolsFromServer discovers tools from an MCP server using simple HTTP client
+func (s *ToolDiscoveryService) DiscoverToolsFromServer(ctx context.Context, serverURL string) ([]DiscoveredTool, error) {
+	s.logger.Infof("🔍 Discovering tools from MCP server: %s", serverURL)
 
-// DiscoverTools connects to an MCP server using the specified transport and
-// headers, listing available tools.
-func (s *ToolDiscoveryService) DiscoverTools(ctx context.Context, params DiscoveryParams) ([]DiscoveredTool, error) {
-	if params.URL == "" {
-		return nil, fmt.Errorf("server URL cannot be empty")
+	// Step 1: Initialize connection
+	initRequest := map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      1,
+		"method":  "initialize",
+		"params": map[string]interface{}{
+			"protocolVersion": mcpTypes.LATEST_PROTOCOL_VERSION,
+			"capabilities":    map[string]interface{}{},
+			"clientInfo": map[string]interface{}{
+				"name":    "Praxis MCP Discovery",
+				"version": "1.0.0",
+			},
+		},
 	}
 
-	transportType := params.Transport
-	if transportType == "" {
-		transportType = TransportHTTP
-	}
-
-	s.logger.Infof("🔍 Discovering tools from MCP server: %s (transport=%s)", params.URL, strings.ToUpper(string(transportType)))
-
-	var (
-		cli *client.Client
-		err error
-	)
-
-	switch transportType {
-	case TransportHTTP:
-		opts := []clientTransport.StreamableHTTPCOption{clientTransport.WithHTTPTimeout(30 * time.Second)}
-		if len(params.Headers) > 0 {
-			opts = append(opts, clientTransport.WithHTTPHeaders(params.Headers))
-		}
-		cli, err = client.NewStreamableHttpClient(params.URL, opts...)
-	case TransportSSE:
-		opts := []clientTransport.ClientOption{}
-		if len(params.Headers) > 0 {
-			opts = append(opts, client.WithHeaders(params.Headers))
-		}
-		cli, err = client.NewSSEMCPClient(params.URL, opts...)
-	default:
-		return nil, fmt.Errorf("unsupported transport %q for discovery", transportType)
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to create %s client: %w", transportType, err)
-	}
-
-	defer func() {
-		if closeErr := cli.Close(); closeErr != nil {
-			s.logger.Debugf("Failed to close MCP client: %v", closeErr)
-		}
-	}()
-
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	initRequest := mcpTypes.InitializeRequest{}
-	initRequest.Params.ProtocolVersion = mcpTypes.LATEST_PROTOCOL_VERSION
-	initRequest.Params.ClientInfo = mcpTypes.Implementation{
-		Name:    "Praxis MCP Discovery",
-		Version: "1.0.0",
-	}
-	initRequest.Params.Capabilities = mcpTypes.ClientCapabilities{}
-
-	initResponse, err := cli.Initialize(ctx, initRequest)
+	serverInfo, err := s.makeSSERequest(ctx, serverURL, initRequest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize MCP connection: %w", err)
 	}
 
-	serverName := initResponse.ServerInfo.Name
-	if serverName == "" {
-		serverName = params.URL
+	// Extract server info from response
+	result, ok := serverInfo["result"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("invalid initialize response format")
 	}
-	serverVersion := initResponse.ServerInfo.Version
+
+	info, ok := result["serverInfo"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("missing server info in response")
+	}
+
+	serverName, _ := info["name"].(string)
+	serverVersion, _ := info["version"].(string)
 	s.logger.Infof("✅ Connected to MCP server: %s (version %s)", serverName, serverVersion)
 
-	toolsResponse, err := cli.ListTools(ctx, mcpTypes.ListToolsRequest{})
+	// Step 2: List available tools
+	s.logger.Debug("Attempting to list tools from server")
+
+	toolsRequest := map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      2,
+		"method":  "tools/list",
+		"params":  map[string]interface{}{},
+	}
+
+	toolsResponse, err := s.makeSSERequest(ctx, serverURL, toolsRequest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list tools: %w", err)
 	}
 
-	discovered := make([]DiscoveredTool, 0, len(toolsResponse.Tools))
-	for _, tool := range toolsResponse.Tools {
-		discovered = append(discovered, DiscoveredTool{
-			Name:        tool.Name,
-			Description: tool.Description,
-			InputSchema: tool.InputSchema,
-			ServerURL:   params.URL,
+	// Extract tools from response
+	result, ok = toolsResponse["result"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("invalid tools/list response format")
+	}
+
+	toolsArray, ok := result["tools"].([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("invalid tools array in response")
+	}
+
+	// Convert to discovered tools
+	var discoveredTools []DiscoveredTool
+	for _, toolData := range toolsArray {
+		toolMap, ok := toolData.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		name, _ := toolMap["name"].(string)
+		description, _ := toolMap["description"].(string)
+
+		// Parse input schema
+		var inputSchema mcpTypes.ToolInputSchema
+		if schemaData, exists := toolMap["inputSchema"]; exists {
+			// Convert to JSON and back to parse into proper structure
+			schemaBytes, _ := json.Marshal(schemaData)
+			json.Unmarshal(schemaBytes, &inputSchema)
+		}
+
+		discoveredTool := DiscoveredTool{
+			Name:        name,
+			Description: description,
+			InputSchema: inputSchema,
+			ServerURL:   serverURL,
 			ServerName:  serverName,
-		})
-		s.logger.Debugf("  📦 Found tool: %s - %s", tool.Name, tool.Description)
+		}
+		discoveredTools = append(discoveredTools, discoveredTool)
+
+		s.logger.Debugf("  📦 Found tool: %s - %s", name, description)
 	}
 
-	s.logger.Infof("📋 Discovered %d tools from %s", len(discovered), serverName)
-	return discovered, nil
+	s.logger.Infof("📋 Discovered %d tools from %s", len(discoveredTools), serverName)
+	return discoveredTools, nil
 }
 
-// DiscoverToolsFromServer attempts streamable HTTP discovery first and falls back to SSE.
-func (s *ToolDiscoveryService) DiscoverToolsFromServer(ctx context.Context, serverURL string) ([]DiscoveredTool, error) {
-	tools, err := s.DiscoverTools(ctx, DiscoveryParams{URL: serverURL, Transport: TransportHTTP})
-	if err == nil {
-		return tools, nil
-	}
-
-	s.logger.Warnf("HTTP discovery failed for %s (%v), trying SSE", serverURL, err)
-	return s.DiscoverTools(ctx, DiscoveryParams{URL: serverURL, Transport: TransportSSE})
-}
-
-// DiscoverToolsFromMultipleServers discovers tools from multiple MCP servers using HTTP by default.
+// DiscoverToolsFromMultipleServers discovers tools from multiple MCP servers
 func (s *ToolDiscoveryService) DiscoverToolsFromMultipleServers(ctx context.Context, serverURLs []string) map[string][]DiscoveredTool {
 	result := make(map[string][]DiscoveredTool)
 
 	for _, url := range serverURLs {
-		tools, err := s.DiscoverTools(ctx, DiscoveryParams{URL: url, Transport: TransportHTTP})
+		tools, err := s.DiscoverToolsFromServer(ctx, url)
 		if err != nil {
 			s.logger.Errorf("Failed to discover tools from %s: %v", url, err)
 			continue
@@ -155,4 +149,78 @@ func (s *ToolDiscoveryService) DiscoverToolsFromMultipleServers(ctx context.Cont
 	}
 
 	return result
+}
+
+// makeSSERequest makes an HTTP request and parses SSE response format
+func (s *ToolDiscoveryService) makeSSERequest(ctx context.Context, serverURL string, request map[string]interface{}) (map[string]interface{}, error) {
+	// Create HTTP client with timeout
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+
+	// Marshal request to JSON
+	requestBody, err := json.Marshal(request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	// Create HTTP request
+	req, err := http.NewRequestWithContext(ctx, "POST", serverURL, bytes.NewReader(requestBody))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "text/event-stream")
+
+	// Make request
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("HTTP error: %d %s", resp.StatusCode, resp.Status)
+	}
+
+	// Read response body
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	// Parse SSE format - expect "data: {json}\n\n"
+	bodyStr := string(body)
+	s.logger.Debugf("Raw SSE response: %s", bodyStr)
+
+	// Extract JSON from SSE format
+	if !strings.HasPrefix(bodyStr, "data: ") {
+		return nil, fmt.Errorf("invalid SSE format: expected 'data: ' prefix")
+	}
+
+	// Find the JSON part
+	jsonStart := strings.Index(bodyStr, "data: ") + 6
+	jsonEnd := strings.Index(bodyStr[jsonStart:], "\n")
+	if jsonEnd == -1 {
+		jsonEnd = len(bodyStr) - jsonStart
+	} else {
+		jsonEnd += jsonStart
+	}
+
+	jsonStr := strings.TrimSpace(bodyStr[jsonStart:jsonEnd])
+	s.logger.Debugf("Extracted JSON: %s", jsonStr)
+
+	// Parse JSON
+	var response map[string]interface{}
+	if err := json.Unmarshal([]byte(jsonStr), &response); err != nil {
+		return nil, fmt.Errorf("failed to parse JSON response: %w", err)
+	}
+
+	// Check for JSON-RPC error
+	if errData, hasError := response["error"]; hasError {
+		return nil, fmt.Errorf("MCP server error: %v", errData)
+	}
+
+	return response, nil
 }

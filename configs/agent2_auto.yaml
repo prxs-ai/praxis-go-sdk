@@ -7,7 +7,7 @@ agent:
 
   # External MCP servers for automatic tool discovery
   external_mcp_servers:
-    - "http://host.docker.internal:8080"  # For Docker to access host
+    - "http://host.docker.internal:8012/mcp"  # CUA computer-use MCP server on host
 
   # No manual tools - all will be auto-discovered
   tools: []

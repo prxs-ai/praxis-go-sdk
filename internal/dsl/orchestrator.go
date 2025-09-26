@@ -36,11 +36,6 @@ func NewOrchestratorAnalyzer(logger *logrus.Logger, agent AgentInterface, eventB
 	}
 }
 
-// SetParams forwards default parameters into embedded Analyzer (used before Analyze/Execute)
-func (o *OrchestratorAnalyzer) SetParams(ps *ParamStore) {
-	o.Analyzer.SetParams(ps)
-}
-
 // AnalyzeWithOrchestration analyzes DSL and builds dynamic workflow
 func (o *OrchestratorAnalyzer) AnalyzeWithOrchestration(ctx context.Context, dsl string) (interface{}, error) {
 	o.logger.Infof("Orchestrator analyzing request: %s", dsl)
@@ -615,6 +610,11 @@ func (o *OrchestratorAnalyzer) handleTwitterScraperResult(command string) {
 	}
 }
 
+// generateSummaryAndSend generates and sends summary for tweets
+func (o *OrchestratorAnalyzer) generateSummaryAndSend(username string, tweets []interface{}) {
+	o.generateSummaryAndSendWithCount(username, tweets, len(tweets))
+}
+
 // generateSummaryAndSendWithCount generates and sends summary for a specific number of tweets
 func (o *OrchestratorAnalyzer) generateSummaryAndSendWithCount(username string, tweets []interface{}, count int) {
 	ctx := context.Background()
@@ -1095,4 +1095,77 @@ func (o *OrchestratorAnalyzer) publishLLMAgentSelections(plan *llm.WorkflowPlan)
 			o.logger.Info(message)
 		}
 	}
+}
+
+// fallbackToDSLParsing falls back to traditional DSL parsing
+func (o *OrchestratorAnalyzer) fallbackToDSLParsing(ctx context.Context, dsl string) (interface{}, error) {
+	// Try to interpret as simple file creation
+	dsl = o.interpretAsSimpleCommand(dsl)
+
+	tokens := o.tokenize(dsl)
+	if len(tokens) == 0 {
+		return nil, fmt.Errorf("failed to tokenize DSL")
+	}
+
+	ast, err := o.parse(tokens)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse DSL: %w", err)
+	}
+
+	complexity := o.analyzeComplexity(ast)
+	workflow, err := o.buildWorkflow(ctx, ast, complexity)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build workflow: %w", err)
+	}
+
+	result, err := o.executeWithOrchestration(ctx, ast, workflow)
+	if err != nil {
+		return nil, err
+	}
+
+	o.publishResult(dsl, result, workflow)
+	return result, nil
+}
+
+// interpretAsSimpleCommand tries to interpret natural language as simple command
+func (o *OrchestratorAnalyzer) interpretAsSimpleCommand(input string) string {
+	lower := strings.ToLower(input)
+
+	// Extract filename from input if possible
+	extractFilename := func(parts []string) string {
+		for _, part := range parts {
+			if strings.Contains(part, ".") && !strings.HasPrefix(part, ".") {
+				return part
+			}
+		}
+		return "file.txt"
+	}
+
+	parts := strings.Fields(input)
+
+	// Simple pattern matching for common requests
+	if strings.Contains(lower, "create") && strings.Contains(lower, "file") {
+		filename := extractFilename(parts)
+		return fmt.Sprintf("CALL write_file %s \"File created by orchestrator\"", filename)
+	}
+
+	// Delete file
+	if strings.Contains(lower, "delete") || strings.Contains(lower, "remove") {
+		filename := extractFilename(parts)
+		return fmt.Sprintf("CALL delete_file %s", filename)
+	}
+
+	// Read file
+	if strings.Contains(lower, "read") || strings.Contains(lower, "show") || strings.Contains(lower, "display") {
+		filename := extractFilename(parts)
+		return fmt.Sprintf("CALL read_file %s", filename)
+	}
+
+	// List files
+	if strings.Contains(lower, "list") || strings.Contains(lower, "ls") || strings.Contains(lower, "dir") {
+		return "CALL list_files"
+	}
+
+	// Default to original input
+	return input
 }

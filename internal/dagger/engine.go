@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"dagger.io/dagger"
@@ -26,7 +25,7 @@ func NewEngine(ctx context.Context) (*DaggerEngine, error) {
 
 // Close закрывает соединение с Dagger Engine.
 func (e *DaggerEngine) Close() {
-	_ = e.client.Close()
+	e.client.Close()
 }
 
 func (e *DaggerEngine) Execute(ctx context.Context, contract contracts.ToolContract, args map[string]interface{}) (string, error) {
@@ -40,9 +39,6 @@ func (e *DaggerEngine) Execute(ctx context.Context, contract contracts.ToolContr
 	if err != nil {
 		return "", fmt.Errorf("dagger spec invalid 'command' field: %w", err)
 	}
-	if len(command) == 0 {
-		return "", fmt.Errorf("dagger spec has empty 'command'")
-	}
 
 	mounts, err := toStringMap(spec["mounts"])
 	if err != nil {
@@ -55,26 +51,27 @@ func (e *DaggerEngine) Execute(ctx context.Context, contract contracts.ToolContr
 	// Optional passthrough env list (names to forward from host env)
 	envPassthrough, _ := toStringSlice(spec["env_passthrough"]) // ignore error; treat non-slice as empty
 
-	// We pass args as env vars (not as extra argv items) so that $var is available
+	// Don't append args to command since we're passing them as env variables
+	// This allows shell substitution like $username to work properly
 	finalCommand := make([]string, len(command))
 	copy(finalCommand, command)
 
 	container := e.client.Container().From(image)
-
-	// Mounts first
 	for hostPath, containerPath := range mounts {
 		absPath, err := filepath.Abs(hostPath)
 		if err != nil {
 			return "", fmt.Errorf("failed to get absolute path for %s: %w", hostPath, err)
 		}
+
 		if _, err := os.Stat(absPath); os.IsNotExist(err) {
 			return "", fmt.Errorf("host directory does not exist: %s", absPath)
 		}
+
 		dir := e.client.Host().Directory(absPath)
 		container = container.WithDirectory(containerPath, dir)
 	}
 
-	// Fixed env
+	// Apply fixed env variables
 	for k, v := range envMap {
 		if k == "" {
 			continue
@@ -82,15 +79,15 @@ func (e *DaggerEngine) Execute(ctx context.Context, contract contracts.ToolContr
 		container = container.WithEnvVariable(k, v)
 	}
 
-	// Args as env (for shell substitution)
+	// Apply args as environment variables (for shell substitution)
 	for key, val := range args {
 		container = container.WithEnvVariable(key, fmt.Sprintf("%v", val))
 	}
 
-	// Cache-bust to avoid stale graph cache during tests
+	// Add timestamp to prevent Dagger caching
 	container = container.WithEnvVariable("CACHE_BUST", fmt.Sprintf("%d", time.Now().UnixNano()))
 
-	// Passthrough env from host
+	// Apply passthrough env variables from the host process environment
 	for _, name := range envPassthrough {
 		if name == "" {
 			continue
@@ -100,39 +97,23 @@ func (e *DaggerEngine) Execute(ctx context.Context, contract contracts.ToolContr
 		}
 	}
 
-	// If command contains shell features (e.g. $var), run via sh -c to expand
-	needsShell := false
-	for _, p := range finalCommand {
-		if strings.ContainsAny(p, "$`*{}[]\\'\"<>|&();") {
-			needsShell = true
-			break
-		}
-	}
-
-	var execCmd []string
-	if needsShell {
-		execCmd = []string{"sh", "-c", strings.Join(finalCommand, " ")}
-	} else {
-		execCmd = finalCommand
-	}
-
-	execContainer := container.WithExec(execCmd)
-
-	// Read stdout; if it fails, try to surface stderr
+	execContainer := container.WithExec(finalCommand)
 	result, err := execContainer.Stdout(ctx)
 	if err != nil {
-		if stderr, stderrErr := execContainer.Stderr(ctx); stderrErr == nil && stderr != "" {
-			return "", fmt.Errorf("dagger execution failed: %s", strings.TrimSpace(stderr))
+		stderr, stderrErr := execContainer.Stderr(ctx)
+		if stderrErr == nil && stderr != "" {
+			return "", fmt.Errorf("dagger execution failed: %s", stderr)
 		}
 		return "", fmt.Errorf("dagger execution failed: %w", err)
 	}
 
-	// Export modified directories back to host (best-effort)
+	// Export modified directories back to host
 	for hostPath, containerPath := range mounts {
 		absPath, _ := filepath.Abs(hostPath)
-		if _, expErr := execContainer.Directory(containerPath).Export(ctx, absPath); expErr != nil {
+		// Export the directory from container back to host
+		if _, err := execContainer.Directory(containerPath).Export(ctx, absPath); err != nil {
 			// Log warning but don't fail - the directory might not have changed
-			fmt.Printf("Warning: Could not export %s back to host: %v\n", containerPath, expErr)
+			fmt.Printf("Warning: Could not export %s back to host: %v\n", containerPath, err)
 		}
 	}
 

@@ -1,4 +1,0 @@
-This is a test document with multiple words.
-It contains text for analysis.
-Python Dagger Engine will analyze this file.
-Line count: 4, Word count should be around 20.
