@@ -15,6 +15,7 @@ type TransportManager struct {
 	clients map[string]*MCPClientWrapper
 	factory *ClientFactory
 	logger  *logrus.Logger
+	mu      sync.RWMutex
 }
 
 func NewTransportManager(logger *logrus.Logger) *TransportManager {
@@ -132,10 +133,7 @@ func (rsc *ResilientSSEClient) connect() error {
 	initRequest.Params.Capabilities = mcp.ClientCapabilities{}
 
 	if _, err := c.Initialize(ctx, initRequest); err != nil {
-		err = c.Close()
-		if err != nil {
-			return fmt.Errorf("failed to close SSE client: %w", err)
-		}
+		c.Close()
 		return fmt.Errorf("failed to initialize SSE client: %w", err)
 	}
 
@@ -240,7 +238,7 @@ func NewStreamableHTTPClientPool(baseURL string, maxSize int, logger *logrus.Log
 
 			if err := client.Initialize(ctx); err != nil {
 				logger.Errorf("Failed to initialize client for pool: %v", err)
-				_ = client.Close()
+				client.Close()
 				return nil
 			}
 

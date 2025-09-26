@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/mark3labs/mcp-go/client"
-	clientTransport "github.com/mark3labs/mcp-go/client/transport"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/sirupsen/logrus"
 )
@@ -62,17 +61,9 @@ func NewMCPClient(config ClientConfig) (*MCPClientWrapper, error) {
 			config.Command, nil, config.Args...,
 		)
 	case ClientTypeStreamableHTTP:
-		var opts []clientTransport.StreamableHTTPCOption
-		if len(config.Headers) > 0 {
-			opts = append(opts, clientTransport.WithHTTPHeaders(config.Headers))
-		}
-		wrapper.client, err = client.NewStreamableHttpClient(config.Address, opts...)
+		wrapper.client, err = client.NewStreamableHttpClient(config.Address)
 	case ClientTypeSSE:
-		var opts []clientTransport.ClientOption
-		if len(config.Headers) > 0 {
-			opts = append(opts, client.WithHeaders(config.Headers))
-		}
-		wrapper.client, err = client.NewSSEMCPClient(config.Address, opts...)
+		wrapper.client, err = client.NewSSEMCPClient(config.Address)
 	default:
 		return nil, fmt.Errorf("unsupported client type: %s", config.Type)
 	}
@@ -278,7 +269,7 @@ func (f *ClientFactory) GetOrCreateClient(name string) (*MCPClientWrapper, error
 	defer cancel()
 
 	if err := client.Initialize(ctx); err != nil {
-		_ = client.Close()
+		client.Close()
 		return nil, fmt.Errorf("failed to initialize client %s: %w", name, err)
 	}
 

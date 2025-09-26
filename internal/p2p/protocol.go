@@ -643,10 +643,12 @@ func (h *P2PProtocolHandler) handleA2ACardStream(stream network.Stream) {
 		if h.a2aProvider != nil {
 			ourA2ACard = h.a2aProvider.GetA2ACard()
 		}
+
 		response := map[string]interface{}{
 			"type": "card_response",
 			"card": ourA2ACard,
 		}
+
 		if err := encoder.Encode(response); err != nil {
 			h.logger.Errorf("Failed to send A2A card: %v", err)
 			return
@@ -708,22 +710,26 @@ func (h *P2PProtocolHandler) RequestA2ACard(ctx context.Context, peerID peer.ID)
 	if err := encoder.Encode(request); err != nil {
 		return nil, fmt.Errorf("failed to send A2A card request: %w", err)
 	}
+
 	// Receive response
 	decoder := json.NewDecoder(stream)
 	var response map[string]interface{}
 	if err := decoder.Decode(&response); err != nil {
 		return nil, fmt.Errorf("failed to receive A2A card response: %w", err)
 	}
+
 	if responseType, _ := response["type"].(string); responseType == "card_response" {
 		if cardData, exists := response["card"]; exists {
 			// Cache the card
 			h.mu.Lock()
 			h.peerA2ACards[peerID] = cardData
 			h.mu.Unlock()
+
 			h.logger.Infof("✅ Received A2A card from peer %s", peerID.ShortString())
 			return cardData, nil
 		}
 	}
+
 	return nil, fmt.Errorf("invalid A2A card response from peer %s", peerID.ShortString())
 }
 
@@ -731,6 +737,7 @@ func (h *P2PProtocolHandler) RequestA2ACard(ctx context.Context, peerID peer.ID)
 func (h *P2PProtocolHandler) GetPeerA2ACards() map[peer.ID]interface{} {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
+
 	cards := make(map[peer.ID]interface{})
 	for id, card := range h.peerA2ACards {
 		cards[id] = card

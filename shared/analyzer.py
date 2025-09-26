@@ -18,6 +18,7 @@ def main():
         return
 
     input_file = args.input_file
+    # Если путь уже содержит /shared/, используем его как есть
     if input_file.startswith('/shared/'):
         input_path = input_file
         input_file = input_file.replace('/shared/', '')
