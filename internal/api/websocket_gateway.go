@@ -355,7 +355,7 @@ func (gw *WebSocketGateway) handleExecuteWorkflow(client *Client, payload map[st
 			// This is a stored workflow - execute it
 			if gw.orchestratorAnalyzer != nil {
 				gw.logger.Infof("▶️ Executing stored workflow: %s", workflowID)
-				
+
 				// Publish workflow start event
 				gw.eventBus.Publish(bus.Event{
 					Type: bus.EventWorkflowStart,
@@ -363,7 +363,7 @@ func (gw *WebSocketGateway) handleExecuteWorkflow(client *Client, payload map[st
 						"workflowId": workflowID,
 					},
 				})
-				
+
 				ctx := context.Background()
 				go func() {
 					result, err := gw.orchestratorAnalyzer.ExecuteStoredWorkflow(ctx, workflowID)
@@ -372,11 +372,11 @@ func (gw *WebSocketGateway) handleExecuteWorkflow(client *Client, payload map[st
 						gw.eventBus.PublishWorkflowError(workflowID, err.Error(), "")
 					} else {
 						gw.logger.Infof("✅ Workflow %s executed successfully", workflowID)
-						
+
 						// Extract tool execution results for better frontend display
 						var message string
 						var toolResults []interface{}
-						
+
 						if resultMap, ok := result.(map[string]interface{}); ok {
 							if results, ok := resultMap["results"].([]interface{}); ok && len(results) > 0 {
 								toolResults = results
@@ -400,17 +400,17 @@ func (gw *WebSocketGateway) handleExecuteWorkflow(client *Client, payload map[st
 								}
 							}
 						}
-						
+
 						if message == "" {
 							message = "Workflow execution completed"
 						}
-						
+
 						gw.eventBus.Publish(bus.Event{
 							Type: bus.EventWorkflowComplete,
 							Payload: map[string]interface{}{
-								"workflowId": workflowID,
-								"result":     result,
-								"message":    message,
+								"workflowId":  workflowID,
+								"result":      result,
+								"message":     message,
 								"toolResults": toolResults,
 							},
 						})
@@ -420,7 +420,7 @@ func (gw *WebSocketGateway) handleExecuteWorkflow(client *Client, payload map[st
 			}
 		}
 	}
-	
+
 	// Fallback to old method with nodes and edges
 	workflowID, _ := payload["workflowId"].(string)
 	if workflowID == "" {
@@ -462,7 +462,7 @@ func (gw *WebSocketGateway) handleExecuteWorkflow(client *Client, payload map[st
 func (gw *WebSocketGateway) handleChatMessage(client *Client, payload map[string]interface{}) {
 	content, _ := payload["content"].(string)
 	gw.logger.Infof("📨 Received chat message: %s", content)
-	
+
 	// Log orchestrator status
 	if gw.orchestratorAnalyzer == nil {
 		gw.logger.Warn("⚠️ OrchestratorAnalyzer is nil - cannot process message!")
@@ -486,7 +486,7 @@ func (gw *WebSocketGateway) handleChatMessage(client *Client, payload map[string
 			go func() {
 				ctx := context.Background()
 				gw.logger.Infof("🚀 Processing chat message with OrchestratorAnalyzer: %s", content)
-				
+
 				// Use orchestrator analyzer for intelligent processing
 				result, err := gw.orchestratorAnalyzer.AnalyzeWithOrchestration(ctx, content)
 				if err != nil {
@@ -519,29 +519,29 @@ func (gw *WebSocketGateway) handleChatMessage(client *Client, payload map[string
 			go func() {
 				ctx := context.Background()
 				gw.logger.Infof("Processing chat message with DSL analyzer: %s", content)
-			
-			result, err := gw.dslAnalyzer.AnalyzeDSL(ctx, content)
-			if err != nil {
-				gw.logger.Errorf("Failed to analyze DSL: %v", err)
+
+				result, err := gw.dslAnalyzer.AnalyzeDSL(ctx, content)
+				if err != nil {
+					gw.logger.Errorf("Failed to analyze DSL: %v", err)
+					gw.eventBus.Publish(bus.Event{
+						Type: bus.EventChatMessage,
+						Payload: map[string]interface{}{
+							"content": fmt.Sprintf("❌ Error: %v", err),
+							"sender":  "system",
+						},
+					})
+					return
+				}
+
+				// Send success message
 				gw.eventBus.Publish(bus.Event{
 					Type: bus.EventChatMessage,
 					Payload: map[string]interface{}{
-						"content": fmt.Sprintf("❌ Error: %v", err),
+						"content": fmt.Sprintf("✅ Result: %v", result),
 						"sender":  "system",
 					},
 				})
-				return
-			}
-
-			// Send success message  
-			gw.eventBus.Publish(bus.Event{
-				Type: bus.EventChatMessage,
-				Payload: map[string]interface{}{
-					"content": fmt.Sprintf("✅ Result: %v", result),
-					"sender":  "system",
-				},
-			})
-		}()
+			}()
 		}
 	}
 }

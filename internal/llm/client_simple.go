@@ -52,7 +52,7 @@ CRITICAL RULES:
 
 REQUEST MAPPING:
 - "list files" -> use list_files tool
-- "analyze file X" -> use python_analyzer tool with input_file parameter  
+- "analyze file X" -> use python_analyzer tool with input_file parameter
 - "create/write file" -> use write_file tool with filename and content parameters
 - "read file" -> use read_file tool with filename parameter
 
@@ -103,7 +103,7 @@ Response:
   "description": "Analyze test.txt using Python",
   "nodes": [
     {
-      "id": "node_1", 
+      "id": "node_1",
       "type": "tool",
       "agent_id": "local",
       "tool_name": "python_analyzer",

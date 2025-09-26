@@ -96,4 +96,3 @@ logging:
   level: "debug"
   format: "text"
   output: "stdout"
-

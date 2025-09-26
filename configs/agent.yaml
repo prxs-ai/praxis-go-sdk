@@ -24,7 +24,7 @@ agent:
       engine: "dagger"
       params:
         - name: "username"
-          type: "string" 
+          type: "string"
           description: "Twitter username to scrape (without @ symbol, e.g. 'elonmusk')"
           required: "true"
         - name: "tweets_count"

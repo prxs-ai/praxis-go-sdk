@@ -32,9 +32,9 @@ func main() {
 		logger.Fatalf("Failed to load configuration: %v", err)
 	}
 
-    // Convert AppConfig to agent.Config and pass AppConfig through
-    agentConfig := agent.AdaptAppConfigToAgentConfig(appConfig)
-    agentConfig.AppConfig = appConfig
+	// Convert AppConfig to agent.Config and pass AppConfig through
+	agentConfig := agent.AdaptAppConfigToAgentConfig(appConfig)
+	agentConfig.AppConfig = appConfig
 
 	logger.Infof("Configuration loaded from %s: %+v", *configFile, agentConfig)
 

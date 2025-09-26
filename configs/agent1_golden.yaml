@@ -4,11 +4,11 @@ agent:
   description: "Orchestrator Agent with Dagger and Computer-Use Tools"
   url: "http://localhost:8000"
   shared_dir: "./shared"
-  
+
   # External MCP endpoints discovered automatically on startup
   external_mcp_endpoints:
     - "http://host.docker.internal:8013/mcp"  # CUA HTTP proxy (translates to SSE)
-  
+
   # Locally declared tools (Dagger workloads + remote computer-use proxy)
   tools:
     - name: "python_analyzer"
@@ -22,7 +22,7 @@ agent:
       meta:
         daggerImage: "python:3.11-slim"
         daggerCommand: ["python", "/shared/analyzer.py"]
-    
+
     - name: "twitter_scraper"
       description: "Scrapes tweets from Twitter/X using Apify API - provide username without @ symbol"
       engine: "dagger"

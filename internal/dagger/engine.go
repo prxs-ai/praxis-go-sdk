@@ -29,78 +29,78 @@ func (e *DaggerEngine) Close() {
 }
 
 func (e *DaggerEngine) Execute(ctx context.Context, contract contracts.ToolContract, args map[string]interface{}) (string, error) {
-    spec := contract.EngineSpec
-    image, ok := spec["image"].(string)
-    if !ok || image == "" {
-        return "", fmt.Errorf("dagger spec missing or invalid 'image' field")
-    }
+	spec := contract.EngineSpec
+	image, ok := spec["image"].(string)
+	if !ok || image == "" {
+		return "", fmt.Errorf("dagger spec missing or invalid 'image' field")
+	}
 
-    command, err := toStringSlice(spec["command"])
-    if err != nil {
-        return "", fmt.Errorf("dagger spec invalid 'command' field: %w", err)
-    }
+	command, err := toStringSlice(spec["command"])
+	if err != nil {
+		return "", fmt.Errorf("dagger spec invalid 'command' field: %w", err)
+	}
 
-    mounts, err := toStringMap(spec["mounts"])
-    if err != nil {
-        return "", fmt.Errorf("dagger spec invalid 'mounts' field: %w", err)
-    }
+	mounts, err := toStringMap(spec["mounts"])
+	if err != nil {
+		return "", fmt.Errorf("dagger spec invalid 'mounts' field: %w", err)
+	}
 
-    // Optional fixed env map
-    envMap, _ := toStringMap(spec["env"]) // ignore error; treat non-map as empty
+	// Optional fixed env map
+	envMap, _ := toStringMap(spec["env"]) // ignore error; treat non-map as empty
 
-    // Optional passthrough env list (names to forward from host env)
-    envPassthrough, _ := toStringSlice(spec["env_passthrough"]) // ignore error; treat non-slice as empty
+	// Optional passthrough env list (names to forward from host env)
+	envPassthrough, _ := toStringSlice(spec["env_passthrough"]) // ignore error; treat non-slice as empty
 
-    // Don't append args to command since we're passing them as env variables
-    // This allows shell substitution like $username to work properly
-    finalCommand := make([]string, len(command))
-    copy(finalCommand, command)
+	// Don't append args to command since we're passing them as env variables
+	// This allows shell substitution like $username to work properly
+	finalCommand := make([]string, len(command))
+	copy(finalCommand, command)
 
-    container := e.client.Container().From(image)
-    for hostPath, containerPath := range mounts {
-        absPath, err := filepath.Abs(hostPath)
-        if err != nil {
-            return "", fmt.Errorf("failed to get absolute path for %s: %w", hostPath, err)
-        }
-        
-        if _, err := os.Stat(absPath); os.IsNotExist(err) {
-            return "", fmt.Errorf("host directory does not exist: %s", absPath)
-        }
-        
-        dir := e.client.Host().Directory(absPath)
-        container = container.WithDirectory(containerPath, dir)
-    }
+	container := e.client.Container().From(image)
+	for hostPath, containerPath := range mounts {
+		absPath, err := filepath.Abs(hostPath)
+		if err != nil {
+			return "", fmt.Errorf("failed to get absolute path for %s: %w", hostPath, err)
+		}
 
-    // Apply fixed env variables
-    for k, v := range envMap {
-        if k == "" {
-            continue
-        }
-        container = container.WithEnvVariable(k, v)
-    }
-    
-    // Apply args as environment variables (for shell substitution)
-    for key, val := range args {
-        container = container.WithEnvVariable(key, fmt.Sprintf("%v", val))
-    }
-    
-    // Add timestamp to prevent Dagger caching
-    container = container.WithEnvVariable("CACHE_BUST", fmt.Sprintf("%d", time.Now().UnixNano()))
+		if _, err := os.Stat(absPath); os.IsNotExist(err) {
+			return "", fmt.Errorf("host directory does not exist: %s", absPath)
+		}
 
-    // Apply passthrough env variables from the host process environment
-    for _, name := range envPassthrough {
-        if name == "" {
-            continue
-        }
-        if val := os.Getenv(name); val != "" {
-            container = container.WithEnvVariable(name, val)
-        }
-    }
+		dir := e.client.Host().Directory(absPath)
+		container = container.WithDirectory(containerPath, dir)
+	}
 
-    execContainer := container.WithExec(finalCommand)
-    result, err := execContainer.Stdout(ctx)
-    if err != nil {
-        stderr, stderrErr := execContainer.Stderr(ctx)
+	// Apply fixed env variables
+	for k, v := range envMap {
+		if k == "" {
+			continue
+		}
+		container = container.WithEnvVariable(k, v)
+	}
+
+	// Apply args as environment variables (for shell substitution)
+	for key, val := range args {
+		container = container.WithEnvVariable(key, fmt.Sprintf("%v", val))
+	}
+
+	// Add timestamp to prevent Dagger caching
+	container = container.WithEnvVariable("CACHE_BUST", fmt.Sprintf("%d", time.Now().UnixNano()))
+
+	// Apply passthrough env variables from the host process environment
+	for _, name := range envPassthrough {
+		if name == "" {
+			continue
+		}
+		if val := os.Getenv(name); val != "" {
+			container = container.WithEnvVariable(name, val)
+		}
+	}
+
+	execContainer := container.WithExec(finalCommand)
+	result, err := execContainer.Stdout(ctx)
+	if err != nil {
+		stderr, stderrErr := execContainer.Stderr(ctx)
 		if stderrErr == nil && stderr != "" {
 			return "", fmt.Errorf("dagger execution failed: %s", stderr)
 		}
@@ -125,7 +125,7 @@ func toStringSlice(v interface{}) ([]string, error) {
 	if v == nil {
 		return nil, nil
 	}
-	
+
 	switch arr := v.(type) {
 	case []string:
 		return arr, nil
@@ -149,7 +149,7 @@ func toStringMap(v interface{}) (map[string]string, error) {
 	if v == nil {
 		return nil, nil
 	}
-	
+
 	switch m := v.(type) {
 	case map[string]string:
 		return m, nil

@@ -37,10 +37,10 @@ type AgentConfig struct {
 	Version              string       `yaml:"version" json:"version"`
 	Description          string       `yaml:"description" json:"description"`
 	URL                  string       `yaml:"url" json:"url"`
-	SharedDir            string       `yaml:"shared_dir" json:"shared_dir"`                          // Base directory for filesystem tools
-	Tools                []ToolConfig `yaml:"tools"`                                                  // Список инструментов, доступных агенту
-	ExternalMCPEndpoints []string     `yaml:"external_mcp_endpoints" json:"external_mcp_endpoints"`     // Внешние MCP серверы для автообнаружения
-	ExternalMCPServers   []string     `yaml:"external_mcp_servers" json:"external_mcp_servers"`         // Alias для ExternalMCPEndpoints
+	SharedDir            string       `yaml:"shared_dir" json:"shared_dir"`                         // Base directory for filesystem tools
+	Tools                []ToolConfig `yaml:"tools"`                                                // Список инструментов, доступных агенту
+	ExternalMCPEndpoints []string     `yaml:"external_mcp_endpoints" json:"external_mcp_endpoints"` // Внешние MCP серверы для автообнаружения
+	ExternalMCPServers   []string     `yaml:"external_mcp_servers" json:"external_mcp_servers"`     // Alias для ExternalMCPEndpoints
 }
 
 // P2PConfig contains libp2p configuration

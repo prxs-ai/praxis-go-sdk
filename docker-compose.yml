@@ -40,48 +40,6 @@ services:
       retries: 3
       start_period: 30s
 
-  praxis-agent-2:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: praxis-agent-22
-    ports:
-      - "8001:8001"  # HTTP API
-      - "8091:8091"  # WebSocket
-      - "4002:4002"  # P2P
-      - "9001:9001"  # SSE
-    environment:
-      - AGENT_NAME=praxis-agent-2
-      - AGENT_VERSION=1.0.0
-      - AGENT_CONFIG=/app/configs/agent2_auto.yaml
-      - HTTP_PORT=8001
-      - WEBSOCKET_PORT=8091
-      - P2P_PORT=4002
-      - SSE_PORT=9001
-      - MCP_ENABLED=true
-      - P2P_ENABLED=true
-      - MDNS_ENABLED=true
-      - LOG_LEVEL=debug
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - APIFY_API_TOKEN=${APIFY_API_TOKEN:-}
-
-    volumes:
-      - ./shared:/app/shared
-      - ./configs:/app/configs
-      - /var/run/docker.sock:/var/run/docker.sock # Docker socket for Dagger
-    networks:
-      - praxis-network
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    depends_on:
-      praxis-agent-1:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "-O-", "--quiet", "--tries=1", "http://127.0.0.1:8001/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
 
   praxis-agent-3:
     build:

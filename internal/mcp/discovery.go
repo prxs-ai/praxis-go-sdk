@@ -28,11 +28,11 @@ func NewToolDiscoveryService(logger *logrus.Logger) *ToolDiscoveryService {
 
 // DiscoveredTool represents a discovered MCP tool
 type DiscoveredTool struct {
-	Name        string                    `json:"name"`
-	Description string                    `json:"description"`
-	InputSchema mcpTypes.ToolInputSchema  `json:"input_schema"`
-	ServerURL   string                    `json:"server_url"`
-	ServerName  string                    `json:"server_name"`
+	Name        string                   `json:"name"`
+	Description string                   `json:"description"`
+	InputSchema mcpTypes.ToolInputSchema `json:"input_schema"`
+	ServerURL   string                   `json:"server_url"`
+	ServerName  string                   `json:"server_name"`
 }
 
 // DiscoverToolsFromServer discovers tools from an MCP server using simple HTTP client
@@ -64,7 +64,7 @@ func (s *ToolDiscoveryService) DiscoverToolsFromServer(ctx context.Context, serv
 	if !ok {
 		return nil, fmt.Errorf("invalid initialize response format")
 	}
-	
+
 	info, ok := result["serverInfo"].(map[string]interface{})
 	if !ok {
 		return nil, fmt.Errorf("missing server info in response")
@@ -76,7 +76,7 @@ func (s *ToolDiscoveryService) DiscoverToolsFromServer(ctx context.Context, serv
 
 	// Step 2: List available tools
 	s.logger.Debug("Attempting to list tools from server")
-	
+
 	toolsRequest := map[string]interface{}{
 		"jsonrpc": "2.0",
 		"id":      2,
@@ -110,7 +110,7 @@ func (s *ToolDiscoveryService) DiscoverToolsFromServer(ctx context.Context, serv
 
 		name, _ := toolMap["name"].(string)
 		description, _ := toolMap["description"].(string)
-		
+
 		// Parse input schema
 		var inputSchema mcpTypes.ToolInputSchema
 		if schemaData, exists := toolMap["inputSchema"]; exists {
