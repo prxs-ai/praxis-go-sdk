@@ -5,6 +5,22 @@ agent:
   url: "http://localhost:8001"
   shared_dir: "./shared"
 
+  identity:
+    did: "did:web:localhost%3A8001"
+    did_doc_uri: "http://localhost:8001/.well-known/did.json"
+    key:
+      type: "ed25519"
+      source: "file"
+      path: "./configs/keys/ed25519-agent2.key"
+      id: "key-1"
+
+  security:
+    sign_cards: true
+    verify_peer_cards: true
+    sign_a2a: false
+    verify_a2a: false
+  did_cache_ttl: "60s"
+
   # External MCP servers for automatic tool discovery
   external_mcp_servers:
     - "http://host.docker.internal:8080"  # For Docker to access host

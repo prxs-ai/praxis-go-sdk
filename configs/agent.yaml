@@ -13,6 +13,20 @@ agent:
     - name: "host-mcp"
       url: "http://host.docker.internal:3000/mcp"
       transport: "sse"
+  identity:
+    did: "did:web:localhost%3A8000"
+    did_doc_uri: "http://localhost:8000/.well-known/did.json"
+    key:
+      type: "ed25519"
+      source: "file"
+      path: "./configs/keys/ed25519.key"
+      id: "key-1"
+  security:
+    sign_cards: true
+    verify_peer_cards: true
+    sign_a2a: false
+    verify_a2a: false
+  did_cache_ttl: "60s"
   tools:
     - name: "python_analyzer"
       description: "Analyzes data using an external Python script"
