@@ -25,9 +25,9 @@ def main():
         }))
         return
 
-    bot_token = "7962743173:AAEMGH1faTKQw4tj7R6ZI9a57IteT0AKgSo"
+    bot_token = ""
 
-    channel_id = "1843443977"
+    channel_id = ""
 
     try:
         api_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
