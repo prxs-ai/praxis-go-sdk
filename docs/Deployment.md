@@ -48,19 +48,19 @@ Environment variables control agent behavior and configuration, including API ke
 ```mermaid
 graph TB
 subgraph "Docker Compose Network"
-A[praxis-agent-1]
-B[praxis-agent-2]
-C[praxis-network]
+A["praxis-agent-1"]
+B["praxis-agent-2"]
+C["praxis-network"]
 A --> C
 B --> C
 end
-D[Host System] --> |Volume Mount| A
+D["Host System"] --> |Volume Mount| A
 D --> |Volume Mount| B
 D --> |Docker Socket| A
 D --> |Docker Socket| B
-E[External Clients] --> |HTTP| A
+E["External Clients"] --> |HTTP| A
 E --> |HTTP| B
-F[Monitoring] --> |Health Check| A
+F["Monitoring"] --> |Health Check| A
 F --> |Health Check| B
 ```
 
@@ -88,17 +88,17 @@ sequenceDiagram
 participant DockerCompose
 participant Agent1
 participant Agent2
-DockerCompose->>Agent1 : Start Service
-Agent1->>Agent1 : Initialize (40s startup period)
-Agent1->>DockerCompose : Health Check (curl)
+DockerCompose->>Agent1: Start Service
+Agent1->>Agent1: Initialize (40s startup period)
+Agent1->>DockerCompose: Health Check (curl)
 loop Every 30s
-Agent1->>DockerCompose : Health Status
+Agent1->>DockerCompose: Health Status
 end
-DockerCompose->>Agent2 : Start (after Agent1 healthy)
-Agent2->>Agent2 : Initialize (40s startup period)
-Agent2->>DockerCompose : Health Check (curl)
+DockerCompose->>Agent2: Start (after Agent1 healthy)
+Agent2->>Agent2: Initialize (40s startup period)
+Agent2->>DockerCompose: Health Check (curl)
 loop Every 30s
-Agent2->>DockerCompose : Health Status
+Agent2->>DockerCompose: Health Status
 end
 ```
 
@@ -124,9 +124,9 @@ The system also includes a WebSocket log hook that sends log entries to the Even
 ```mermaid
 classDiagram
 class LogConfig {
-+Level : string
-+Format : string
-+OutputPath : string
++Level: string
++Format: string
++OutputPath: string
 }
 class Logger {
 +SetLevel(level)
@@ -137,9 +137,9 @@ class WebSocketLogHook {
 +Levels()
 +Fire(entry)
 }
-LogConfig --> Logger : "configures"
-Logger --> WebSocketLogHook : "sends logs to"
-WebSocketLogHook --> EventBus : "publishes events"
+LogConfig --> Logger: "configures"
+Logger --> WebSocketLogHook: "sends logs to"
+WebSocketLogHook --> EventBus: "publishes events"
 ```
 
 **Diagram sources**
@@ -213,12 +213,12 @@ Agents can connect to external MCP servers by specifying the endpoint in their c
 sequenceDiagram
 participant Agent
 participant MCPServer
-Agent->>MCPServer : initialize request
-MCPServer-->>Agent : capabilities and server info
-Agent->>MCPServer : tools/list request
-MCPServer-->>Agent : list of available tools
-Agent->>MCPServer : tools/call request
-MCPServer-->>Agent : tool execution result
+Agent->>MCPServer: initialize request
+MCPServer-->>Agent: capabilities and server info
+Agent->>MCPServer: tools/list request
+MCPServer-->>Agent: list of available tools
+Agent->>MCPServer: tools/call request
+MCPServer-->>Agent: tool execution result
 ```
 
 **Diagram sources**

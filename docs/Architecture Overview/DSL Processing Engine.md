@@ -21,19 +21,19 @@ The DSL processing engine is organized within the `internal/dsl` directory, with
 
 ```mermaid
 graph TD
-subgraph "DSL Engine"
+subgraph DSLEngine["DSL Engine"]
 A[analyzer.go]
 B[orchestrator.go]
 end
-subgraph "LLM Integration"
+subgraph LLMIntegration["LLM Integration"]
 C[client.go]
 D[cache.go]
 end
-subgraph "MCP Integration"
+subgraph MCPIntegration["MCP Integration"]
 E[remote_engine.go]
 F[client.go]
 end
-subgraph "Agent Core"
+subgraph AgentCore["Agent Core"]
 G[agent.go]
 end
 A --> C
@@ -72,8 +72,8 @@ The DSL engine follows a layered architecture where user input flows through a p
 ```mermaid
 graph TD
 A[User Input] --> B{Input Type}
-B --> |DSL Command| C[DSL Analyzer]
-B --> |Natural Language| D[OrchestratorAnalyzer]
+B -->|DSL Command| C[DSL Analyzer]
+B -->|Natural Language| D[OrchestratorAnalyzer]
 C --> E[Tokenization]
 E --> F[Parsing to AST]
 F --> G[Execution Planning]
@@ -84,9 +84,9 @@ J --> K[Workflow Plan]
 G --> L[Execution Engine]
 K --> L
 L --> M{Execution Target}
-M --> |Local| N[Dagger Engine]
-M --> |Remote MCP| O[Remote MCP Engine]
-M --> |Other Agent| P[P2P A2A Protocol]
+M -->|Local| N[Dagger Engine]
+M -->|Remote MCP| O[Remote MCP Engine]
+M -->|Other Agent| P[P2P A2A Protocol]
 N --> Q[Containerized Execution]
 O --> R[HTTP/SSE Call]
 P --> S[P2P Message]
@@ -272,19 +272,19 @@ The engine handles failures at multiple levels:
 ```mermaid
 stateDiagram-v2
 [*] --> Idle
-Idle --> Processing : "DSL Received"
-Processing --> CacheCheck : "Parse & Validate"
-CacheCheck --> CacheHit : "Key Found & Valid"
-CacheCheck --> Execution : "Miss or Expired"
-Execution --> Success : "Tool Returns Result"
-Execution --> Failure : "Error Occurs"
-Failure --> ErrorHandling : "Handle Error"
-ErrorHandling --> PartialSuccess : "Continue Independent Tasks"
-ErrorHandling --> Abort : "Critical Failure"
-Success --> CacheStore : "Store Result"
-CacheStore --> Response : "Return Success"
+Idle --> Processing: DSL Received
+Processing --> CacheCheck: Parse & Validate
+CacheCheck --> CacheHit: Key Found & Valid
+CacheCheck --> Execution: Miss or Expired
+Execution --> Success: Tool Returns Result
+Execution --> Failure: Error Occurs
+Failure --> ErrorHandling: Handle Error
+ErrorHandling --> PartialSuccess: Continue Independent Tasks
+ErrorHandling --> Abort: Critical Failure
+Success --> CacheStore: Store Result
+CacheStore --> Response: Return Success
 PartialSuccess --> Response
-Abort --> Response : "Return Error"
+Abort --> Response: Return Error
 Response --> Idle
 ```
 

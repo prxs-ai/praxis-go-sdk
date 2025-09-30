@@ -33,9 +33,9 @@ C --> G[EventBus]
 H[HTTP Server] --> C
 H --> B
 end
-I[Remote Peer] < --> A
-J[Remote Peer] < --> A
-K[Remote Peer] < --> A
+I[Remote Peer] <--> A
+J[Remote Peer] <--> A
+K[Remote Peer] <--> A
 style A fill:#4B7BEC,stroke:#333
 style B fill:#5CB85C,stroke:#333
 style C fill:#F0AD4E,stroke:#333
@@ -196,14 +196,14 @@ The P2P bridge facilitates inter-agent data flow by connecting the libp2p networ
 ```mermaid
 classDiagram
 class P2PMCPBridge {
-+SendMessage(ctx: peerID, message)
++SendMessage(ctx, peerID, message)
 +ListPeers(ctx)
--Host : host
--MCPServer : mcpServer
--Logger : logger
+-host Host
+-mcpServer MCPServer
+-logger Logger
 }
 class P2PProtocolHandler {
-+InvokeTool(ctx: peerID, toolName: args)
++InvokeTool(ctx, peerID, toolName, args)
 +SetMCPBridge(bridge)
 +SetAgentCard(card)
 -handleToolStream(stream)
