@@ -15,16 +15,9 @@ import (
 )
 
 const (
-	// Time allowed to write a message to the peer.
-	writeWait = 10 * time.Second
-
-	// Time allowed to read the next pong message from the peer.
-	pongWait = 60 * time.Second
-
-	// Send pings to peer with this period. Must be less than pongWait.
-	pingPeriod = (pongWait * 9) / 10
-
-	// Maximum message size allowed from peer.
+	writeWait      = 10 * time.Second
+	pongWait       = 60 * time.Second
+	pingPeriod     = (pongWait * 9) / 10
 	maxMessageSize = 512000
 )
 
@@ -32,9 +25,7 @@ var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin: func(r *http.Request) bool {
-		// Allow connections from any origin for development
-		// TODO: Restrict in production
-		return true
+		return true // allow all origins for dev
 	},
 }
 
@@ -42,12 +33,9 @@ var upgrader = websocket.Upgrader{
 type MessageType string
 
 const (
-	// Client -> Server messages
 	MessageDSLCommand      MessageType = "DSL_COMMAND"
 	MessageExecuteWorkflow MessageType = "EXECUTE_WORKFLOW"
 	MessageChatMessage     MessageType = "CHAT_MESSAGE"
-
-	// Server -> Client messages (handled by EventBus)
 )
 
 // ClientMessage represents a message from the client
@@ -82,12 +70,13 @@ type WebSocketGateway struct {
 	orchestrator         WorkflowOrchestrator
 	logger               *logrus.Logger
 	port                 int
-	broadcastMu          sync.Mutex // Prevent concurrent message sending
+	broadcastMu          sync.Mutex
 }
 
 // WorkflowOrchestrator interface for workflow execution
 type WorkflowOrchestrator interface {
 	ExecuteWorkflow(ctx context.Context, workflowID string, nodes []interface{}, edges []interface{}) error
+	ExecuteWorkflowWithOptions(ctx context.Context, workflowID string, nodes []interface{}, edges []interface{}, opts *dsl.WorkflowOptions) error
 }
 
 // NewWebSocketGateway creates a new WebSocket gateway
@@ -107,18 +96,15 @@ func NewWebSocketGateway(port int, eventBus *bus.EventBus, dslAnalyzer *dsl.Anal
 		port:        port,
 	}
 
-	// Subscribe to all events from EventBus
 	eventBus.SubscribeAll(gateway.handleEvent)
 
 	return gateway
 }
 
-// SetOrchestrator sets the workflow orchestrator
 func (gw *WebSocketGateway) SetOrchestrator(orchestrator WorkflowOrchestrator) {
 	gw.orchestrator = orchestrator
 }
 
-// SetOrchestratorAnalyzer sets the orchestrator analyzer for complex DSL handling
 func (gw *WebSocketGateway) SetOrchestratorAnalyzer(analyzer *dsl.OrchestratorAnalyzer) {
 	gw.orchestratorAnalyzer = analyzer
 	if analyzer != nil {
@@ -128,21 +114,14 @@ func (gw *WebSocketGateway) SetOrchestratorAnalyzer(analyzer *dsl.OrchestratorAn
 	}
 }
 
-// Run starts the WebSocket gateway
 func (gw *WebSocketGateway) Run() error {
-	// Start hub
 	go gw.hub.run()
-
-	// Setup HTTP server
 	http.HandleFunc("/ws/workflow", gw.handleWebSocket)
-
 	addr := fmt.Sprintf(":%d", gw.port)
 	gw.logger.Infof("WebSocket Gateway starting on %s", addr)
-
 	return http.ListenAndServe(addr, nil)
 }
 
-// handleWebSocket handles WebSocket upgrade and client connection
 func (gw *WebSocketGateway) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -161,12 +140,10 @@ func (gw *WebSocketGateway) handleWebSocket(w http.ResponseWriter, r *http.Reque
 	gw.hub.register <- client
 	gw.logger.Infof("New WebSocket client connected: %s", clientID)
 
-	// Start goroutines for reading and writing
 	go client.writePump()
 	go gw.readPump(client)
 }
 
-// readPump pumps messages from the WebSocket connection to the hub
 func (gw *WebSocketGateway) readPump(client *Client) {
 	defer func() {
 		client.hub.unregister <- client
@@ -190,7 +167,6 @@ func (gw *WebSocketGateway) readPump(client *Client) {
 			break
 		}
 
-		// Parse and handle message
 		var msg ClientMessage
 		if err := json.Unmarshal(message, &msg); err != nil {
 			gw.logger.Errorf("Failed to parse WebSocket message: %v", err)
@@ -201,7 +177,6 @@ func (gw *WebSocketGateway) readPump(client *Client) {
 	}
 }
 
-// writePump pumps messages from the hub to the WebSocket connection
 func (c *Client) writePump() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
@@ -217,20 +192,15 @@ func (c *Client) writePump() {
 				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
-
-			// Send the current message
 			if err := c.conn.WriteMessage(websocket.TextMessage, message); err != nil {
 				return
 			}
-
-			// Send any additional queued messages separately
 			n := len(c.send)
 			for i := 0; i < n; i++ {
 				if err := c.conn.WriteMessage(websocket.TextMessage, <-c.send); err != nil {
 					return
 				}
 			}
-
 		case <-ticker.C:
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
@@ -240,7 +210,6 @@ func (c *Client) writePump() {
 	}
 }
 
-// hub.run handles client registration, unregistration and message broadcasting
 func (h *Hub) run() {
 	for {
 		select {
@@ -248,7 +217,6 @@ func (h *Hub) run() {
 			h.mu.Lock()
 			h.clients[client] = true
 			h.mu.Unlock()
-
 		case client := <-h.unregister:
 			h.mu.Lock()
 			if _, ok := h.clients[client]; ok {
@@ -256,7 +224,6 @@ func (h *Hub) run() {
 				close(client.send)
 			}
 			h.mu.Unlock()
-
 		case message := <-h.broadcast:
 			h.mu.RLock()
 			for client := range h.clients {
@@ -272,7 +239,6 @@ func (h *Hub) run() {
 	}
 }
 
-// handleClientMessage routes incoming messages to appropriate handlers
 func (gw *WebSocketGateway) handleClientMessage(client *Client, msg ClientMessage) {
 	gw.logger.Debugf("Received message type %s from client %s", msg.Type, client.clientID)
 
@@ -288,7 +254,6 @@ func (gw *WebSocketGateway) handleClientMessage(client *Client, msg ClientMessag
 	}
 }
 
-// handleDSLCommand processes DSL commands
 func (gw *WebSocketGateway) handleDSLCommand(client *Client, payload map[string]interface{}) {
 	command, ok := payload["command"].(string)
 	if !ok {
@@ -301,19 +266,15 @@ func (gw *WebSocketGateway) handleDSLCommand(client *Client, payload map[string]
 		workflowID = fmt.Sprintf("workflow-%d", time.Now().UnixNano())
 	}
 
-	// Use OrchestratorAnalyzer if available for better agent selection and UI feedback
 	ctx := context.Background()
 	var result interface{}
 	var err error
 
 	if gw.orchestratorAnalyzer != nil {
-		// Use orchestrator analyzer for complex workflows and agent selection
 		gw.logger.Info("Using OrchestratorAnalyzer for DSL command")
 		result, err = gw.orchestratorAnalyzer.AnalyzeWithOrchestration(ctx, command)
 	} else {
-		// Fall back to basic analyzer
 		gw.logger.Info("Using basic Analyzer for DSL command")
-		// Publish progress event
 		gw.eventBus.PublishDSLProgress("parsing", "Parsing DSL command...", map[string]interface{}{
 			"command": command,
 		})
@@ -332,10 +293,8 @@ func (gw *WebSocketGateway) handleDSLCommand(client *Client, payload map[string]
 		return
 	}
 
-	// Create workflow suggestion based on DSL analysis
 	workflowSuggestion := gw.createWorkflowFromDSL(result)
 
-	// Publish result
 	gw.eventBus.Publish(bus.Event{
 		Type: bus.EventDSLResult,
 		Payload: map[string]interface{}{
@@ -347,81 +306,7 @@ func (gw *WebSocketGateway) handleDSLCommand(client *Client, payload map[string]
 	})
 }
 
-// handleExecuteWorkflow processes workflow execution requests
 func (gw *WebSocketGateway) handleExecuteWorkflow(client *Client, payload map[string]interface{}) {
-	// First check if we have the full workflow object with an ID
-	if workflow, ok := payload["workflow"].(map[string]interface{}); ok {
-		if workflowID, ok := workflow["id"].(string); ok {
-			// This is a stored workflow - execute it
-			if gw.orchestratorAnalyzer != nil {
-				gw.logger.Infof("▶️ Executing stored workflow: %s", workflowID)
-
-				// Publish workflow start event
-				gw.eventBus.Publish(bus.Event{
-					Type: bus.EventWorkflowStart,
-					Payload: map[string]interface{}{
-						"workflowId": workflowID,
-					},
-				})
-
-				ctx := context.Background()
-				go func() {
-					result, err := gw.orchestratorAnalyzer.ExecuteStoredWorkflow(ctx, workflowID)
-					if err != nil {
-						gw.logger.Errorf("Workflow execution failed: %v", err)
-						gw.eventBus.PublishWorkflowError(workflowID, err.Error(), "")
-					} else {
-						gw.logger.Infof("✅ Workflow %s executed successfully", workflowID)
-
-						// Extract tool execution results for better frontend display
-						var message string
-						var toolResults []interface{}
-
-						if resultMap, ok := result.(map[string]interface{}); ok {
-							if results, ok := resultMap["results"].([]interface{}); ok && len(results) > 0 {
-								toolResults = results
-								// Extract the first tool result for the message
-								if firstResult, ok := results[0].(map[string]interface{}); ok {
-									if toolName, ok := firstResult["tool"].(string); ok {
-										if toolResult, ok := firstResult["result"].(string); ok {
-											// Try to parse tool result as JSON
-											var parsedResult map[string]interface{}
-											if err := json.Unmarshal([]byte(toolResult), &parsedResult); err == nil {
-												if msg, ok := parsedResult["message"].(string); ok {
-													message = msg
-												}
-											} else {
-												message = fmt.Sprintf("%s tool executed successfully", toolName)
-											}
-										} else {
-											message = fmt.Sprintf("%s tool executed successfully", toolName)
-										}
-									}
-								}
-							}
-						}
-
-						if message == "" {
-							message = "Workflow execution completed"
-						}
-
-						gw.eventBus.Publish(bus.Event{
-							Type: bus.EventWorkflowComplete,
-							Payload: map[string]interface{}{
-								"workflowId":  workflowID,
-								"result":      result,
-								"message":     message,
-								"toolResults": toolResults,
-							},
-						})
-					}
-				}()
-				return
-			}
-		}
-	}
-
-	// Fallback to old method with nodes and edges
 	workflowID, _ := payload["workflowId"].(string)
 	if workflowID == "" {
 		workflowID = fmt.Sprintf("workflow-%d", time.Now().UnixNano())
@@ -430,47 +315,58 @@ func (gw *WebSocketGateway) handleExecuteWorkflow(client *Client, payload map[st
 	nodes, _ := payload["nodes"].([]interface{})
 	edges, _ := payload["edges"].([]interface{})
 
+	params := map[string]interface{}{}
+	if p, ok := payload["params"].(map[string]interface{}); ok {
+		params = p
+	}
+
+	secrets := map[string]string{}
+	if s, ok := payload["secrets"].(map[string]interface{}); ok {
+		for k, v := range s {
+			if str, ok := v.(string); ok {
+				secrets[k] = str
+			}
+		}
+	}
+
 	if len(nodes) == 0 {
 		gw.sendError(client, "No nodes in workflow")
 		return
 	}
 
-	// Publish workflow start event
 	gw.eventBus.Publish(bus.Event{
 		Type: bus.EventWorkflowStart,
 		Payload: map[string]interface{}{
 			"workflowId": workflowID,
+			"params":     params,
+			"secrets":    maskSecrets(secrets),
 		},
 	})
 
-	// Execute workflow if orchestrator is available
 	if gw.orchestrator != nil {
 		ctx := context.Background()
 		go func() {
-			err := gw.orchestrator.ExecuteWorkflow(ctx, workflowID, nodes, edges)
+			opts := &dsl.WorkflowOptions{Params: params, Secrets: secrets}
+			err := gw.orchestrator.ExecuteWorkflowWithOptions(ctx, workflowID, nodes, edges, opts)
 			if err != nil {
 				gw.eventBus.PublishWorkflowError(workflowID, err.Error(), "")
 			}
 		}()
 	} else {
-		// Simulate workflow execution for testing
 		gw.simulateWorkflowExecution(workflowID, nodes, edges)
 	}
 }
 
-// handleChatMessage processes chat messages
 func (gw *WebSocketGateway) handleChatMessage(client *Client, payload map[string]interface{}) {
 	content, _ := payload["content"].(string)
 	gw.logger.Infof("📨 Received chat message: %s", content)
 
-	// Log orchestrator status
 	if gw.orchestratorAnalyzer == nil {
 		gw.logger.Warn("⚠️ OrchestratorAnalyzer is nil - cannot process message!")
 	} else {
 		gw.logger.Info("✅ OrchestratorAnalyzer is available")
 	}
 
-	// Echo back as assistant message
 	gw.eventBus.Publish(bus.Event{
 		Type: bus.EventChatMessage,
 		Payload: map[string]interface{}{
@@ -479,15 +375,11 @@ func (gw *WebSocketGateway) handleChatMessage(client *Client, payload map[string
 		},
 	})
 
-	// IMPORTANT: Process ALL messages as DSL commands with orchestrator
-	// Every chat message should go through the orchestrator for intelligent processing
 	if content != "" {
 		if gw.orchestratorAnalyzer != nil {
 			go func() {
 				ctx := context.Background()
 				gw.logger.Infof("🚀 Processing chat message with OrchestratorAnalyzer: %s", content)
-
-				// Use orchestrator analyzer for intelligent processing
 				result, err := gw.orchestratorAnalyzer.AnalyzeWithOrchestration(ctx, content)
 				if err != nil {
 					gw.logger.Errorf("❌ Failed to analyze DSL command: %v", err)
@@ -500,8 +392,6 @@ func (gw *WebSocketGateway) handleChatMessage(client *Client, payload map[string
 					})
 					return
 				}
-
-				// Send success message
 				gw.eventBus.Publish(bus.Event{
 					Type: bus.EventChatMessage,
 					Payload: map[string]interface{}{
@@ -509,17 +399,13 @@ func (gw *WebSocketGateway) handleChatMessage(client *Client, payload map[string
 						"sender":  "system",
 					},
 				})
-
-				// Log the result
 				gw.logger.Infof("✅ DSL command result: %v", result)
 			}()
 		} else if gw.dslAnalyzer != nil {
-			// Fallback to regular DSL analyzer if orchestrator not available
 			gw.logger.Warn("⚠️ Using fallback DSL analyzer (orchestrator not available)")
 			go func() {
 				ctx := context.Background()
 				gw.logger.Infof("Processing chat message with DSL analyzer: %s", content)
-
 				result, err := gw.dslAnalyzer.AnalyzeDSL(ctx, content)
 				if err != nil {
 					gw.logger.Errorf("Failed to analyze DSL: %v", err)
@@ -532,8 +418,6 @@ func (gw *WebSocketGateway) handleChatMessage(client *Client, payload map[string
 					})
 					return
 				}
-
-				// Send success message
 				gw.eventBus.Publish(bus.Event{
 					Type: bus.EventChatMessage,
 					Payload: map[string]interface{}{
@@ -546,13 +430,10 @@ func (gw *WebSocketGateway) handleChatMessage(client *Client, payload map[string
 	}
 }
 
-// handleEvent handles events from EventBus and broadcasts to clients
 func (gw *WebSocketGateway) handleEvent(event bus.Event) {
-	// Serialize access to prevent message batching
 	gw.broadcastMu.Lock()
 	defer gw.broadcastMu.Unlock()
 
-	// Convert event to WebSocket message format
 	wsMessage := map[string]interface{}{
 		"type":    string(event.Type),
 		"payload": event.Payload,
@@ -564,14 +445,10 @@ func (gw *WebSocketGateway) handleEvent(event bus.Event) {
 		return
 	}
 
-	// Broadcast to all connected clients
 	gw.hub.broadcast <- messageBytes
-
-	// Add small delay to ensure message is processed before next one
 	time.Sleep(20 * time.Millisecond)
 }
 
-// sendError sends an error message to a specific client
 func (gw *WebSocketGateway) sendError(client *Client, message string) {
 	errorMsg := map[string]interface{}{
 		"type": "error",
@@ -579,59 +456,37 @@ func (gw *WebSocketGateway) sendError(client *Client, message string) {
 			"message": message,
 		},
 	}
-
 	msgBytes, _ := json.Marshal(errorMsg)
 	client.send <- msgBytes
 }
 
-// createWorkflowFromDSL creates a workflow suggestion from DSL analysis
 func (gw *WebSocketGateway) createWorkflowFromDSL(result interface{}) map[string]interface{} {
-	// This is a simplified implementation
-	// In reality, this would parse the DSL result and create appropriate nodes/edges
-
 	nodes := []map[string]interface{}{
 		{
-			"id":   "orchestrator",
-			"type": "orchestrator",
-			"position": map[string]int{
-				"x": 100,
-				"y": 100,
-			},
+			"id":       "orchestrator",
+			"type":     "orchestrator",
+			"position": map[string]int{"x": 100, "y": 100},
 			"data": map[string]interface{}{
 				"label": "Workflow Orchestrator",
 				"type":  "orchestrator",
 			},
 		},
 		{
-			"id":   "executor",
-			"type": "executor",
-			"position": map[string]int{
-				"x": 400,
-				"y": 100,
-			},
+			"id":       "executor",
+			"type":     "executor",
+			"position": map[string]int{"x": 400, "y": 100},
 			"data": map[string]interface{}{
 				"label": "P2P Executor",
 				"type":  "executor",
 			},
 		},
 	}
-
 	edges := []map[string]interface{}{
-		{
-			"id":     "e1",
-			"source": "orchestrator",
-			"target": "executor",
-			"type":   "custom",
-		},
+		{"id": "e1", "source": "orchestrator", "target": "executor", "type": "custom"},
 	}
-
-	return map[string]interface{}{
-		"nodes": nodes,
-		"edges": edges,
-	}
+	return map[string]interface{}{"nodes": nodes, "edges": edges}
 }
 
-// simulateWorkflowExecution simulates workflow execution for testing
 func (gw *WebSocketGateway) simulateWorkflowExecution(workflowID string, nodes []interface{}, edges []interface{}) {
 	go func() {
 		for i, node := range nodes {
@@ -639,33 +494,25 @@ func (gw *WebSocketGateway) simulateWorkflowExecution(workflowID string, nodes [
 			if !ok {
 				continue
 			}
-
 			nodeID, _ := nodeMap["id"].(string)
-
-			// Update status to running
 			gw.eventBus.PublishNodeStatusUpdate(workflowID, nodeID, "running")
-
-			// Simulate processing
 			time.Sleep(2 * time.Second)
-
-			// Send log
-			gw.eventBus.PublishWorkflowLog(
-				workflowID,
-				"info",
+			gw.eventBus.PublishWorkflowLog(workflowID, "info",
 				fmt.Sprintf("Processing node %d of %d", i+1, len(nodes)),
-				"simulator",
-				nodeID,
-			)
-
-			// Update status to success
+				"simulator", nodeID)
 			gw.eventBus.PublishNodeStatusUpdate(workflowID, nodeID, "success")
-
 			time.Sleep(1 * time.Second)
 		}
-
-		// Complete workflow
 		gw.eventBus.PublishWorkflowComplete(workflowID, map[string]interface{}{
 			"message": "Workflow completed successfully",
 		})
 	}()
+}
+
+func maskSecrets(secrets map[string]string) map[string]string {
+	masked := make(map[string]string, len(secrets))
+	for k := range secrets {
+		masked[k] = "***"
+	}
+	return masked
 }
