@@ -52,10 +52,10 @@ participant Service as ToolDiscoveryService
 participant MockServer as Mock MCP Server
 Test->>Service : DiscoverToolsFromServer(ctx, url)
 Service->>MockServer : POST /mcp
-MockServer->>Service : {"method" : "initialize", ...}
+MockServer-->>Service : {"method" : "initialize", ...}
 Service->>MockServer : POST /mcp
-MockServer->>Service : {"method" : "tools/list", ...}
-Service->>Test : []DiscoveredTool
+MockServer-->>Service : {"method" : "tools/list", ...}
+Service-->>Test : []DiscoveredTool
 ```
 
 **Diagram sources**
@@ -237,17 +237,17 @@ It uses temporary files (e.g., `/tmp/current_task_id`) to share state between te
 ```mermaid
 classDiagram
 class TestFixture {
-+int : MCP_PID
-+string : AGENT1_URL
-+string : AGENT2_URL
-+string : List<TEST_RESULTS>
++MCP_PID : int
++AGENT1_URL : string
++AGENT2_URL : string
++TEST_RESULTS : List~string~
 +print_test(name)
 +print_success(msg)
 +print_error(msg)
-+wait_for_service(url: name, timeout)
++wait_for_service(url, name, timeout)
 }
 class MockServer {
-+createMockMCPServer(t: T, name: string, toolNames: List<string>) : Server
++createMockMCPServer(t, name, toolNames) : Server
 }
 TestFixture --> MockServer : uses
 ```

@@ -23,48 +23,48 @@ The P2P Networking service enables agent discovery and direct communication usin
 ```mermaid
 classDiagram
 class Discovery {
-+Host : host
-+PeerInfo~ : foundPeers Map~PeerID
-+[]PeerHandler : peerHandlers
-+P2PProtocolHandler : protocolHandler
-+Start() : error
-+Stop() : error
++Host: host
++foundPeers: Map~PeerID, PeerInfo~
++peerHandlers: List~PeerHandler~
++protocolHandler: P2PProtocolHandler
++Start(): error
++Stop(): error
 +HandlePeerFound(pi: AddrInfo)
-+GetConnectedPeers() : List<PeerInfo>
++GetConnectedPeers(): List~PeerInfo~
 }
 class PeerInfo {
-+PeerID : ID
-+[]Multiaddr : Addrs
-+Time : FoundAt
-+Time : LastSeen
-+AgentCard : AgentCard
-+bool : IsConnected
++PeerID: ID
++Addrs: List~Multiaddr~
++FoundAt: Time
++LastSeen: Time
++AgentCard: AgentCard
++IsConnected: bool
 }
 class P2PProtocolHandler {
-+Host : host
-+AgentCard~ : peerCards Map~PeerID
-+AgentCard : ourCard
++host: host
++peerCards: Map~PeerID, AgentCard~
++ourCard: AgentCard
 +SetMCPBridge(bridge: P2PMCPBridge)
-+RequestCard(ctx: Context, peerID: PeerID) : (AgentCard, error)
-+InvokeTool(ctx: Context, peerID: PeerID, toolName: string, args: Map~string, interface~) : (ToolResponse, error)
++RequestCard(ctx: Context, peerID: PeerID): AgentCard
++InvokeTool(ctx: Context, peerID: PeerID, toolName: string, args: Map~string, interface~): ToolResponse
 }
 class AgentCard {
-+string : Name
-+string : Version
-+string : PeerID
-+[]string : Capabilities
-+[]ToolSpec : Tools
-+int64 : Timestamp
++Name: string
++Version: string
++PeerID: string
++Capabilities: List~string~
++Tools: List~ToolSpec~
++Timestamp: int64
 }
 class ToolSpec {
-+string : Name
-+string : Description
-+[]ToolParameter : Parameters
++Name: string
++Description: string
++Parameters: List~ToolParameter~
 }
-Discovery --> PeerInfo : "maintains"
-P2PProtocolHandler --> AgentCard : "exchanges"
-P2PProtocolHandler --> ToolSpec : "uses"
-Discovery --> P2PProtocolHandler : "connects for card exchange"
+Discovery --> PeerInfo: "maintains"
+P2PProtocolHandler --> AgentCard: "exchanges"
+P2PProtocolHandler --> ToolSpec: "uses"
+Discovery --> P2PProtocolHandler: "connects for card exchange"
 ```
 
 **Diagram sources**
@@ -85,20 +85,20 @@ The MCP (Modular Capability Protocol) service enables standardized tool sharing 
 
 ```mermaid
 sequenceDiagram
-participant AgentA as "Agent A"
-participant MCP as "MCP Server"
-participant Bridge as "P2P Bridge"
-participant AgentB as "Agent B"
-AgentA->>MCP : Register Tool (name, spec, handler)
-MCP->>AgentA : Confirmation
-AgentA->>Bridge : Advertise Capability
-Bridge->>AgentB : Broadcast via P2P
-AgentB->>AgentA : Request AgentCard
-AgentA->>AgentB : Send AgentCard (with tools)
-AgentB->>AgentA : InvokeTool("tool_name", args)
-AgentA->>MCP : Execute Tool via Handler
-MCP->>AgentA : Return Result
-AgentA->>AgentB : Send ToolResponse
+participant AgentA as Agent A
+participant MCP as MCP Server
+participant Bridge as P2P Bridge
+participant AgentB as Agent B
+AgentA->>MCP: Register Tool (name, spec, handler)
+MCP->>AgentA: Confirmation
+AgentA->>Bridge: Advertise Capability
+Bridge->>AgentB: Broadcast via P2P
+AgentB->>AgentA: Request AgentCard
+AgentA->>AgentB: Send AgentCard (with tools)
+AgentB->>AgentA: InvokeTool("tool_name", args)
+AgentA->>MCP: Execute Tool via Handler
+MCP->>AgentA: Return Result
+AgentA->>AgentB: Send ToolResponse
 ```
 
 **Diagram sources**
@@ -122,20 +122,20 @@ Execution Engines provide the runtime environment for executing tasks securely a
 classDiagram
 class ExecutionEngine {
 <<interface>>
-+Execute(ctx: Context, contract: ToolContract, args: Map~string, interface~) : (string, error)
++Execute(ctx: Context, contract: ToolContract, args: Map~string, interface~): string
 }
 class ToolContract {
-+string : Engine
-+string : Name
-+interface{}~ : EngineSpec Map~string
++Engine: string
++Name: string
++EngineSpec: Map~string, interface~
 }
 class RemoteMCPEngine {
-+TransportManager : transportManager
-+Execute(ctx: Context, contract: ToolContract, args: Map~string, interface~) : (string, error)
++transportManager: TransportManager
++Execute(ctx: Context, contract: ToolContract, args: Map~string, interface~): string
 }
 class DaggerEngine {
-+*dagger.Client : client
-+Execute(ctx: Context, contract: ToolContract, args: Map~string, interface~) : (string, error)
++client: dagger.Client
++Execute(ctx: Context, contract: ToolContract, args: Map~string, interface~): string
 }
 ExecutionEngine <|.. RemoteMCPEngine
 ExecutionEngine <|.. DaggerEngine
@@ -166,11 +166,11 @@ DSL Processing enables the interpretation of natural language commands into exec
 
 ```mermaid
 flowchart TD
-Start([DSL Input]) --> Tokenize["Tokenize Input<br/>Respects quoted strings"]
+Start(["DSL Input"]) --> Tokenize["Tokenize Input<br/>Respects quoted strings"]
 Tokenize --> Parse["Parse Tokens into AST"]
 Parse --> Execute["Execute AST Nodes"]
-subgraph LLM Orchestration
-LLMStart([Natural Language]) --> NetworkContext["Build Network Context<br/>(Agents & Tools)"]
+subgraph "LLM Orchestration"
+LLMStart(["Natural Language"]) --> NetworkContext["Build Network Context<br/>(Agents & Tools)"]
 NetworkContext --> GeneratePlan["Generate Workflow Plan<br/>via LLM"]
 GeneratePlan --> ValidatePlan["Validate Plan<br/>Against Capabilities"]
 ValidatePlan --> ConvertAST["Convert to AST & Workflow"]
@@ -199,23 +199,23 @@ The core services work together to enable distributed AI workflows, from initial
 ```mermaid
 graph TB
 subgraph User
-UI[User Interface]
+UI["User Interface"]
 end
 subgraph AgentA
-WSG[WebSocket Gateway]
-DSL[DSL Processor]
-MCP[MCP Server]
-P2P[P2P Layer]
-EE[Execution Engines]
+WSG["WebSocket Gateway"]
+DSL["DSL Processor"]
+MCP["MCP Server"]
+P2P["P2P Layer"]
+EE["Execution Engines"]
 end
 subgraph AgentB
-P2P_B[P2P Layer]
-MCP_B[MCP Server]
+P2P_B["P2P Layer"]
+MCP_B["MCP Server"]
 end
 UI --> WSG
 WSG --> DSL
 DSL --> |Execute| EE
-EE --> |Local| Dagger[Dagger Engine]
+EE --> |Local| Dagger["Dagger Engine"]
 EE --> |Remote| P2P
 P2P --> |InvokeTool| P2P_B
 P2P_B --> |Execute| MCP_B
@@ -225,7 +225,7 @@ P2P --> |Result| EE
 EE --> |Result| DSL
 DSL --> |Result| WSG
 WSG --> |Stream| UI
-P2P < --> |Discover| P2P_B
+P2P <--> |Discover| P2P_B
 P2P --> |Exchange Cards| P2P_B
 ```
 

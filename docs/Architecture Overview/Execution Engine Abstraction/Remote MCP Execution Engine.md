@@ -31,50 +31,50 @@ The Remote MCP Execution Engine follows a modular architecture centered around t
 ```mermaid
 classDiagram
 class RemoteMCPEngine {
-+*TransportManager : transportManager
-+Execute(ctx: contract, args) : (string, error)
++transportManager *TransportManager
++Execute(ctx, contract, args) string, error
 }
 class TransportManager {
-+map[string]*MCPClientWrapper : clients
-+*ClientFactory : factory
-+RegisterSSEEndpoint(name: url, headers)
-+RegisterHTTPEndpoint(name: url, headers)
-+RegisterSTDIOEndpoint(name: command, args)
-+CallRemoteTool(ctx: clientName, toolName: args) : (CallToolResult, error)
-+GetClient(name) : (MCPClientWrapper, error)
++clients map~string MCPClientWrapper~
++factory *ClientFactory
++RegisterSSEEndpoint(name, url, headers)
++RegisterHTTPEndpoint(name, url, headers)
++RegisterSTDIOEndpoint(name, command, args)
++CallRemoteTool(ctx, clientName, toolName, args) CallToolResult, error
++GetClient(name) MCPClientWrapper, error
 +Close()
 }
 class MCPClientWrapper {
-+*client.Client : client
-+ClientType : clientType
-+*InitializeResult : serverInfo
-+*logrus.Logger : logger
-+context.Context : ctx
-+bool : initialized
-+Initialize(ctx) : error
-+CallTool(ctx: name, args) : (CallToolResult, error)
-+Close() : error
++client *client.Client
++clientType ClientType
++serverInfo *InitializeResult
++logger *logrus.Logger
++ctx context.Context
++initialized bool
++Initialize(ctx) error
++CallTool(ctx, name, args) CallToolResult, error
++Close() error
 }
 class ClientFactory {
-+map[string]ClientConfig : configs
-+map[string]*MCPClientWrapper : clients
-+RegisterConfig(name: config)
-+GetOrCreateClient(name) : (MCPClientWrapper, error)
++configs map~string ClientConfig~
++clients map~string MCPClientWrapper~
++RegisterConfig(name, config)
++GetOrCreateClient(name) MCPClientWrapper, error
 +CloseAll()
 }
 class ClientConfig {
-+ClientType : Type
-+string : Address
-+string : Command
-+[]string : Args
-+map[string]string : Headers
-+*logrus.Logger : Logger
++Type ClientType
++Address string
++Command string
++Args []string
++Headers map~string string~
++Logger *logrus.Logger
 }
-RemoteMCPEngine --> TransportManager : "uses"
-TransportManager --> ClientFactory : "delegates"
-ClientFactory --> ClientConfig : "stores"
-ClientFactory --> MCPClientWrapper : "creates/manages"
-TransportManager --> MCPClientWrapper : "retrieves"
+RemoteMCPEngine --> TransportManager : uses
+TransportManager --> ClientFactory : delegates
+ClientFactory --> ClientConfig : stores
+ClientFactory --> MCPClientWrapper : creates/manages
+TransportManager --> MCPClientWrapper : retrieves
 ```
 
 **Diagram sources**
@@ -92,34 +92,34 @@ The execution flow begins when a tool call is made through the `Execute` method 
 
 ```mermaid
 sequenceDiagram
-participant Client as "Agent Application"
-participant Engine as "RemoteMCPEngine"
-participant TM as "TransportManager"
-participant CF as "ClientFactory"
-participant ClientWrapper as "MCPClientWrapper"
-participant Server as "Remote MCP Server"
-Client->>Engine : Execute(contract, args)
-Engine->>Engine : Validate contract.EngineSpec.address
+participant Client as Agent Application
+participant Engine as RemoteMCPEngine
+participant TM as TransportManager
+participant CF as ClientFactory
+participant ClientWrapper as MCPClientWrapper
+participant Server as Remote MCP Server
+Client->>Engine: Execute(contract, args)
+Engine->>Engine: Validate contract.EngineSpec.address
 alt Address missing
-Engine-->>Client : Error : missing address
+Engine-->>Client: Error: missing address
 else Valid address
-Engine->>TM : RegisterSSEEndpoint(clientName, address)
-TM->>CF : GetOrCreateClient(clientName)
+Engine->>TM: RegisterSSEEndpoint(clientName, address)
+TM->>CF: GetOrCreateClient(clientName)
 alt Client not exists
-CF->>CF : Create ClientConfig
-CF->>ClientWrapper : NewMCPClient(config)
-ClientWrapper->>ClientWrapper : Initialize()
-CF-->>TM : Return new client
+CF->>CF: Create ClientConfig
+CF->>ClientWrapper: NewMCPClient(config)
+ClientWrapper->>ClientWrapper: Initialize()
+CF-->>TM: Return new client
 else Client exists
-CF-->>TM : Return existing client
+CF-->>TM: Return existing client
 end
-TM->>ClientWrapper : CallTool(ctx, toolName, args)
-ClientWrapper->>Server : HTTP/SSE Request (JSON-RPC)
-Server-->>ClientWrapper : Streamed Response
-ClientWrapper-->>TM : Return CallToolResult
-TM-->>Engine : Return result
-Engine->>Engine : Extract text from result.Content
-Engine-->>Client : Return text output
+TM->>ClientWrapper: CallTool(ctx, toolName, args)
+ClientWrapper->>Server: HTTP/SSE Request (JSON-RPC)
+Server-->>ClientWrapper: Streamed Response
+ClientWrapper-->>TM: Return CallToolResult
+TM-->>Engine: Return result
+Engine->>Engine: Extract text from result.Content
+Engine-->>Client: Return text output
 end
 ```
 

@@ -53,12 +53,13 @@ The system uses `ToolContract` structures to map Go function signatures to JSON-
 ```mermaid
 classDiagram
 class ToolContract {
-+string : Engine
-+string : Name
-+map[string]interface{} : EngineSpec
++string Engine
++string Name
++map~string,interface~ EngineSpec
 }
 class ExecutionEngine {
-+Execute(ctx: Context, contract: ToolContract, args: Map<string, interface>) : (string, error)
+<<interface>>
++Execute(ctx Context, contract ToolContract, args map~string,interface~) string, error
 }
 ToolContract --> ExecutionEngine : "executed by"
 ```

@@ -110,14 +110,14 @@ After tokenization, the system parses the tokens into an Abstract Syntax Tree (A
 ```mermaid
 classDiagram
 class AST {
-+Nodes : List<ASTNode>
++Nodes List~ASTNode~
 }
 class ASTNode {
-+Type : NodeType
-+Value : string
-+ToolName : string
-+Args : Map<string, interface>
-+Children : List<ASTNode>
++Type NodeType
++Value string
++ToolName string
++Args Map~string interface~
++Children List~ASTNode~
 }
 class NodeType {
 +NodeTypeCommand
@@ -129,7 +129,7 @@ class NodeType {
 +NodeTypeSequence
 }
 AST "1" *-- "0..*" ASTNode
-ASTNode --> NodeType : "has type"
+ASTNode --> NodeType: has type
 ```
 
 **Diagram sources**
@@ -409,10 +409,10 @@ The system also handles output mapping between chained operations, allowing the 
 
 ```mermaid
 flowchart LR
-A[Task 1: read_file] --> |output: file_content| B[Task 2: analyze_content]
-B --> |output: analysis_results| C[Task 3: write_report]
-C --> |output: report_file| D[Task 4: summarize_report]
-subgraph Data Flow
+A[Task 1: read_file] -->|output: file_content| B[Task 2: analyze_content]
+B -->|output: analysis_results| C[Task 3: write_report]
+C -->|output: report_file| D[Task 4: summarize_report]
+subgraph DataFlow["Data Flow"]
 A_Output["file_content: string"]
 B_Input["content: file_content"]
 B_Output["analysis_results: object"]
@@ -524,13 +524,13 @@ func (t *LLMWorkflowTool) GenerateWorkflowHandler(ctx context.Context, req mcpTy
 
 ```mermaid
 flowchart TD
-Request([Natural Language Request]) --> Context["Build Network Context"]
-Context --> LLM["Generate Workflow Plan"]
-LLM --> Validation["Validate Plan"]
-Validation --> |Valid| DSL["Convert to DSL Commands"]
-Validation --> |Invalid| Error["Return Error"]
-DSL --> Execution["Execute Workflow"]
-Execution --> Results["Return Results"]
+Request([Natural Language Request]) --> Context[Build Network Context]
+Context --> LLM[Generate Workflow Plan]
+LLM --> Validation[Validate Plan]
+Validation -->|Valid| DSL[Convert to DSL Commands]
+Validation -->|Invalid| Error[Return Error]
+DSL --> Execution[Execute Workflow]
+Execution --> Results[Return Results]
 ```
 
 **Diagram sources**
@@ -674,13 +674,13 @@ func (tm *TaskManager) UpdateTaskStatus(id, state string, agentMessage *Message)
 ```mermaid
 stateDiagram-v2
 [*] --> Submitted
-Submitted --> Working : Execute
-Working --> Completed : Success
-Working --> Failed : Error
-Failed --> Working : Retry
-Failed --> Degraded : Fallback
-Working --> InputRequired : User Input
-InputRequired --> Working : Resume
+Submitted --> Working: Execute
+Working --> Completed: Success
+Working --> Failed: Error
+Failed --> Working: Retry
+Failed --> Degraded: Fallback
+Working --> InputRequired: User Input
+InputRequired --> Working: Resume
 Completed --> [*]
 Degraded --> [*]
 ```

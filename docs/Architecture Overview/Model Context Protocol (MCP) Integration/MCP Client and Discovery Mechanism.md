@@ -299,19 +299,19 @@ The P2P bridge implements standard MCP methods (`tools/list`, `tools/call`, `res
 
 ```mermaid
 graph TD
-A[Local Agent] -- mDNS --> B[Peer Discovery]
-B --> C[Connect via libp2p]
-C --> D[Exchange Agent Cards]
-D --> E[Discover Tools]
-E --> F[Call Remote Tools]
-F --> G[P2P Bridge]
-G --> H[libp2p Transport]
-H --> I[Remote Agent]
-I --> J[MCP Server]
-J --> K[Execute Tool]
-K --> L[Return Result]
-L --> M[P2P Bridge]
-M --> N[Local Agent]
+A["Local Agent"] -->|mDNS| B["Peer Discovery"]
+B --> C["Connect via libp2p"]
+C --> D["Exchange Agent Cards"]
+D --> E["Discover Tools"]
+E --> F["Call Remote Tools"]
+F --> G["P2P Bridge"]
+G --> H["libp2p Transport"]
+H --> I["Remote Agent"]
+I --> J["MCP Server"]
+J --> K["Execute Tool"]
+K --> L["Return Result"]
+L --> M["P2P Bridge"]
+M --> N["Local Agent"]
 ```
 
 **Diagram sources**

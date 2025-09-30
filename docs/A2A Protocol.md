@@ -33,20 +33,20 @@ The A2A protocol implementation is organized across several key directories with
 ```mermaid
 graph TD
 subgraph "A2A Core"
-A2A_Types[types.go]
-A2A_TaskManager[task_manager.go]
+A2A_Types["types.go"]
+A2A_TaskManager["task_manager.go"]
 end
 subgraph "Agent Layer"
-Agent_Main[agent.go]
-Agent_Card[Agent Card]
+Agent_Main["agent.go"]
+Agent_Card["Agent Card"]
 end
 subgraph "Communication"
-P2P[p2p/]
-MCP[mcp/]
+P2P["p2p/"]
+MCP["mcp/"]
 end
 subgraph "Testing"
-Test_Script[test_a2a_full_docker.sh]
-E2E_Test[dagger_e2e_test.go]
+Test_Script["test_a2a_full_docker.sh"]
+E2E_Test["dagger_e2e_test.go"]
 end
 A2A_Types --> Agent_Main
 A2A_TaskManager --> Agent_Main
@@ -122,14 +122,14 @@ The A2A architecture integrates multiple layers to enable seamless agent communi
 
 ```mermaid
 graph TD
-Client[External Client] --> |JSON-RPC| Agent1[Praxis Agent 1]
-Agent2[Praxis Agent 2] --> |P2P| Agent1
-Agent1 --> TaskManager[A2A TaskManager]
-TaskManager --> EventBus[EventBus]
-Agent1 --> MCP[MCP Server]
-MCP --> Tools[Dagger, Remote MCP, etc.]
-Agent1 --> P2PDiscovery[P2P Discovery]
-P2PDiscovery --> AgentCards[Agent Cards]
+Client["External Client"] --> |JSON-RPC| Agent1["Praxis Agent 1"]
+Agent2["Praxis Agent 2"] --> |P2P| Agent1
+Agent1 --> TaskManager["A2A TaskManager"]
+TaskManager --> EventBus["EventBus"]
+Agent1 --> MCP["MCP Server"]
+MCP --> Tools["Dagger, Remote MCP, etc."]
+Agent1 --> P2PDiscovery["P2P Discovery"]
+P2PDiscovery --> AgentCards["Agent Cards"]
 AgentCards --> Agent2
 style TaskManager fill:#f9f,stroke:#333
 style EventBus fill:#bbf,stroke:#333
@@ -239,13 +239,13 @@ The A2A protocol depends on several internal components:
 
 ```mermaid
 graph TD
-A2A[internal/a2a] --> EventBus[internal/bus]
-A2A --> Logger[internal/logger]
-Agent[internal/agent] --> A2A
-Agent --> MCP[internal/mcp]
-Agent --> P2P[internal/p2p]
-MCP --> Contracts[internal/contracts]
-P2P --> LibP2P[github.com/libp2p/go-libp2p]
+A2A["internal/a2a"] --> EventBus["internal/bus"]
+A2A --> Logger["internal/logger"]
+Agent["internal/agent"] --> A2A
+Agent --> MCP["internal/mcp"]
+Agent --> P2P["internal/p2p"]
+MCP --> Contracts["internal/contracts"]
+P2P --> LibP2P["github.com/libp2p/go-libp2p"]
 ```
 
 Key dependencies:

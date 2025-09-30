@@ -54,12 +54,12 @@ FS[Filesystem Tools]
 MCP2[MCP Server]
 EB2[Event Bus]
 end
-UI < --> WSG
+UI <--> WSG
 HTTP --> DSL
 DSL --> LLM
 DSL --> MCP1
-P2P1 < --> P2P2
-MCP1 < --> MCP2
+P2P1 <--> P2P2
+MCP1 <--> MCP2
 WSG --> EB1
 EB1 --> WSG
 EB2 --> WSG
@@ -246,22 +246,22 @@ The `TaskManager` handles the lifecycle of agent-to-agent (A2A) tasks, including
 ```mermaid
 classDiagram
 class TaskManager {
-+tasks : Map<string, Task>
++tasks : Map~string, Task~
 +eventBus : EventBus
 +logger : Logger
 +CreateTask(Message) : Task
-+GetTask(string) : (Task, bool)
-+UpdateTaskStatus(string: string, Message)
-+AddArtifactToTask(string: Artifact)
-+AddMessageToHistory(string: Message)
-+ListTasks() : Map<string, Task>
++GetTask(string) : Task, bool
++UpdateTaskStatus(string, string, Message)
++AddArtifactToTask(string, Artifact)
++AddMessageToHistory(string, Message)
++ListTasks() : Map~string, Task~
 }
 class Task {
 +ID : string
 +ContextID : string
 +Status : TaskStatus
-+History : List<Message>
-+Artifacts : List<Artifact>
++History : List~Message~
++Artifacts : List~Artifact~
 +Kind : string
 }
 class TaskStatus {
@@ -285,11 +285,13 @@ class Artifact {
 +Description : string
 +Timestamp : string
 }
-TaskManager --> Task : "manages"
-Task --> TaskStatus : "has"
-Task --> Message : "contains"
-Task --> Artifact : "produces"
-TaskManager --> bus.EventBus : "publishes events"
+class EventBus {
+}
+TaskManager --> Task : manages
+Task --> TaskStatus : has
+Task --> Message : contains
+Task --> Artifact : produces
+TaskManager --> EventBus : publishes events
 ```
 
 **Diagram sources**

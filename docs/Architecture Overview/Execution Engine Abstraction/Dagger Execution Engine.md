@@ -21,16 +21,16 @@ The project follows a modular architecture with clear separation of concerns. Th
 
 ```mermaid
 graph TD
-subgraph "Execution Engine"
+subgraph Execution_Engine["Execution Engine"]
 DE[DaggerEngine]
 RE[RemoteMCPEngine]
 end
-subgraph "Agent Core"
+subgraph Agent_Core["Agent Core"]
 AG[PraxisAgent]
 DS[DSL Analyzer]
 MC[MCP Server]
 end
-subgraph "Contracts & Interfaces"
+subgraph Contracts_Interfaces["Contracts & Interfaces"]
 CT[ToolContract]
 EE[ExecutionEngine]
 end
@@ -84,19 +84,19 @@ The Dagger execution engine integrates with the Praxis agent system through a we
 
 ```mermaid
 graph TB
-subgraph "Client Request"
+subgraph Client_Request["Client Request"]
 User[User/Application]
 end
-subgraph "Agent System"
+subgraph Agent_System["Agent System"]
 MCP[MCP Server]
 DSL[DSL Orchestrator]
 AG[PraxisAgent]
 end
-subgraph "Execution Engines"
+subgraph Execution_Engines["Execution Engines"]
 DE[DaggerEngine]
 RE[RemoteMCPEngine]
 end
-subgraph "Execution Environment"
+subgraph Execution_Environment["Execution Environment"]
 Dagger[Dagger.io]
 Container[Container Runtime]
 end
@@ -126,14 +126,14 @@ The `DaggerEngine` struct provides secure, containerized tool execution by imple
 ```mermaid
 classDiagram
 class DaggerEngine {
-+*dagger.Client : client
-+NewEngine(ctx: Context) : (DaggerEngine, error)
++client *dagger.Client
++NewEngine(ctx Context) DaggerEngine, error
 +Close()
-+Execute(ctx: Context, contract: ToolContract, args: Map<string, interface>) : (string, error)
++Execute(ctx Context, contract ToolContract, args Map~string interface~) string, error
 }
 class ExecutionEngine {
 <<interface>>
-+Execute(ctx: Context, contract: ToolContract, args: Map<string, interface>) : (string, error)
++Execute(ctx Context, contract ToolContract, args Map~string interface~) string, error
 }
 DaggerEngine ..|> ExecutionEngine : implements
 ```
@@ -151,40 +151,40 @@ The lifecycle of a tool execution request in the Dagger engine follows a well-de
 #### Sequence Diagram
 ```mermaid
 sequenceDiagram
-participant Client as "Client"
-participant Agent as "PraxisAgent"
-participant Engine as "DaggerEngine"
-participant Dagger as "Dagger.io"
-participant Container as "Container"
-Client->>Agent : Execute Tool Request
-Agent->>Engine : Execute(contract, args)
-Engine->>Engine : Validate contract.EngineSpec
-Engine->>Engine : Extract image, command, mounts
-Engine->>Dagger : Connect to Dagger client
-Dagger-->>Engine : Client connection
-Engine->>Engine : Create container from image
+participant Client as Client
+participant Agent as PraxisAgent
+participant Engine as DaggerEngine
+participant Dagger as Dagger.io
+participant Container as Container
+Client->>Agent: Execute Tool Request
+Agent->>Engine: Execute(contract, args)
+Engine->>Engine: Validate contract.EngineSpec
+Engine->>Engine: Extract image, command, mounts
+Engine->>Dagger: Connect to Dagger client
+Dagger-->>Engine: Client connection
+Engine->>Engine: Create container from image
 loop For each mount
-Engine->>Engine : Resolve host path
-Engine->>Engine : Validate directory exists
-Engine->>Dagger : Mount host directory
+Engine->>Engine: Resolve host path
+Engine->>Engine: Validate directory exists
+Engine->>Dagger: Mount host directory
 end
 loop For each env variable
-Engine->>Dagger : Set environment variable
+Engine->>Dagger: Set environment variable
 end
 loop For each argument
-Engine->>Dagger : Set argument as env variable
+Engine->>Dagger: Set argument as env variable
 end
-Engine->>Dagger : Add cache-busting timestamp
-Engine->>Dagger : Execute command in container
-Dagger->>Container : Run command
-Container-->>Dagger : Return stdout/stderr
-Dagger-->>Engine : Execution result
+Engine->>Dagger: Add cache-busting timestamp
+Engine->>Dagger: Execute command in container
+Dagger->>Container: Run command
+Container-->>Dagger: Return stdout/stderr
+Dagger-->>Engine: Execution result
 loop Export modified directories
-Engine->>Dagger : Export directory to host
-Dagger-->>Engine : Export status
+Engine->>Dagger: Export directory to host
+Dagger-->>Engine: Export status
 end
-Engine-->>Agent : Return execution result
-Agent-->>Client : Return result
+Engine-->>Agent: Return execution result
+Agent-->>Client: Return result
 ```
 
 **Diagram sources**
@@ -202,25 +202,25 @@ The Dagger engine supports various configuration parameters that control the exe
 flowchart TD
 Start([Start Execution]) --> ValidateContract["Validate ToolContract"]
 ValidateContract --> ImageValid{"Image specified?"}
-ImageValid --> |No| ReturnError["Return validation error"]
-ImageValid --> |Yes| CreateContainer["Create container from image"]
+ImageValid -->|No| ReturnError["Return validation error"]
+ImageValid -->|Yes| CreateContainer["Create container from image"]
 CreateContainer --> ProcessMounts["Process mount points"]
 ProcessMounts --> ValidatePaths["Validate host paths exist"]
-ValidatePaths --> |Invalid| ReturnError
-ValidatePaths --> |Valid| MountDirectories["Mount directories to container"]
+ValidatePaths -->|Invalid| ReturnError
+ValidatePaths -->|Valid| MountDirectories["Mount directories to container"]
 MountDirectories --> ProcessEnv["Process environment variables"]
 ProcessEnv --> SetFixedEnv["Set fixed environment variables"]
-ProcessEnv --> SetArgsAsEnv["Set arguments as environment variables"]
-ProcessEnv --> SetPassthroughEnv["Set passthrough environment variables"]
+SetFixedEnv --> SetArgsAsEnv["Set arguments as environment variables"]
+SetArgsAsEnv --> SetPassthroughEnv["Set passthrough environment variables"]
 SetPassthroughEnv --> AddCacheBust["Add cache-busting timestamp"]
 AddCacheBust --> ExecuteCommand["Execute command in container"]
 ExecuteCommand --> CheckResult{"Execution successful?"}
-CheckResult --> |No| GetStderr["Get stderr output"]
-GetStderr --> |Has output| ReturnStderr["Return stderr as error"]
-GetStderr --> |No output| ReturnGenericError["Return generic execution error"]
-CheckResult --> |Yes| ExportMounts["Export modified directories"]
+CheckResult -->|No| GetStderr["Get stderr output"]
+GetStderr -->|Has output| ReturnStderr["Return stderr as error"]
+GetStderr -->|No output| ReturnGenericError["Return generic execution error"]
+CheckResult -->|Yes| ExportMounts["Export modified directories"]
 ExportMounts --> LogWarnings["Log export warnings if failed"]
-ExportMounts --> ReturnResult["Return stdout result"]
+LogWarnings --> ReturnResult["Return stdout result"]
 ReturnError --> End([End])
 ReturnStderr --> End
 ReturnGenericError --> End
