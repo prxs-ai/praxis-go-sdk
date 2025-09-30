@@ -375,10 +375,26 @@ func (a *PraxisAgent) registerDynamicTools() {
 
 func (a *PraxisAgent) createGenericHandler(toolCfg appconfig.ToolConfig) server.ToolHandlerFunc {
 	return func(ctx context.Context, req mcpTypes.CallToolRequest) (*mcpTypes.CallToolResult, error) {
-		args := req.GetArguments()
+		args := normalizeArgs(req.GetArguments())
 		engineName := toolCfg.Engine
 
-		a.logger.Infof("Executing tool '%s' via generic handler with engine '%s'", toolCfg.Name, engineName)
+		// Extract params and secrets from args if nested
+		var params map[string]interface{}
+		var secrets map[string]interface{}
+
+		if raw, ok := args["params"].(map[string]interface{}); ok {
+			params = normalizeArgs(raw)
+		} else {
+			params = args
+		}
+		if raw, ok := args["secrets"].(map[string]interface{}); ok {
+			secrets = normalizeArgs(raw)
+		} else {
+			secrets = map[string]interface{}{}
+		}
+
+		a.logger.Infof("Executing tool '%s' with engine '%s'. Params: %v, Secrets: %v",
+			toolCfg.Name, engineName, params, redactSecrets(secrets))
 
 		engine, ok := a.executionEngines[engineName]
 		if !ok {
@@ -393,7 +409,7 @@ func (a *PraxisAgent) createGenericHandler(toolCfg appconfig.ToolConfig) server.
 				engine = daggerEngine
 				a.logger.Info("🚀 Dagger Engine initialized successfully")
 			} else {
-				err := fmt.Errorf("execution engine '%s' not found or not initialized", engineName)
+				err := fmt.Errorf("execution engine '%s' not found", engineName)
 				a.logger.Error(err)
 				return mcpTypes.NewToolResultError(err.Error()), nil
 			}
@@ -403,23 +419,23 @@ func (a *PraxisAgent) createGenericHandler(toolCfg appconfig.ToolConfig) server.
 			Engine:     engineName,
 			Name:       toolCfg.Name,
 			EngineSpec: toolCfg.EngineSpec,
+			Params:     params,
+			Secrets:    secrets,
 		}
 
-		// Валидация аргументов
 		for _, param := range toolCfg.Params {
 			paramName := param["name"]
 			isRequired := param["required"] == "true"
 			if isRequired {
-				if _, exists := args[paramName]; !exists {
+				if _, exists := params[paramName]; !exists {
 					return mcpTypes.NewToolResultError(fmt.Sprintf("required parameter '%s' missing", paramName)), nil
 				}
 			}
 		}
 
-		// 3. Выполняем контракт через найденный движок
-		result, err := engine.Execute(ctx, contract, args)
+		result, err := engine.Execute(ctx, contract, params)
 		if err != nil {
-			a.logger.Errorf("Tool '%s' execution with engine '%s' failed: %v", toolCfg.Name, engineName, err)
+			a.logger.Errorf("Tool '%s' execution failed: %v", toolCfg.Name, err)
 			return mcpTypes.NewToolResultError(err.Error()), nil
 		}
 
@@ -467,7 +483,36 @@ func (a *PraxisAgent) handleDaggerTool(ctx context.Context, req mcpTypes.CallToo
 
 func (a *PraxisAgent) handleExecuteWorkflow(ctx context.Context, req mcpTypes.CallToolRequest) (*mcpTypes.CallToolResult, error) {
 	args := req.GetArguments()
+
+	// Extract DSL (optional, maybe workflow DSL comes directly as nodes/edges)
 	dslQuery, _ := args["dsl"].(string)
+
+	// Extract params and secrets
+	rawParams, _ := args["params"].(map[string]interface{})
+	rawSecrets, _ := args["secrets"].(map[string]interface{})
+
+	// Convert secrets to map[string]interface{}
+	secrets := map[string]interface{}{}
+	for k, v := range rawSecrets {
+		secrets[k] = v
+	}
+
+	// Logging (mask secrets!)
+	if len(rawParams) > 0 {
+		a.logger.Infof("📦 Params received from frontend: %v", rawParams)
+	} else {
+		a.logger.Infof("📦 No params received from frontend")
+	}
+	if len(secrets) > 0 {
+		a.logger.Infof("🔑 Secrets received from frontend: %v", redactSecrets(secrets))
+	} else {
+		a.logger.Infof("🔑 No secrets received from frontend")
+	}
+
+	// Inject into context
+	ctx = dsl.WithParams(ctx, rawParams)
+	ctx = dsl.WithSecrets(ctx, secrets)
+
 	if dslQuery == "" {
 		return mcpTypes.NewToolResultError("DSL query is required"), nil
 	}
@@ -476,8 +521,8 @@ func (a *PraxisAgent) handleExecuteWorkflow(ctx context.Context, req mcpTypes.Ca
 	if err != nil {
 		return mcpTypes.NewToolResultError(fmt.Sprintf("Failed to execute workflow: %v", err)), nil
 	}
-
-	return mcpTypes.NewToolResultText(fmt.Sprintf("Workflow executed: %v", result)), nil
+	safeResult := redactSecretsDeep(result)
+	return mcpTypes.NewToolResultText(fmt.Sprintf("Workflow executed: %v", safeResult)), nil
 }
 
 // updateP2PCardWithTools updates the P2P card with full tool specifications
@@ -1999,4 +2044,68 @@ func (a *PraxisAgent) handleAdminSetRegistration(c *gin.Context) {
 	}
 	a.SetERC8004Registration(req.ChainID, req.AgentID, eoa, req.Signature)
 	c.JSON(200, gin.H{"status": "ok"})
+}
+
+func normalizeArgs(raw map[string]interface{}) map[string]interface{} {
+	out := make(map[string]interface{})
+	for k, v := range raw {
+		switch val := v.(type) {
+		case float64:
+			if float64(int(val)) == val {
+				out[k] = int(val)
+			} else {
+				out[k] = val
+			}
+		default:
+			out[k] = v
+		}
+	}
+	return out
+}
+
+func redactSecretsDeep(v interface{}) interface{} {
+	switch val := v.(type) {
+	case map[string]interface{}:
+		out := make(map[string]interface{}, len(val))
+		for k, v2 := range val {
+			if isSecretKey(k) {
+				out[k] = "***"
+			} else {
+				out[k] = redactSecretsDeep(v2)
+			}
+		}
+		return out
+	case map[string]string:
+		out := make(map[string]string, len(val))
+		for k, v2 := range val {
+			if isSecretKey(k) {
+				out[k] = "***"
+			} else {
+				out[k] = v2
+			}
+		}
+		return out
+	case []interface{}:
+		out := make([]interface{}, len(val))
+		for i, v2 := range val {
+			out[i] = redactSecretsDeep(v2)
+		}
+		return out
+	case []string:
+		return val
+	default:
+		return val
+	}
+}
+
+func isSecretKey(key string) bool {
+	return key == "api_key" || key == "API_KEY" || key == "token" || key == "TOKEN"
+}
+
+func redactSecrets(secrets map[string]interface{}) map[string]interface{} {
+	redacted := make(map[string]interface{})
+	for k := range secrets {
+		redacted[k] = "***"
+	}
+	return redacted
 }

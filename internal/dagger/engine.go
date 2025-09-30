@@ -30,6 +30,7 @@ func (e *DaggerEngine) Close() {
 
 func (e *DaggerEngine) Execute(ctx context.Context, contract contracts.ToolContract, args map[string]interface{}) (string, error) {
 	spec := contract.EngineSpec
+
 	image, ok := spec["image"].(string)
 	if !ok || image == "" {
 		return "", fmt.Errorf("dagger spec missing or invalid 'image' field")
@@ -45,76 +46,81 @@ func (e *DaggerEngine) Execute(ctx context.Context, contract contracts.ToolContr
 		return "", fmt.Errorf("dagger spec invalid 'mounts' field: %w", err)
 	}
 
-	// Optional fixed env map
-	envMap, _ := toStringMap(spec["env"]) // ignore error; treat non-map as empty
+	envMap, _ := toStringMap(spec["env"])
+	envPassthrough, _ := toStringSlice(spec["env_passthrough"])
 
-	// Optional passthrough env list (names to forward from host env)
-	envPassthrough, _ := toStringSlice(spec["env_passthrough"]) // ignore error; treat non-slice as empty
+	fmt.Printf("⚙️ [Dagger] Preparing container\n")
+	fmt.Printf("   image=%s command=%v\n", image, command)
+	fmt.Printf("   mounts=%v\n", mounts)
 
-	// Don't append args to command since we're passing them as env variables
-	// This allows shell substitution like $username to work properly
 	finalCommand := make([]string, len(command))
 	copy(finalCommand, command)
 
 	container := e.client.Container().From(image)
+
+	// Apply mounts
 	for hostPath, containerPath := range mounts {
 		absPath, err := filepath.Abs(hostPath)
 		if err != nil {
 			return "", fmt.Errorf("failed to get absolute path for %s: %w", hostPath, err)
 		}
-
-		if _, err := os.Stat(absPath); os.IsNotExist(err) {
-			return "", fmt.Errorf("host directory does not exist: %s", absPath)
-		}
-
 		dir := e.client.Host().Directory(absPath)
 		container = container.WithDirectory(containerPath, dir)
 	}
 
 	// Apply fixed env variables
+	if len(envMap) > 0 {
+		fmt.Printf("   fixed env=%v\n", envMap)
+	}
 	for k, v := range envMap {
-		if k == "" {
-			continue
-		}
 		container = container.WithEnvVariable(k, v)
 	}
 
-	// Apply args as environment variables (for shell substitution)
-	for key, val := range args {
-		container = container.WithEnvVariable(key, fmt.Sprintf("%v", val))
+	// Split args into params vs secrets (simple heuristic: secrets often UPPERCASE or from dsl.Secrets)
+	params := map[string]string{}
+	secrets := map[string]string{}
+	for k, v := range args {
+		strVal := fmt.Sprintf("%v", v)
+		if isSecretKey(k) {
+			secrets[k] = strVal
+		} else {
+			params[k] = strVal
+		}
 	}
 
-	// Add timestamp to prevent Dagger caching
+	if len(params) > 0 {
+		fmt.Printf("   injecting params=%v\n", params)
+	}
+	for k, v := range params {
+		container = container.WithEnvVariable(k, v)
+	}
+
+	if len(secrets) > 0 {
+		fmt.Printf("   injecting secrets(keys)=%v\n", redactSecretKeys(secrets))
+	}
+	for k, v := range secrets {
+		container = container.WithEnvVariable(k, v)
+	}
+
 	container = container.WithEnvVariable("CACHE_BUST", fmt.Sprintf("%d", time.Now().UnixNano()))
 
-	// Apply passthrough env variables from the host process environment
+	// Passthrough env
+	if len(envPassthrough) > 0 {
+		fmt.Printf("   passthrough env=%v\n", envPassthrough)
+	}
 	for _, name := range envPassthrough {
-		if name == "" {
-			continue
-		}
 		if val := os.Getenv(name); val != "" {
 			container = container.WithEnvVariable(name, val)
 		}
 	}
 
+	fmt.Printf("🚀 [Dagger] Executing %v\n", finalCommand)
 	execContainer := container.WithExec(finalCommand)
+
 	result, err := execContainer.Stdout(ctx)
 	if err != nil {
-		stderr, stderrErr := execContainer.Stderr(ctx)
-		if stderrErr == nil && stderr != "" {
-			return "", fmt.Errorf("dagger execution failed: %s", stderr)
-		}
-		return "", fmt.Errorf("dagger execution failed: %w", err)
-	}
-
-	// Export modified directories back to host
-	for hostPath, containerPath := range mounts {
-		absPath, _ := filepath.Abs(hostPath)
-		// Export the directory from container back to host
-		if _, err := execContainer.Directory(containerPath).Export(ctx, absPath); err != nil {
-			// Log warning but don't fail - the directory might not have changed
-			fmt.Printf("Warning: Could not export %s back to host: %v\n", containerPath, err)
-		}
+		stderr, _ := execContainer.Stderr(ctx)
+		return "", fmt.Errorf("dagger execution failed: %s", stderr)
 	}
 
 	return result, nil
@@ -180,4 +186,16 @@ func toStringMap(v interface{}) (map[string]string, error) {
 	default:
 		return nil, fmt.Errorf("expected map[string]string, got %T", v)
 	}
+}
+
+func redactSecretKeys(m map[string]string) map[string]string {
+	redacted := make(map[string]string, len(m))
+	for k := range m {
+		redacted[k] = "***"
+	}
+	return redacted
+}
+
+func isSecretKey(key string) bool {
+	return key == "api_key" || key == "API_KEY" || key == "token" || key == "TOKEN"
 }

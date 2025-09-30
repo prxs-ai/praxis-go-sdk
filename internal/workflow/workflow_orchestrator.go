@@ -514,3 +514,22 @@ func (wo *WorkflowOrchestrator) GetWorkflowStatus(workflowID string) (map[string
 
 	return status, nil
 }
+
+func (wo *WorkflowOrchestrator) ExecuteWorkflowWithOptions(
+	ctx context.Context,
+	workflowID string,
+	nodes []interface{},
+	edges []interface{},
+	opts *dsl.WorkflowOptions,
+) error {
+	wo.logger.Infof("Executing workflow %s with options: params=%v secrets=%v", workflowID, opts.Params, maskSecrets(opts.Secrets))
+	return wo.ExecuteWorkflow(ctx, workflowID, nodes, edges)
+}
+
+func maskSecrets(secrets map[string]string) map[string]string {
+	masked := make(map[string]string, len(secrets))
+	for k := range secrets {
+		masked[k] = "***"
+	}
+	return masked
+}

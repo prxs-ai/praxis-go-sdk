@@ -61,7 +61,7 @@ func (a *Analyzer) AnalyzeDSL(ctx context.Context, dsl string) (interface{}, err
 		return nil, fmt.Errorf("failed to tokenize DSL")
 	}
 
-	ast, err := a.parse(tokens)
+	ast, err := a.parse(ctx, tokens)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse DSL: %w", err)
 	}
@@ -118,7 +118,6 @@ func (a *Analyzer) parseQuotedFields(line string) []string {
 
 		if r == '"' {
 			if inQuotes {
-				// End of quoted string
 				fields = append(fields, current.String())
 				current.Reset()
 				inQuotes = false
@@ -127,7 +126,6 @@ func (a *Analyzer) parseQuotedFields(line string) []string {
 					i = j
 				}
 			} else {
-				// Start of quoted string - add any current content first
 				if current.Len() > 0 {
 					fields = append(fields, current.String())
 					current.Reset()
@@ -142,7 +140,6 @@ func (a *Analyzer) parseQuotedFields(line string) []string {
 				fields = append(fields, current.String())
 				current.Reset()
 			}
-			// Skip consecutive spaces
 			for i+1 < len(line) && line[i+1] == ' ' {
 				i++
 			}
@@ -151,7 +148,6 @@ func (a *Analyzer) parseQuotedFields(line string) []string {
 		}
 	}
 
-	// Add any remaining content
 	if current.Len() > 0 {
 		fields = append(fields, current.String())
 	}
@@ -159,40 +155,34 @@ func (a *Analyzer) parseQuotedFields(line string) []string {
 	return fields
 }
 
-func (a *Analyzer) parse(tokens []Token) (*AST, error) {
+func (a *Analyzer) parse(ctx context.Context, tokens []Token) (*AST, error) {
 	ast := &AST{
 		Nodes: make([]ASTNode, 0),
 	}
 
 	for _, token := range tokens {
-		// Convert []string args to map[string]interface{} for traditional DSL
 		argsMap := make(map[string]interface{})
+		params := make(map[string]interface{})
+		secrets := make(map[string]interface{})
 		toolName := ""
 
 		if token.Value == "CALL" && len(token.Args) > 0 {
 			toolName = token.Args[0]
-			// Debug logging
 			a.logger.Infof("🔍 Debug tokenization: toolName=%s, args=%v", toolName, token.Args)
 
-			// НОВАЯ, ИСПРАВЛЕННАЯ ЛОГИКА
-			args := token.Args[1:] // Все, кроме имени инструмента
+			args := token.Args[1:]
 			for i := 0; i < len(args); i++ {
 				arg := args[i]
 				if strings.HasPrefix(arg, "--") {
 					key := strings.TrimPrefix(arg, "--")
 					if i+1 < len(args) && !strings.HasPrefix(args[i+1], "--") {
-						// Это пара ключ-значение: --key value
 						argsMap[key] = args[i+1]
-						i++ // Пропускаем следующий токен, так как он является значением
+						i++
 					} else {
-						// Это флаг без значения: --verbose
 						argsMap[key] = true
 					}
 				} else {
-					// Это позиционный аргумент
-					// Для обратной совместимости с простыми вызовами (например, CALL read_file test.txt)
-					// мы можем присвоить его стандартному имени параметра.
-					if len(argsMap) == 0 { // Первый позиционный аргумент
+					if len(argsMap) == 0 {
 						switch toolName {
 						case "read_file", "delete_file":
 							argsMap["filename"] = arg
@@ -201,19 +191,15 @@ func (a *Analyzer) parse(tokens []Token) (*AST, error) {
 						case "write_file":
 							argsMap["filename"] = arg
 						default:
-							// Generic conversion for unknown tools
 							argsMap[fmt.Sprintf("arg%d", len(argsMap))] = arg
 						}
 					} else {
-						// Для write_file второй позиционный аргумент - content
 						if toolName == "write_file" && len(argsMap) == 1 {
-							// Join remaining args as content
 							content := strings.Join(args[i:], " ")
 							content = strings.Trim(content, "\"")
 							argsMap["content"] = content
-							break // Выходим из цикла
+							break
 						} else {
-							// Generic conversion for unknown tools
 							argsMap[fmt.Sprintf("arg%d", len(argsMap))] = arg
 						}
 					}
@@ -222,11 +208,31 @@ func (a *Analyzer) parse(tokens []Token) (*AST, error) {
 		}
 
 		node := ASTNode{
-			Type:     NodeTypeCommand,
+			Type:     NodeTypeCall,
 			Value:    token.Value,
 			ToolName: toolName,
 			Args:     argsMap,
+			Params:   params,
+			Secrets:  secrets,
 		}
+
+		// 🔒 Inject external params and secrets (not leaked to LLM)
+		if externalParams, ok := ctxParamsFromContext(ctx); ok {
+			for k, v := range externalParams {
+				node.Params[k] = v
+			}
+		}
+		if externalSecrets, ok := ctxSecretsFromContext(ctx); ok {
+			for k, v := range externalSecrets {
+				node.Secrets[k] = v
+			}
+		}
+
+		// 📦 Log params and secrets (secrets are masked)
+		a.logger.Infof(
+			"📦 Built AST node: tool=%s, args=%v, params=%v, secrets=%v",
+			toolName, argsMap, node.Params, maskSecrets(node.Secrets),
+		)
 
 		switch token.Value {
 		case "WORKFLOW":
@@ -354,105 +360,105 @@ func (a *Analyzer) executeAgent(ctx context.Context, node ASTNode) (interface{},
 
 func (a *Analyzer) executeCall(ctx context.Context, node ASTNode) (interface{}, error) {
 	toolName := node.ToolName
-	argsMap := node.Args // Direct use of named arguments map
 
-	a.logger.Infof("Calling tool: %s with args: %v", toolName, argsMap)
+	payload := map[string]interface{}{
+		"args":    node.Args,
+		"params":  node.Params,
+		"secrets": node.Secrets,
+	}
 
-	// Check cache first
-	cacheKey := llm.GenerateCacheKey(toolName, argsMap)
+	a.logger.Infof("Calling tool: %s with payload (params=%v, secrets=%v)",
+		toolName, node.Params, maskSecrets(node.Secrets))
+
+	cacheKey := llm.GenerateCacheKey(toolName, payload)
 	if cachedResult := a.cache.Get(cacheKey); cachedResult != nil {
 		a.logger.Infof("Cache hit for tool %s", toolName)
 		return cachedResult, nil
 	}
 
-	// If no agent integration, fall back to simulation
 	if a.agent == nil {
 		a.logger.Debug("No agent integration, simulating execution")
 		result := map[string]interface{}{
-			"type":   "call",
-			"tool":   toolName,
-			"args":   argsMap,
-			"status": "simulated",
+			"type":    "call",
+			"tool":    toolName,
+			"payload": payload,
+			"status":  "simulated",
 		}
-		// Cache simulated result too
 		a.cache.Set(cacheKey, result)
 		return result, nil
 	}
 
-	// Step 1: Check if tool is available locally
 	if a.agent.HasLocalTool(toolName) {
 		a.logger.Infof("Executing tool %s locally", toolName)
-		result, err := a.agent.ExecuteLocalTool(ctx, toolName, argsMap)
+		result, err := a.agent.ExecuteLocalTool(ctx, toolName, payload)
 		if err != nil {
 			errorResult := map[string]interface{}{
-				"type":   "call",
-				"tool":   toolName,
-				"args":   argsMap,
-				"status": "failed",
-				"error":  err.Error(),
+				"type":    "call",
+				"tool":    toolName,
+				"payload": payload,
+				"status":  "failed",
+				"error":   err.Error(),
 			}
-			// Don't cache error results
 			return errorResult, nil
 		}
-
 		successResult := map[string]interface{}{
-			"type":   "call",
-			"tool":   toolName,
-			"args":   argsMap,
-			"status": "executed",
-			"result": result,
+			"type":    "call",
+			"tool":    toolName,
+			"payload": payload,
+			"status":  "executed",
+			"result":  result,
 		}
-
-		// Cache successful result
 		a.cache.Set(cacheKey, successResult)
 		return successResult, nil
 	}
 
-	// Step 2: Find agent with the tool
 	peerID, err := a.agent.FindAgentWithTool(toolName)
 	if err != nil {
 		a.logger.Errorf("Tool %s not found: %v", toolName, err)
 		errorResult := map[string]interface{}{
-			"type":   "call",
-			"tool":   toolName,
-			"args":   argsMap,
-			"status": "failed",
-			"error":  fmt.Sprintf("Tool not found: %v", err),
+			"type":    "call",
+			"tool":    toolName,
+			"payload": payload,
+			"status":  "failed",
+			"error":   fmt.Sprintf("Tool not found: %v", err),
 		}
-		// Don't cache error results
 		return errorResult, nil
 	}
 
-	// Step 3: Execute remotely via P2P
 	a.logger.Infof("Executing tool %s remotely on peer %s", toolName, peerID)
-	result, err := a.agent.ExecuteRemoteTool(ctx, peerID, toolName, argsMap)
+	result, err := a.agent.ExecuteRemoteTool(ctx, peerID, toolName, payload)
 	if err != nil {
 		errorResult := map[string]interface{}{
-			"type":   "call",
-			"tool":   toolName,
-			"args":   argsMap,
-			"status": "failed",
-			"error":  fmt.Sprintf("Remote execution failed: %v", err),
+			"type":    "call",
+			"tool":    toolName,
+			"payload": payload,
+			"status":  "failed",
+			"error":   fmt.Sprintf("Remote execution failed: %v", err),
 		}
-		// Don't cache error results
 		return errorResult, nil
 	}
 
 	successResult := map[string]interface{}{
 		"type":        "call",
 		"tool":        toolName,
-		"args":        argsMap,
+		"payload":     payload,
 		"status":      "executed",
 		"result":      result,
 		"executed_by": peerID,
 	}
-
-	// Cache successful result
 	a.cache.Set(cacheKey, successResult)
 	return successResult, nil
 }
 
-// GetCacheStats returns cache statistics
+// maskSecrets replaces secret values with *** for logging
+func maskSecrets(secrets map[string]interface{}) map[string]interface{} {
+	masked := make(map[string]interface{}, len(secrets))
+	for k := range secrets {
+		masked[k] = "***"
+	}
+	return masked
+}
+
 func (a *Analyzer) GetCacheStats() map[string]interface{} {
 	return map[string]interface{}{
 		"size":    a.cache.Size(),
@@ -460,7 +466,6 @@ func (a *Analyzer) GetCacheStats() map[string]interface{} {
 	}
 }
 
-// ClearCache clears the tool execution cache
 func (a *Analyzer) ClearCache() {
 	a.cache.Clear()
 	a.logger.Info("Tool execution cache cleared")
@@ -505,6 +510,43 @@ func (a *Analyzer) executeSequence(ctx context.Context, node ASTNode) (interface
 	}, nil
 }
 
+// ==== Context helpers for injecting params and secrets ====
+
+type ctxKey string
+
+const (
+	ctxKeyParams  ctxKey = "dsl_params"
+	ctxKeySecrets ctxKey = "dsl_secrets"
+)
+
+func WithParams(ctx context.Context, params map[string]interface{}) context.Context {
+	return context.WithValue(ctx, ctxKeyParams, params)
+}
+
+func WithSecrets(ctx context.Context, secrets map[string]interface{}) context.Context {
+	return context.WithValue(ctx, ctxKeySecrets, secrets)
+}
+
+func ctxParamsFromContext(ctx context.Context) (map[string]interface{}, bool) {
+	v := ctx.Value(ctxKeyParams)
+	if v == nil {
+		return nil, false
+	}
+	params, ok := v.(map[string]interface{})
+	return params, ok
+}
+
+func ctxSecretsFromContext(ctx context.Context) (map[string]interface{}, bool) {
+	v := ctx.Value(ctxKeySecrets)
+	if v == nil {
+		return nil, false
+	}
+	secrets, ok := v.(map[string]interface{})
+	return secrets, ok
+}
+
+// ==== Types ====
+
 type Token struct {
 	Type  TokenType
 	Value string
@@ -526,8 +568,10 @@ type AST struct {
 type ASTNode struct {
 	Type     NodeType
 	Value    string
-	ToolName string                 // Separate field for tool name
-	Args     map[string]interface{} // Named arguments from LLM plan
+	ToolName string
+	Args     map[string]interface{}
+	Params   map[string]interface{}
+	Secrets  map[string]interface{}
 	Children []ASTNode
 }
 
