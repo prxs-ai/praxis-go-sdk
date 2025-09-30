@@ -97,51 +97,51 @@ The `P2PProtocolHandler` manages incoming streams for various protocols and rout
 ```mermaid
 classDiagram
 class P2PProtocolHandler {
-+Host : host
-+Logger : logger
-+AgentCard~ : peerCards Map~PeerID
-+AgentCard : ourCard
-+P2PMCPBridge : mcpBridge
-+A2AAgent : agent
++host Host
++logger Logger
++peerCards Map~PeerID,AgentCard~
++ourCard AgentCard
++mcpBridge P2PMCPBridge
++agent A2AAgent
 +SetMCPBridge(bridge)
 +SetAgent(agent)
 +handleMCPStream(stream)
 +handleCardStream(stream)
 +handleToolStream(stream)
 +handleA2AStream(stream)
-+RequestCard(ctx: peerID)
-+InvokeTool(ctx: peerID, name: args)
++RequestCard(ctx, peerID)
++InvokeTool(ctx, peerID, name, args)
 }
 class AgentCard {
-+string : Name
-+string : Version
-+string : PeerID
-+[]string : Capabilities
-+[]ToolSpec : Tools
-+int64 : Timestamp
++Name string
++Version string
++PeerID string
++Capabilities []string
++Tools []ToolSpec
++Timestamp int64
 }
 class ToolSpec {
-+string : Name
-+string : Description
-+[]ToolParameter : Parameters
++Name string
++Description string
++Parameters []ToolParameter
 }
 class ToolParameter {
-+string : Name
-+string : Type
-+string : Description
-+bool : Required
++Name string
++Type string
++Description string
++Required bool
 }
 class P2PMessage {
-+string : Type
-+string : ID
-+string : Method
-+interface{} : Params
-+interface{} : Result
-+P2PError : Error
++Type string
++ID string
++Method string
++Params interface{}
++Result interface{}
++Error P2PError
 }
 class P2PError {
-+int : Code
-+string : Message
++Code int
++Message string
 }
 P2PProtocolHandler --> AgentCard : "Stores"
 P2PProtocolHandler --> ToolSpec : "Contains"
@@ -162,34 +162,34 @@ The `P2PMCPBridge` serves as an interface between the P2P layer and MCP services
 ```mermaid
 classDiagram
 class P2PMCPBridge {
-+Host : host
-+MCPServerWrapper : mcpServer
-+MCPClientWrapper~ : peerClients Map~PeerID
++host Host
++mcpServer MCPServerWrapper
++peerClients Map~PeerID,MCPClientWrapper~
 +ProcessMCPRequest(request)
 +handleMCPStream(stream)
 +handleCardStream(stream)
 +ConnectToPeer(peerID)
-+CallPeerTool(ctx: peerID, name: args)
++CallPeerTool(ctx, peerID, name, args)
 +ListPeers(ctx)
-+SendMessage(ctx: peerID, message)
++SendMessage(ctx, peerID, message)
 }
 class MCPRequest {
-+int : ID
-+string : Method
-+interface{}~ : Params Map~string
++ID int
++Method string
++Params Map~string,interface{}~
 }
 class MCPResponse {
-+int : ID
-+interface{} : Result
-+MCPError : Error
++ID int
++Result interface{}
++Error MCPError
 }
 class MCPError {
-+int : Code
-+string : Message
-+interface{} : Data
++Code int
++Message string
++Data interface{}
 }
 class P2PStreamTransport {
-+Stream : stream
++stream Stream
 +Send(data)
 +Receive()
 +Close()
@@ -278,20 +278,20 @@ The P2P networking layer has well-defined dependencies that enable its functiona
 
 ```mermaid
 graph TD
-P2PProtocolHandler --> libp2p : "Uses core types"
-P2PMCPBridge --> libp2p : "Uses core types"
-Discovery --> libp2p : "Uses core types"
-P2PProtocolHandler --> logrus : "Uses for logging"
-P2PMCPBridge --> logrus : "Uses for logging"
-Discovery --> logrus : "Uses for logging"
-P2PProtocolHandler --> mcpTypes : "Uses MCP types"
-P2PMCPBridge --> mcpTypes : "Uses MCP types"
-P2PMCPBridge --> MCPServerWrapper : "Interfaces with"
-P2PMCPBridge --> MCPClientWrapper : "Creates instances"
-P2PProtocolHandler --> P2PMCPBridge : "References for tool execution"
-Discovery --> P2PProtocolHandler : "Sets for card exchange"
-MCPServerWrapper --> mcpTypes : "Implements MCP protocol"
-MCPClientWrapper --> mcpTypes : "Implements MCP protocol"
+P2PProtocolHandler -->|"Uses core types"| libp2p
+P2PMCPBridge -->|"Uses core types"| libp2p
+Discovery -->|"Uses core types"| libp2p
+P2PProtocolHandler -->|"Uses for logging"| logrus
+P2PMCPBridge -->|"Uses for logging"| logrus
+Discovery -->|"Uses for logging"| logrus
+P2PProtocolHandler -->|"Uses MCP types"| mcpTypes
+P2PMCPBridge -->|"Uses MCP types"| mcpTypes
+P2PMCPBridge -->|"Interfaces with"| MCPServerWrapper
+P2PMCPBridge -->|"Creates instances"| MCPClientWrapper
+P2PProtocolHandler -->|"References for tool execution"| P2PMCPBridge
+Discovery -->|"Sets for card exchange"| P2PProtocolHandler
+MCPServerWrapper -->|"Implements MCP protocol"| mcpTypes
+MCPClientWrapper -->|"Implements MCP protocol"| mcpTypes
 ```
 
 **Diagram sources**

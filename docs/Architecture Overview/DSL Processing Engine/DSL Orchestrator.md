@@ -21,20 +21,20 @@ The project follows a modular Go application structure with clear separation of 
 
 ```mermaid
 graph TD
-subgraph "Core Orchestrator"
+subgraph CoreOrchestrator["Core Orchestrator"]
 DSL[internal/dsl]
 Workflow[internal/workflow]
 end
-subgraph "Execution Engines"
+subgraph ExecutionEngines["Execution Engines"]
 Dagger[internal/dagger]
 MCP[internal/mcp]
 end
-subgraph "Agent & Communication"
+subgraph AgentCommunication["Agent & Communication"]
 Agent[internal/agent]
 P2P[internal/p2p]
 API[internal/api]
 end
-subgraph "Infrastructure"
+subgraph Infrastructure["Infrastructure"]
 Bus[internal/bus]
 LLM[internal/llm]
 Config[internal/config]
@@ -75,12 +75,12 @@ LLM --> Plan[Workflow Plan]
 Plan --> AST[AST Generation]
 AST --> Orchestrator[OrchestratorAnalyzer]
 Orchestrator --> Workflow[WorkflowOrchestrator]
-subgraph "Execution Engines"
+subgraph ExecutionEngines["Execution Engines"]
 Workflow --> Dagger[Dagger Engine]
 Workflow --> RemoteMCP[Remote MCP]
 Workflow --> A2A[A2A Task Delegation]
 end
-subgraph "Event System"
+subgraph EventSystem["Event System"]
 Orchestrator --> EventBus[EventBus]
 Workflow --> EventBus
 EventBus --> WebSocket[WebSocket Gateway]
@@ -104,26 +104,26 @@ The `OrchestratorAnalyzer` is responsible for transforming natural language requ
 ```mermaid
 classDiagram
 class OrchestratorAnalyzer {
-+analyzer : Analyzer
-+eventBus : EventBus
-+llmClient : LLMClient
-+AnalyzeWithOrchestration(ctx: dsl) : (interface, error)
-+buildNetworkContext() : NetworkContext
-+findAgentsForWorkflow(ctx: ast) : List<Map<string, interface>>
-+publishProgress(stage: message, details) : void
-+publishResult(command: result, workflow) : void
++analyzer Analyzer
++eventBus EventBus
++llmClient LLMClient
++AnalyzeWithOrchestration(ctx, dsl) interface, error
++buildNetworkContext() NetworkContext
++findAgentsForWorkflow(ctx, ast) List~Map~
++publishProgress(stage, message, details) void
++publishResult(command, result, workflow) void
 }
 class Analyzer {
-+logger : Logger
-+agent : AgentInterface
-+AnalyzeDSL(ctx: dsl) : (interface, error)
-+tokenize(dsl) : List<string>
-+parse(tokens) : (AST, error)
++logger Logger
++agent AgentInterface
++AnalyzeDSL(ctx, dsl) interface, error
++tokenize(dsl) List~string~
++parse(tokens) AST, error
 }
-OrchestratorAnalyzer --> Analyzer : "extends"
-OrchestratorAnalyzer --> bus.EventBus : "uses"
-OrchestratorAnalyzer --> llm.LLMClient : "uses"
-OrchestratorAnalyzer --> AgentInterface : "depends on"
+OrchestratorAnalyzer --> Analyzer: extends
+OrchestratorAnalyzer --> EventBus: uses
+OrchestratorAnalyzer --> LLMClient: uses
+OrchestratorAnalyzer --> AgentInterface: depends on
 ```
 
 **Diagram sources**
@@ -139,42 +139,42 @@ The `WorkflowOrchestrator` manages the execution of complex workflows by coordin
 ```mermaid
 classDiagram
 class WorkflowOrchestrator {
-+eventBus : EventBus
-+dslAnalyzer : Analyzer
-+agentInterface : AgentInterface
-+logger : Logger
-+workflows : Map<string, WorkflowExecution>
-+ExecuteWorkflow(ctx: workflowID, nodes: edges) : error
-+GetWorkflowStatus(workflowID) : (Map<string, interface>, error)
-+buildGraph(nodes: edges) : (WorkflowGraph, error)
-+findEntryNodes(graph) : List<string>
-+executeNode(ctx: execution, nodeID) : error
++eventBus EventBus
++dslAnalyzer Analyzer
++agentInterface AgentInterface
++logger Logger
++workflows Map~string WorkflowExecution~
++ExecuteWorkflow(ctx, workflowID, nodes, edges) error
++GetWorkflowStatus(workflowID) Map~string interface~ error
++buildGraph(nodes, edges) WorkflowGraph error
++findEntryNodes(graph) List~string~
++executeNode(ctx, execution, nodeID) error
 }
 class WorkflowExecution {
-+ID : string
-+Graph : WorkflowGraph
-+Status : string
-+StartTime : Time
-+EndTime : Time
-+Results : Map<string, interface>
++ID string
++Graph WorkflowGraph
++Status string
++StartTime Time
++EndTime Time
++Results Map~string interface~
 }
 class WorkflowGraph {
-+Nodes : Map<string, Node>
-+Edges : List<Edge>
-+Adjacency : Map<string, List<string>>
++Nodes Map~string Node~
++Edges List~Edge~
++Adjacency Map~string List~
 }
 class Node {
-+ID : string
-+Type : string
-+Position : Map<string, int>
-+Data : Map<string, interface>
-+Status : NodeStatus
++ID string
++Type string
++Position Map~string int~
++Data Map~string interface~
++Status NodeStatus
 }
 class Edge {
-+ID : string
-+Source : string
-+Target : string
-+Type : string
++ID string
++Source string
++Target string
++Type string
 }
 class NodeStatus {
 <<enumeration>>
@@ -183,12 +183,12 @@ running
 success
 error
 }
-WorkflowOrchestrator --> WorkflowExecution : "manages"
-WorkflowOrchestrator --> WorkflowGraph : "uses"
-WorkflowGraph --> Node : "contains"
-WorkflowGraph --> Edge : "contains"
-WorkflowOrchestrator --> AgentInterface : "depends on"
-WorkflowOrchestrator --> bus.EventBus : "notifies"
+WorkflowOrchestrator --> WorkflowExecution: manages
+WorkflowOrchestrator --> WorkflowGraph: uses
+WorkflowGraph --> Node: contains
+WorkflowGraph --> Edge: contains
+WorkflowOrchestrator --> AgentInterface: depends on
+WorkflowOrchestrator --> EventBus: notifies
 ```
 
 **Diagram sources**
@@ -203,34 +203,36 @@ The orchestrator coordinates between multiple execution engines based on resourc
 #### For API/Service Components:
 ```mermaid
 sequenceDiagram
-participant UA as "User Application"
-participant OA as "OrchestratorAnalyzer"
-participant WO as "WorkflowOrchestrator"
-participant DE as "Dagger Engine"
-participant RMCP as "Remote MCP"
-participant A2A as "A2A Task Manager"
-UA->>OA : Natural Language Request
-OA->>LLM : Generate Workflow Plan
-LLM-->>OA : Structured Workflow Plan
-OA->>OA : Validate Plan
-OA->>WO : Execute Workflow
-WO->>WO : Build Execution Graph
+participant UA as User Application
+participant OA as OrchestratorAnalyzer
+participant LLM as LLM Client
+participant WO as WorkflowOrchestrator
+participant DE as Dagger Engine
+participant RMCP as Remote MCP
+participant A2A as A2A Task Manager
+participant EventBus as EventBus
+UA->>OA: Natural Language Request
+OA->>LLM: Generate Workflow Plan
+LLM-->>OA: Structured Workflow Plan
+OA->>OA: Validate Plan
+OA->>WO: Execute Workflow
+WO->>WO: Build Execution Graph
 loop For Each Node
-WO->>WO : Determine Execution Strategy
+WO->>WO: Determine Execution Strategy
 alt Local Tool Available
-WO->>DE : Execute Locally
-DE-->>WO : Result
+WO->>DE: Execute Locally
+DE-->>WO: Result
 else Remote Tool Required
-WO->>RMCP : Execute via MCP
-RMCP-->>WO : Result
+WO->>RMCP: Execute via MCP
+RMCP-->>WO: Result
 else Cross-Agent Task
-WO->>A2A : Delegate Task
-A2A-->>WO : Task Result
+WO->>A2A: Delegate Task
+A2A-->>WO: Task Result
 end
-WO->>EventBus : Publish Node Status
+WO->>EventBus: Publish Node Status
 end
-WO->>EventBus : Publish Workflow Complete
-EventBus-->>UA : Real-time Updates
+WO->>EventBus: Publish Workflow Complete
+EventBus-->>UA: Real-time Updates
 ```
 
 **Diagram sources**

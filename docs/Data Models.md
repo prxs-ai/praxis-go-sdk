@@ -87,42 +87,42 @@ The `AgentCard` is serialized to JSON for transmission and deserialized upon rec
 ```mermaid
 classDiagram
 class AgentCard {
-+Name : string
-+Description : string
-+URL : string
-+Version : string
-+ProtocolVersion : string
-+Provider : AgentProvider
-+Capabilities : AgentCapabilities
-+Skills : List<AgentSkill>
-+SecuritySchemes : Map<string, interface>
-+SupportedTransports : List<string>
-+Metadata : interface
++Name: string
++Description: string
++URL: string
++Version: string
++ProtocolVersion: string
++Provider: AgentProvider
++Capabilities: AgentCapabilities
++Skills: List~AgentSkill~
++SecuritySchemes: Map~string, interface~
++SupportedTransports: List~string~
++Metadata: interface
 }
 class AgentProvider {
-+Name : string
-+Version : string
-+Description : string
-+URL : string
-+Organization : string
++Name: string
++Version: string
++Description: string
++URL: string
++Organization: string
 }
 class AgentCapabilities {
-+Streaming : bool
-+PushNotifications : bool
-+StateTransition : bool
++Streaming: bool
++PushNotifications: bool
++StateTransition: bool
 }
 class AgentSkill {
-+ID : string
-+Name : string
-+Description : string
-+Tags : List<string>
-+Examples : List<string>
-+InputModes : List<string>
-+OutputModes : List<string>
++ID: string
++Name: string
++Description: string
++Tags: List~string~
++Examples: List~string~
++InputModes: List~string~
++OutputModes: List~string~
 }
-AgentCard --> AgentProvider : "has"
-AgentCard --> AgentCapabilities : "has"
-AgentCard --> AgentSkill : "has many"
+AgentCard --> AgentProvider: "has"
+AgentCard --> AgentCapabilities: "has"
+AgentCard --> AgentSkill: "has many"
 ```
 
 **Diagram sources**
@@ -222,23 +222,23 @@ The `ToolContract` is referenced by the `AgentCard` through the `Skills` field, 
 ```mermaid
 classDiagram
 class ToolContract {
-+Engine : string
-+Name : string
-+EngineSpec : Map<string, interface>
++Engine: string
++Name: string
++EngineSpec: Map~string, interface~
 }
 class ExecutionEngine {
-+Execute(ctx: contract, args) : (string, error)
++Execute(ctx: contract, args): string
 }
 class AgentCard {
-+Skills : List<AgentSkill>
++Skills: List~AgentSkill~
 }
 class AgentSkill {
-+ID : string
-+Name : string
++ID: string
++Name: string
 }
-ToolContract --|> ExecutionEngine : "executed by"
-AgentCard --> AgentSkill : "has"
-AgentSkill ..> ToolContract : "implemented by"
+ToolContract --|> ExecutionEngine: "executed by"
+AgentCard --> AgentSkill: "has"
+AgentSkill ..> ToolContract: "implemented by"
 ```
 
 **Diagram sources**
@@ -491,32 +491,32 @@ Messages are added to a task's `History` array as the conversation progresses. T
 ```mermaid
 classDiagram
 class Message {
-+Role : string
-+Parts : List<Part>
-+MessageID : string
-+TaskID : string
-+ContextID : string
-+Kind : string
++Role: string
++Parts: List~Part~
++MessageID: string
++TaskID: string
++ContextID: string
++Kind: string
 }
 class Part {
-+Kind : string
-+Text : string
-+File : File
-+Data : interface
++Kind: string
++Text: string
++File: File
++Data: interface
 }
 class File {
-+Name : string
-+MimeType : string
-+Bytes : string
-+URI : string
++Name: string
++MimeType: string
++Bytes: string
++URI: string
 }
 class Task {
-+ID : string
-+History : List<Message>
++ID: string
++History: List~Message~
 }
-Message --> Part : "contains"
-Part --> File : "references"
-Task --> Message : "has history"
+Message --> Part: "contains"
+Part --> File: "references"
+Task --> Message: "has history"
 ```
 
 **Diagram sources**
@@ -590,18 +590,18 @@ sequenceDiagram
 participant AgentA
 participant Network
 participant AgentB
-AgentA->>Network : Advertise via mDNS with tag "praxis-p2p-mcp"
-AgentB->>Network : Advertise via mDNS with tag "praxis-p2p-mcp"
-Network->>AgentA : Discover AgentB
-Network->>AgentB : Discover AgentA
-AgentA->>AgentB : Connect via libp2p
-AgentB->>AgentA : Connect via libp2p
-AgentA->>AgentB : Open card stream (/praxis/card/1.0.0)
-AgentA->>AgentB : Send AgentCard
-AgentB->>AgentA : Send AgentCard
-AgentA->>AgentA : Store AgentB's card
-AgentB->>AgentB : Store AgentA's card
-Note over AgentA,AgentB : Agents now know each other's capabilities
+AgentA->>Network: Advertise via mDNS with tag "praxis-p2p-mcp"
+AgentB->>Network: Advertise via mDNS with tag "praxis-p2p-mcp"
+Network->>AgentA: Discover AgentB
+Network->>AgentB: Discover AgentA
+AgentA->>AgentB: Connect via libp2p
+AgentB->>AgentA: Connect via libp2p
+AgentA->>AgentB: Open card stream (/praxis/card/1.0.0)
+AgentA->>AgentB: Send AgentCard
+AgentB->>AgentA: Send AgentCard
+AgentA->>AgentA: Store AgentB's card
+AgentB->>AgentB: Store AgentA's card
+Note over AgentA,AgentB: Agents now know each other's capabilities
 ```
 
 **Diagram sources**
@@ -636,56 +636,56 @@ The key data models in the Praxis system are interconnected to support agent com
 
 ```mermaid
 erDiagram
-AGENTCARD ||--o{ TOOLCONTRACT : "implements"
-AGENTCARD ||--o{ AGENTSKILL : "has"
-TASK ||--o{ MESSAGE : "has history"
-TASK ||--o{ ARTIFACT : "produces"
-MESSAGE ||--o{ PART : "contains"
-PART ||--o{ FILE : "references"
-AGENT ||--|| AGENTCARD : "has"
-PEER ||--|| AGENTCARD : "exchanges"
-class AgentCard {
-Name
-Version
-Capabilities
-Skills
+AGENTCARD ||--o{ TOOLCONTRACT: "implements"
+AGENTCARD ||--o{ AGENTSKILL: "has"
+TASK ||--o{ MESSAGE: "has history"
+TASK ||--o{ ARTIFACT: "produces"
+MESSAGE ||--o{ PART: "contains"
+PART ||--o{ FILE: "references"
+AGENT ||--|| AGENTCARD: "has"
+PEER ||--|| AGENTCARD: "exchanges"
+AGENTCARD {
+string Name
+string Version
+string Capabilities
+string Skills
 }
-class ToolContract {
-Engine
-Name
-EngineSpec
+TOOLCONTRACT {
+string Engine
+string Name
+string EngineSpec
 }
-class Task {
-ID
-Status
-History
-Artifacts
+TASK {
+string ID
+string Status
+string History
+string Artifacts
 }
-class Message {
-Role
-Parts
-MessageID
+MESSAGE {
+string Role
+string Parts
+string MessageID
 }
-class Part {
-Kind
-Text
-File
-Data
+PART {
+string Kind
+string Text
+string File
+string Data
 }
-class Artifact {
-ArtifactID
-Name
-Parts
+ARTIFACT {
+string ArtifactID
+string Name
+string Parts
 }
-class Agent {
-Name
-Host
-Card
+AGENT {
+string Name
+string Host
+string Card
 }
-class Peer {
-ID
-Addrs
-AgentCard
+PEER {
+string ID
+string Addrs
+string AgentCard
 }
 ```
 
@@ -767,12 +767,12 @@ This ensures that clients and servers correctly interpret the message format.
 
 ```mermaid
 flowchart TD
-A[Go Struct] --> B["json.Marshal()"]
-B --> C[JSON Bytes]
-C --> D[Network Transmission]
-D --> E[JSON Bytes]
+A["Go Struct"] --> B["json.Marshal()"]
+B --> C["JSON Bytes"]
+C --> D["Network Transmission"]
+D --> E["JSON Bytes"]
 E --> F["json.Unmarshal()"]
-F --> G[Go Struct]
+F --> G["Go Struct"]
 style A fill:#f9f,stroke:#333
 style C fill:#bbf,stroke:#333
 style E fill:#bbf,stroke:#333

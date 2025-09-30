@@ -66,16 +66,16 @@ The PraxisAgent system follows a microservices-based, event-driven architecture 
 ```mermaid
 graph TB
 subgraph "Agent Node"
-P2P[P2P Networking]
-MCP[MCP Server]
-DSL[DSL Analyzer]
-LLM[LLM Client]
-EventBus[EventBus]
-TaskManager[Task Manager]
-API[WebSocket Gateway]
-Execution[Dagger/Remote Engines]
-P2P < --> MCP
-MCP < --> Execution
+P2P["P2P Networking"]
+MCP["MCP Server"]
+DSL["DSL Analyzer"]
+LLM["LLM Client"]
+EventBus["EventBus"]
+TaskManager["Task Manager"]
+API["WebSocket Gateway"]
+Execution["Dagger/Remote Engines"]
+P2P <--> MCP
+MCP <--> Execution
 DSL --> LLM
 LLM --> EventBus
 EventBus --> TaskManager
@@ -83,9 +83,9 @@ EventBus --> API
 TaskManager --> Execution
 API --> DSL
 end
-P2P <- --> P2P[Other Agents]
-LLM --> OpenAI[OpenAI API]
-Execution --> Docker[Docker Engine]
+P2P <--> OtherAgents["Other Agents"]
+LLM --> OpenAI["OpenAI API"]
+Execution --> Docker["Docker Engine"]
 ```
 
 **Diagram sources**
@@ -103,12 +103,12 @@ sequenceDiagram
 participant AgentA
 participant AgentB
 participant ProtocolHandler
-AgentA->>AgentB : Connect via libp2p
-AgentB->>ProtocolHandler : StreamHandler(ProtocolCard)
-ProtocolHandler->>AgentA : Send AgentCard
-AgentA->>ProtocolHandler : Receive AgentCard
-ProtocolHandler->>AgentB : Store Peer Card
-AgentB->>AgentA : Confirm Connection
+AgentA->>AgentB: Connect via libp2p
+AgentB->>ProtocolHandler: StreamHandler(ProtocolCard)
+ProtocolHandler->>AgentA: Send AgentCard
+AgentA->>ProtocolHandler: Receive AgentCard
+ProtocolHandler->>AgentB: Store Peer Card
+AgentB->>AgentA: Confirm Connection
 ```
 
 **Diagram sources**
@@ -129,15 +129,15 @@ class MCPServer {
 +StartSSE(port: string)
 }
 class RemoteMCPEngine {
--TransportManager : transportManager
-+Execute(contract: ToolContract, args: Map<string, interface>) : string
+-TransportManager: transportManager
++Execute(contract: ToolContract, args: Map~string, interface~): string
 }
 class TransportManager {
 +RegisterSSEEndpoint(name: string, address: string)
-+CallRemoteTool(ctx: Context, clientName: string, toolName: string, args: Map<string, interface>) : (PartialResponse, error)
++CallRemoteTool(ctx: Context, clientName: string, toolName: string, args: Map~string, interface~): PartialResponse
 }
-MCPServer --> TransportManager : uses
-RemoteMCPEngine --> TransportManager : uses
+MCPServer --> TransportManager: uses
+RemoteMCPEngine --> TransportManager: uses
 ```
 
 **Diagram sources**
@@ -152,7 +152,7 @@ The DSL analyzer interprets natural language input and generates executable work
 
 ```mermaid
 flowchart TD
-Start([User Input]) --> LLMClient{LLM Enabled?}
+Start(["User Input"]) --> LLMClient{"LLM Enabled?"}
 LLMClient --> |Yes| GeneratePlan["LLMClient.GenerateWorkflowFromNaturalLanguage()"]
 GeneratePlan --> ValidatePlan["ValidateWorkflowPlan()"]
 ValidatePlan --> ConvertAST["convertLLMPlanToAST()"]
@@ -179,12 +179,12 @@ participant DSLAnalyzer
 participant EventBus
 participant WebSocketGateway
 participant TaskManager
-DSLAnalyzer->>EventBus : Publish(EventWorkflowGenerated)
-EventBus->>WebSocketGateway : Notify Subscribers
-WebSocketGateway->>UI : Send Workflow via WebSocket
-DSLAnalyzer->>EventBus : Publish(EventTaskCreated)
-EventBus->>TaskManager : Notify TaskManager
-TaskManager->>TaskManager : CreateTask()
+DSLAnalyzer->>EventBus: Publish(EventWorkflowGenerated)
+EventBus->>WebSocketGateway: Notify Subscribers
+WebSocketGateway->>UI: Send Workflow via WebSocket
+DSLAnalyzer->>EventBus: Publish(EventTaskCreated)
+EventBus->>TaskManager: Notify TaskManager
+TaskManager->>TaskManager: CreateTask()
 ```
 
 **Diagram sources**
@@ -199,21 +199,21 @@ The system exhibits a well-defined dependency graph with clear boundaries betwee
 
 ```mermaid
 graph TD
-agent --> p2p
-agent --> mcp
-agent --> dsl
-agent --> llm
-agent --> bus
-agent --> a2a
-agent --> api
+agent["agent"] --> p2p["p2p"]
+agent --> mcp["mcp"]
+agent --> dsl["dsl"]
+agent --> llm["llm"]
+agent --> bus["bus"]
+agent --> a2a["a2a"]
+agent --> api["api"]
 dsl --> llm
-llm --> openai
-mcp --> dagger
-mcp --> transport
+llm --> openai["openai"]
+mcp --> dagger["dagger"]
+mcp --> transport["transport"]
 a2a --> bus
 api --> bus
 api --> dsl
-p2p --> libp2p
+p2p --> libp2p["libp2p"]
 ```
 
 **Diagram sources**

@@ -162,17 +162,19 @@ The `DaggerEngine` provides local execution capabilities using the Dagger.io pla
 ```mermaid
 classDiagram
 class DaggerEngine {
-+*dagger.Client : client
-+Execute(ctx: Context, contract: ToolContract, args: Map<string, interface>) : (string, error)
++client *dagger.Client
++Execute(ctx Context, contract ToolContract, args Map~string interface~) string, error
 +Close()
 }
 class ToolContract {
-+string : Engine
-+string : Name
-+map[string]interface{} : EngineSpec
++Engine string
++Name string
++EngineSpec map~string interface~
 }
-DaggerEngine --> ToolContract : "executes"
-DaggerEngine --> "dagger.Client" : "uses"
+class daggerClient["dagger.Client"] {
+}
+DaggerEngine --> ToolContract : executes
+DaggerEngine --> daggerClient : uses
 ```
 
 **Diagram sources**
@@ -199,25 +201,25 @@ participant Orchestrator
 participant DaggerEngine
 participant DaggerClient
 participant Container
-Orchestrator->>DaggerEngine : Execute(contract, args)
-DaggerEngine->>DaggerClient : Connect()
-DaggerClient-->>DaggerEngine : Client
-DaggerEngine->>DaggerEngine : Parse EngineSpec
-DaggerEngine->>Container : Create from image
+Orchestrator->>DaggerEngine: Execute(contract, args)
+DaggerEngine->>DaggerClient: Connect()
+DaggerClient-->>DaggerEngine: Client
+DaggerEngine->>DaggerEngine: Parse EngineSpec
+DaggerEngine->>Container: Create from image
 loop For each mount
-DaggerEngine->>Container : Mount host directory
+DaggerEngine->>Container: Mount host directory
 end
 loop For each env variable
-DaggerEngine->>Container : Set environment variable
+DaggerEngine->>Container: Set environment variable
 end
 loop For each arg
-DaggerEngine->>Container : Set as environment variable
+DaggerEngine->>Container: Set as environment variable
 end
-DaggerEngine->>Container : Add cache-busting timestamp
-DaggerEngine->>Container : Execute command
-Container-->>DaggerEngine : Stdout
-DaggerEngine->>DaggerEngine : Export modified directories
-DaggerEngine-->>Orchestrator : Result string
+DaggerEngine->>Container: Add cache-busting timestamp
+DaggerEngine->>Container: Execute command
+Container-->>DaggerEngine: Stdout
+DaggerEngine->>DaggerEngine: Export modified directories
+DaggerEngine-->>Orchestrator: Result string
 ```
 
 **Diagram sources**
@@ -233,20 +235,20 @@ The `RemoteMCPEngine` enables execution on remote servers via the Model Context 
 ```mermaid
 classDiagram
 class RemoteMCPEngine {
-+*TransportManager : transportManager
-+Execute(ctx: Context, contract: ToolContract, args: Map<string, interface>) : (string, error)
++transportManager *TransportManager
++Execute(ctx Context, contract ToolContract, args Map~string interface~) string, error
 }
 class ToolContract {
-+string : Engine
-+string : Name
-+map[string]interface{} : EngineSpec
++Engine string
++Name string
++EngineSpec map~string interface~
 }
 class TransportManager {
-+RegisterSSEEndpoint(name: string, address: string, config: EndpointConfig)
-+GetClient(name: string) : SSEClient
++RegisterSSEEndpoint(name string, address string, config EndpointConfig)
++GetClient(name string) SSEClient
 }
-RemoteMCPEngine --> ToolContract : "executes"
-RemoteMCPEngine --> TransportManager : "uses"
+RemoteMCPEngine --> ToolContract : executes
+RemoteMCPEngine --> TransportManager : uses
 ```
 
 **Diagram sources**
@@ -269,16 +271,16 @@ participant Orchestrator
 participant RemoteMCPEngine
 participant TransportManager
 participant RemoteServer
-Orchestrator->>RemoteMCPEngine : Execute(contract, args)
-RemoteMCPEngine->>RemoteMCPEngine : Extract address from EngineSpec
+Orchestrator->>RemoteMCPEngine: Execute(contract, args)
+RemoteMCPEngine->>RemoteMCPEngine: Extract address from EngineSpec
 alt Address missing
-RemoteMCPEngine-->>Orchestrator : Error
+RemoteMCPEngine-->>Orchestrator: Error
 else Address present
-RemoteMCPEngine->>TransportManager : RegisterSSEEndpoint(address)
-TransportManager-->>RemoteMCPEngine : Confirmation
-RemoteMCPEngine->>RemoteServer : POST /tool/{toolName} with args
-RemoteServer-->>RemoteMCPEngine : Response
-RemoteMCPEngine-->>Orchestrator : Result string
+RemoteMCPEngine->>TransportManager: RegisterSSEEndpoint(address)
+TransportManager-->>RemoteMCPEngine: Confirmation
+RemoteMCPEngine->>RemoteServer: POST /tool/{toolName} with args
+RemoteServer-->>RemoteMCPEngine: Response
+RemoteMCPEngine-->>Orchestrator: Result string
 end
 ```
 
@@ -324,17 +326,20 @@ The orchestrator uses a generic handler to route execution requests to the appro
 flowchart TD
 Start([Execution Request]) --> ExtractEngine["Extract engine name from tool config"]
 ExtractEngine --> CheckEngine{"Engine in registry?"}
-CheckEngine --> |Yes| GetEngine["Get engine from registry"]
-CheckEngine --> |No| InitializeDagger["Is engine 'dagger'?"]
-InitializeDagger --> |Yes| CreateDagger["Create DaggerEngine"]
-InitializeDagger --> |No| ReturnError["Return engine not found error"]
+CheckEngine -->|Yes| GetEngine["Get engine from registry"]
+CheckEngine -->|No| InitializeDagger["Is engine 'dagger'?"]
+InitializeDagger -->|Yes| CreateDagger["Create DaggerEngine"]
+InitializeDagger -->|No| ReturnError["Return engine not found error"]
 CreateDagger --> RegisterDagger["Register in executionEngines"]
 RegisterDagger --> GetEngine
 GetEngine --> CreateContract["Create ToolContract"]
 CreateContract --> Execute["Call engine.Execute()"]
 Execute --> HandleResult{"Execution successful?"}
-HandleResult --> |Yes| ReturnResult["Return result"]
-HandleResult --> |No| ReturnError["Return execution error"]
+HandleResult -->|Yes| ReturnResult["Return result"]
+HandleResult -->|No| ReturnError2["Return execution error"]
+ReturnError --> End([End])
+ReturnError2 --> End
+ReturnResult --> End
 ```
 
 **Diagram sources**
@@ -354,27 +359,27 @@ participant HTTPServer
 participant PraxisAgent
 participant ExecutionEngine
 participant Backend
-Client->>HTTPServer : POST /execute with DSL
-HTTPServer->>PraxisAgent : Parse as JSON-RPC
-PraxisAgent->>PraxisAgent : DispatchA2ARequest()
-PraxisAgent->>PraxisAgent : handleMessageSend()
-PraxisAgent->>PraxisAgent : CreateTask()
-PraxisAgent->>PraxisAgent : processTask() async
-PraxisAgent->>PraxisAgent : AnalyzeWithOrchestration()
+Client->>HTTPServer: POST /execute with DSL
+HTTPServer->>PraxisAgent: Parse as JSON-RPC
+PraxisAgent->>PraxisAgent: DispatchA2ARequest()
+PraxisAgent->>PraxisAgent: handleMessageSend()
+PraxisAgent->>PraxisAgent: CreateTask()
+PraxisAgent->>PraxisAgent: processTask() async
+PraxisAgent->>PraxisAgent: AnalyzeWithOrchestration()
 loop For each tool call
-PraxisAgent->>PraxisAgent : createGenericHandler()
-PraxisAgent->>ExecutionEngine : Execute(contract, args)
+PraxisAgent->>PraxisAgent: createGenericHandler()
+PraxisAgent->>ExecutionEngine: Execute(contract, args)
 alt Dagger engine
-ExecutionEngine->>Docker : Execute in container
+ExecutionEngine->>Backend: Execute in container
 else Remote engine
-ExecutionEngine->>Backend : HTTP POST to remote server
+ExecutionEngine->>Backend: HTTP POST to remote server
 end
-ExecutionEngine-->>PraxisAgent : Result
-PraxisAgent->>PraxisAgent : AddArtifactToTask()
+ExecutionEngine-->>PraxisAgent: Result
+PraxisAgent->>PraxisAgent: AddArtifactToTask()
 end
-PraxisAgent->>PraxisAgent : UpdateTaskStatus(completed)
-PraxisAgent-->>HTTPServer : Task with artifacts
-HTTPServer-->>Client : JSON response
+PraxisAgent->>PraxisAgent: UpdateTaskStatus(completed)
+PraxisAgent-->>HTTPServer: Task with artifacts
+HTTPServer-->>Client: JSON response
 ```
 
 **Diagram sources**

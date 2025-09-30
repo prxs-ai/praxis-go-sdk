@@ -25,34 +25,34 @@ The transport system implements a standardized interface that abstracts the unde
 ```mermaid
 classDiagram
 class TransportManager {
-+clients : Map<string, MCPClientWrapper>
-+factory : ClientFactory
-+logger : Logger
-+RegisterSSEEndpoint(name: url, headers)
-+RegisterHTTPEndpoint(name: url, headers)
-+RegisterSTDIOEndpoint(name: command, args)
-+GetClient(name) : MCPClientWrapper
-+CallRemoteTool(ctx: clientName, toolName: args)
++map~string,MCPClientWrapper~ clients
++ClientFactory factory
++Logger logger
++RegisterSSEEndpoint(name string, url string, headers map~string,string~)
++RegisterHTTPEndpoint(name string, url string, headers map~string,string~)
++RegisterSTDIOEndpoint(name string, command string, args string[])
++GetClient(name string) MCPClientWrapper
++CallRemoteTool(ctx Context, clientName string, toolName string, args map~string,interface~)
 +Close()
 }
 class ClientFactory {
-+configs : Map<string, ClientConfig>
-+logger : Logger
-+RegisterConfig(name: config)
-+GetOrCreateClient(name) : MCPClientWrapper
++map~string,ClientConfig~ configs
++Logger logger
++RegisterConfig(name string, config ClientConfig)
++GetOrCreateClient(name string) MCPClientWrapper
 +CloseAll()
 }
 class MCPClientWrapper {
-+client : Client
-+clientType : ClientType
-+serverInfo : InitializeResult
-+logger : Logger
-+ctx : Context
-+cancel : CancelFunc
-+initialized : bool
-+CallTool(ctx: name, args) : CallToolResult
-+Initialize(ctx) : error
-+Close() : error
++Client client
++ClientType clientType
++InitializeResult serverInfo
++Logger logger
++Context ctx
++CancelFunc cancel
++bool initialized
++CallTool(ctx Context, name string, args map~string,interface~) CallToolResult
++Initialize(ctx Context) error
++Close() error
 }
 TransportManager --> ClientFactory : "uses"
 ClientFactory --> MCPClientWrapper : "creates"
@@ -87,11 +87,6 @@ B --> E["STDIO Client"]
 C --> F["Event Stream"]
 D --> G["HTTP Request/Response"]
 E --> H["Process stdin/stdout"]
-style A fill:#f9f,stroke:#333
-style B fill:#bbf,stroke:#333,color:#fff
-style C fill:#9f9,stroke:#333
-style D fill:#9f9,stroke:#333
-style E fill:#9f9,stroke:#333
 ```
 
 **Diagram sources**
@@ -133,26 +128,26 @@ The system defines a common error structure that maps to JSON-RPC 2.0 error conv
 ```mermaid
 classDiagram
 class MCPError {
-+Code : int
-+Message : string
-+Data : interface
++int Code
++string Message
++interface Data
 }
 class P2PError {
-+Code : int
-+Message : string
++int Code
++string Message
 }
 class MCPResponse {
-+ID : int
-+Result : interface
-+Error : MCPError
++int ID
++interface Result
++MCPError Error
 }
 class P2PMessage {
-+Type : string
-+ID : string
-+Method : string
-+Params : interface
-+Result : interface
-+Error : P2PError
++string Type
++string ID
++string Method
++interface Params
++interface Result
++P2PError Error
 }
 MCPResponse --> MCPError : "contains"
 P2PMessage --> P2PError : "contains"

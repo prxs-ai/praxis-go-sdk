@@ -22,38 +22,38 @@ The `AgentCard` structure serves as a comprehensive capability advertisement for
 ```mermaid
 classDiagram
 class AgentCard {
-+Name : string
-+Description : string
-+URL : string
-+Version : string
-+ProtocolVersion : string
-+Provider : AgentProvider
-+Capabilities : AgentCapabilities
-+Skills : List<AgentSkill>
-+SecuritySchemes : Map<string, interface>
-+SupportedTransports : List<string>
-+Metadata : interface
++Name string
++Description string
++URL string
++Version string
++ProtocolVersion string
++Provider AgentProvider
++Capabilities AgentCapabilities
++Skills List~AgentSkill~
++SecuritySchemes Map~string,interface~
++SupportedTransports List~string~
++Metadata interface
 }
 class AgentProvider {
-+Name : string
-+Version : string
-+Description : string
-+URL : string
-+Organization : string
++Name string
++Version string
++Description string
++URL string
++Organization string
 }
 class AgentCapabilities {
-+Streaming : bool
-+PushNotifications : bool
-+StateTransition : bool
++Streaming bool
++PushNotifications bool
++StateTransition bool
 }
 class AgentSkill {
-+ID : string
-+Name : string
-+Description : string
-+Tags : List<string>
-+Examples : List<string>
-+InputModes : List<string>
-+OutputModes : List<string>
++ID string
++Name string
++Description string
++Tags List~string~
++Examples List~string~
++InputModes List~string~
++OutputModes List~string~
 }
 AgentCard --> AgentProvider : "has"
 AgentCard --> AgentCapabilities : "has"
@@ -134,40 +134,40 @@ The Bridge component, implemented as `P2PMCPBridge`, plays a critical role in pr
 ```mermaid
 classDiagram
 class P2PMCPBridge {
-+host : Host
-+mcpServer : MCPServerWrapper
-+transportMgr : TransportManager
-+peerClients : Map<ID, MCPClientWrapper>
-+logger : Logger
-+ctx : Context
-+cancel : CancelFunc
-+mu : RWMutex
++host Host
++mcpServer MCPServerWrapper
++transportMgr TransportManager
++peerClients Map~ID,MCPClientWrapper~
++logger Logger
++ctx Context
++cancel CancelFunc
++mu RWMutex
 +handleMCPStream(stream)
 +handleCardStream(stream)
 +ProcessMCPRequest(request)
 +ConnectToPeer(peerID)
-+CallPeerTool(ctx: peerID, toolName: args)
++CallPeerTool(ctx, peerID, toolName, args)
 +ListPeers(ctx)
-+SendMessage(ctx: peerIDStr, message)
++SendMessage(ctx, peerIDStr, message)
 +GetAgentCard(peerID)
 +getAgentCard()
 +Close()
 }
 class P2PProtocolHandler {
-+host : Host
-+logger : Logger
-+handlers : Map<ID, StreamHandler>
-+peerCards : Map<ID, AgentCard>
-+ourCard : AgentCard
-+mcpBridge : P2PMCPBridge
-+agent : A2AAgent
-+mu : RWMutex
++host Host
++logger Logger
++handlers Map~ID,StreamHandler~
++peerCards Map~ID,AgentCard~
++ourCard AgentCard
++mcpBridge P2PMCPBridge
++agent A2AAgent
++mu RWMutex
 +handleMCPStream(stream)
 +handleCardStream(stream)
 +handleToolStream(stream)
-+RequestCard(ctx: peerID)
-+InvokeTool(ctx: peerID, toolName: args)
-+SendMCPRequest(ctx: peerID, request)
++RequestCard(ctx, peerID)
++InvokeTool(ctx, peerID, toolName, args)
++SendMCPRequest(ctx, peerID, request)
 +GetPeerCards()
 +processMCPMessage(msg)
 +listTools()
