@@ -162,6 +162,7 @@ See the `/docs` folder for detailed documentation:
 - `ARCHITECTURE_AND_USAGE.md` - System architecture details
 - `INTEGRATION_SUMMARY.md` - Integration guide
 - `VISUAL_GUIDE.md` - Visual workflow examples
+- `PARAMETRIZED_WORKFLOW.md` - Parametrized workflows
 
 ## 🤝 Contributing
 
