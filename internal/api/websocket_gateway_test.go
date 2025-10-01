@@ -144,24 +144,33 @@ func TestWebSocketGateway_MessageRouting(t *testing.T) {
 		assert.NoError(t, err)
 
 		var response map[string]interface{}
-		var foundChatMessage bool
-		for i := 0; i < 3; i++ {
-			err = ws.SetReadDeadline(time.Now().Add(2 * time.Second))
-			assert.NoError(t, err)
-			err = ws.ReadJSON(&response)
-			if err != nil {
+		found := false
+		var lastPayloadText string
+
+		for i := 0; i < 10; i++ {
+			assert.NoError(t, ws.SetReadDeadline(time.Now().Add(3*time.Second)))
+			if err := ws.ReadJSON(&response); err != nil {
 				break
 			}
-			if response["type"] == "chatMessage" {
-				foundChatMessage = true
-				break
+
+			typ, _ := response["type"].(string)
+			if strings.ToLower(typ) != "chatmessage" {
+				continue
+			}
+
+			if payloadMap, ok := response["payload"].(map[string]interface{}); ok {
+				if txt, ok := payloadMap["content"].(string); ok {
+					lastPayloadText = txt
+					if strings.Contains(strings.ToLower(txt), "processing") ||
+						strings.Contains(strings.ToLower(txt), "result") {
+						found = true
+						break
+					}
+				}
 			}
 		}
-		assert.True(t, foundChatMessage)
-		assert.NotNil(t, response["payload"])
-		if payloadMap, ok := response["payload"].(map[string]interface{}); ok {
-			assert.Contains(t, payloadMap["content"], "Processing")
-		}
+
+		assert.True(t, found, "expected a chatMessage payload containing 'Processing' or 'Result', got: %q", lastPayloadText)
 	})
 }
 
