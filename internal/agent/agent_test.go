@@ -231,25 +231,6 @@ func firstFullP2pAddr(t *testing.T, h libhost.Host) string {
 	return s.String()
 }
 
-// mustNewHost creates a libp2p host bound to a random local port and returns a closer.
-func mustNewHost(t *testing.T) (libhost.Host, func()) {
-	t.Helper()
-
-	h, err := libp2p.New(
-		libp2p.ListenAddrStrings("/ip4/127.0.0.1/tcp/0"),
-	)
-	require.NoError(t, err)
-
-	closer := func() {
-		_ = h.Close()
-	}
-	return h, closer
-}
-
-func hasP2pSuffix(a multiaddr.Multiaddr) bool {
-	return containsSegment(a, "p2p")
-}
-
 func containsSegment(a multiaddr.Multiaddr, seg string) bool {
 	for _, p := range a.Protocols() {
 		if p.Name == seg {
