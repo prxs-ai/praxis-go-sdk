@@ -1,7 +1,15 @@
 package agent
 
 import (
+	"encoding/json"
+	"time"
+
 	"context"
+	libp2p "github.com/libp2p/go-libp2p"
+	libhost "github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/multiformats/go-multiaddr"
+	"github.com/praxis/praxis-go-sdk/internal/p2p"
 	"testing"
 
 	mcpTypes "github.com/mark3labs/mcp-go/mcp"
@@ -129,4 +137,99 @@ func TestHandleExecuteWorkflow_InjectsParamsAndSecrets(t *testing.T) {
 
 	assert.Contains(t, textContent.Text, "Alice")     // param consumed
 	assert.NotContains(t, textContent.Text, "SECRET") // secret must not leak
+}
+
+func TestRegisterDIDWithRegistry_Succeeds(t *testing.T) {
+	t.Parallel()
+
+	// --- Spin up a fake "registry" libp2p host with the DID handler
+	registryHost, registryClose := mustNewHost(t)
+	defer registryClose()
+
+	// Minimal handler that echos back {status:"ok", did, peer_info}
+	registryHost.SetStreamHandler(p2p.ProtocolDidRegister, func(s network.Stream) {
+		defer s.Close()
+
+		var payload map[string]any
+		if err := json.NewDecoder(s).Decode(&payload); err != nil {
+			_ = json.NewEncoder(s).Encode(map[string]any{
+				"error": err.Error(),
+				"code":  400,
+			})
+			return
+		}
+		_ = json.NewEncoder(s).Encode(map[string]any{
+			"status":    "ok",
+			"did":       payload["did"],
+			"peer_info": payload["peer_info"],
+		})
+	})
+
+	// Build a full registry multiaddr: /ip4/127.0.0.1/tcp/<port>/p2p/<peerID>
+	registryMaddr := firstFullP2pAddr(t, registryHost)
+
+	// --- Build an agent with its own libp2p host
+	agentHost, agentClose := mustNewHost(t)
+	defer agentClose()
+
+	a := &PraxisAgent{
+		logger: logrus.New(),
+		host:   agentHost,
+		// ctx/cancel aren’t required by RegisterDIDWithRegistry; use a local ctx here.
+	}
+
+	// --- Call the new method
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	did := "did:example:test-did-123"
+	err := a.RegisterDIDWithRegistry(ctx, registryMaddr, did)
+
+	require.NoError(t, err, "RegisterDIDWithRegistry should succeed")
+}
+
+// mustNewHost creates a libp2p host bound to a random local port and returns a closer.
+func mustNewHost(t *testing.T) (libhost.Host, func()) {
+	t.Helper()
+
+	h, err := libp2p.New(
+		libp2p.ListenAddrStrings("/ip4/127.0.0.1/tcp/0"),
+	)
+	require.NoError(t, err)
+
+	closer := func() {
+		_ = h.Close()
+	}
+	return h, closer
+}
+
+// firstFullP2pAddr returns "<addr>/p2p/<peerID>" built from the host’s first listen addr.
+func firstFullP2pAddr(t *testing.T, h libhost.Host) string {
+	t.Helper()
+
+	addrs := h.Addrs()
+	require.NotEmpty(t, addrs, "host has no listen addrs")
+
+	pid := h.ID()
+	base := addrs[0]
+	// Ensure we don’t double-append /p2p
+	if !hasP2pSuffix(base) {
+		s, err := multiaddr.NewMultiaddr(base.String() + "/p2p/" + pid.String())
+		require.NoError(t, err)
+		return s.String()
+	}
+	return base.String()
+}
+
+func hasP2pSuffix(a multiaddr.Multiaddr) bool {
+	return containsSegment(a, "p2p")
+}
+
+func containsSegment(a multiaddr.Multiaddr, seg string) bool {
+	for _, p := range a.Protocols() {
+		if p.Name == seg {
+			return true
+		}
+	}
+	return false
 }
