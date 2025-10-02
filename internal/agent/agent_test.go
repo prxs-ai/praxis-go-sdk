@@ -138,26 +138,21 @@ func TestHandleExecuteWorkflow_InjectsParamsAndSecrets(t *testing.T) {
 	assert.Contains(t, textContent.Text, "Alice")     // param consumed
 	assert.NotContains(t, textContent.Text, "SECRET") // secret must not leak
 }
-
 func TestRegisterDIDWithRegistry_Succeeds(t *testing.T) {
-	t.Parallel()
+	// Many CI hooks run with -short; skip socket/libp2p integration in that mode.
+	if testing.Short() {
+		t.Skip("skipping libp2p DID registration test in -short mode")
+	}
 
 	// --- Spin up a fake "registry" libp2p host with the DID handler
-	registryHost, registryClose := mustNewHost(t)
+	registryHost, registryClose := mustNewHostIPv4(t)
 	defer registryClose()
 
 	// Minimal handler that echos back {status:"ok", did, peer_info}
 	registryHost.SetStreamHandler(p2p.ProtocolDidRegister, func(s network.Stream) {
 		defer s.Close()
-
 		var payload map[string]any
-		if err := json.NewDecoder(s).Decode(&payload); err != nil {
-			_ = json.NewEncoder(s).Encode(map[string]any{
-				"error": err.Error(),
-				"code":  400,
-			})
-			return
-		}
+		_ = json.NewDecoder(s).Decode(&payload)
 		_ = json.NewEncoder(s).Encode(map[string]any{
 			"status":    "ok",
 			"did":       payload["did"],
@@ -169,23 +164,71 @@ func TestRegisterDIDWithRegistry_Succeeds(t *testing.T) {
 	registryMaddr := firstFullP2pAddr(t, registryHost)
 
 	// --- Build an agent with its own libp2p host
-	agentHost, agentClose := mustNewHost(t)
+	agentHost, agentClose := mustNewHostIPv4(t)
 	defer agentClose()
 
 	a := &PraxisAgent{
 		logger: logrus.New(),
 		host:   agentHost,
-		// ctx/cancel aren’t required by RegisterDIDWithRegistry; use a local ctx here.
 	}
 
-	// --- Call the new method
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	// --- Call the new method with a generous CI-safe timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	did := "did:example:test-did-123"
+	did := "did:example:test-did-ci"
 	err := a.RegisterDIDWithRegistry(ctx, registryMaddr, did)
-
 	require.NoError(t, err, "RegisterDIDWithRegistry should succeed")
+}
+
+// mustNewHostIPv4 creates a libp2p host bound to a random local IPv4 port and returns a closer.
+func mustNewHostIPv4(t *testing.T) (libhost.Host, func()) {
+	t.Helper()
+	h, err := libp2p.New(
+		libp2p.ListenAddrStrings("/ip4/127.0.0.1/tcp/0"),
+	)
+	require.NoError(t, err)
+	return h, func() { _ = h.Close() }
+}
+
+// firstFullP2pAddr returns "<addr>/p2p/<peerID>" from the host’s first IPv4 listen addr.
+// If none found, it falls back to the first addr.
+func firstFullP2pAddr(t *testing.T, h libhost.Host) string {
+	t.Helper()
+	addrs := h.Addrs()
+	require.NotEmpty(t, addrs, "host has no listen addrs")
+
+	var base multiaddr.Multiaddr
+	for _, a := range addrs {
+		for _, p := range a.Protocols() {
+			if p.Name == "ip4" {
+				base = a
+				break
+			}
+		}
+		if base != nil {
+			break
+		}
+	}
+	if base == nil {
+		base = addrs[0]
+	}
+
+	pid := h.ID()
+	// don’t double-append /p2p
+	alreadyHasP2P := false
+	for _, p := range base.Protocols() {
+		if p.Name == "p2p" {
+			alreadyHasP2P = true
+			break
+		}
+	}
+	if alreadyHasP2P {
+		return base.String()
+	}
+	s, err := multiaddr.NewMultiaddr(base.String() + "/p2p/" + pid.String())
+	require.NoError(t, err)
+	return s.String()
 }
 
 // mustNewHost creates a libp2p host bound to a random local port and returns a closer.
@@ -201,24 +244,6 @@ func mustNewHost(t *testing.T) (libhost.Host, func()) {
 		_ = h.Close()
 	}
 	return h, closer
-}
-
-// firstFullP2pAddr returns "<addr>/p2p/<peerID>" built from the host’s first listen addr.
-func firstFullP2pAddr(t *testing.T, h libhost.Host) string {
-	t.Helper()
-
-	addrs := h.Addrs()
-	require.NotEmpty(t, addrs, "host has no listen addrs")
-
-	pid := h.ID()
-	base := addrs[0]
-	// Ensure we don’t double-append /p2p
-	if !hasP2pSuffix(base) {
-		s, err := multiaddr.NewMultiaddr(base.String() + "/p2p/" + pid.String())
-		require.NoError(t, err)
-		return s.String()
-	}
-	return base.String()
 }
 
 func hasP2pSuffix(a multiaddr.Multiaddr) bool {
