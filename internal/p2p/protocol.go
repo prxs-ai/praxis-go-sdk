@@ -18,11 +18,12 @@ import (
 
 const (
 	// P2P Protocol IDs
-	ProtocolMCP     = protocol.ID("/praxis/mcp/1.0.0")
-	ProtocolCard    = protocol.ID("/praxis/card/1.0.0")
-	ProtocolTool    = protocol.ID("/praxis/tool/1.0.0")
-	ProtocolA2A     = protocol.ID("/praxis/a2a/1.0.0")      // A2A Protocol
-	ProtocolA2ACard = protocol.ID("/praxis/a2a.card/0.3.0") // A2A Card Exchange Protocol
+	ProtocolMCP         = protocol.ID("/praxis/mcp/1.0.0")
+	ProtocolCard        = protocol.ID("/praxis/card/1.0.0")
+	ProtocolTool        = protocol.ID("/praxis/tool/1.0.0")
+	ProtocolA2A         = protocol.ID("/praxis/a2a/1.0.0")      // A2A Protocol
+	ProtocolA2ACard     = protocol.ID("/praxis/a2a.card/0.3.0") // A2A Card Exchange Protocol
+	ProtocolDidRegister = protocol.ID("/praxis/did-register/1.0.0")
 )
 
 // P2PProtocolHandler handles P2P protocol messages
