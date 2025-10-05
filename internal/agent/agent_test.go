@@ -231,11 +231,74 @@ func firstFullP2pAddr(t *testing.T, h libhost.Host) string {
 	return s.String()
 }
 
-func containsSegment(a multiaddr.Multiaddr, seg string) bool {
-	for _, p := range a.Protocols() {
-		if p.Name == seg {
-			return true
-		}
+func TestAutoRegisterDIDOnInitializeP2P(t *testing.T) {
+	// Skip on -short to keep CI fast if needed.
+	if testing.Short() {
+		t.Skip("skipping libp2p auto-registration test in -short mode")
 	}
-	return false
+
+	// ---- Spin up a fake registry host that handles /praxis/did-register ----
+	registryHost, registryClose := mustNewHostIPv4(t)
+	defer registryClose()
+
+	type gotMsg struct {
+		did       string
+		peerInfo  string
+		remotePID string
+	}
+	got := make(chan gotMsg, 1)
+
+	registryHost.SetStreamHandler(p2p.ProtocolDidRegister, func(s network.Stream) {
+		defer s.Close()
+
+		var payload map[string]any
+		_ = json.NewDecoder(s).Decode(&payload)
+
+		// Echo OK so the agent sees success
+		_ = json.NewEncoder(s).Encode(map[string]any{
+			"status":    "ok",
+			"did":       payload["did"],
+			"peer_info": payload["peer_info"],
+		})
+
+		remote := s.Conn().RemotePeer().String()
+		did, _ := payload["did"].(string)
+		pi, _ := payload["peer_info"].(string)
+		got <- gotMsg{did: did, peerInfo: pi, remotePID: remote}
+	})
+
+	// Build full /p2p/ multiaddr for the registry
+	registryMaddr := firstFullP2pAddr(t, registryHost)
+
+	// ---- Create the agent and enable auto-registration ----
+	a := &PraxisAgent{
+		logger:        logrus.New(),
+		httpPort:      0,
+		p2pPort:       0, // random port
+		ssePort:       0,
+		websocketPort: 0,
+		registryMaddr: registryMaddr, // <- enable auto-registration
+		did:           "did:example:auto-init-test",
+	}
+
+	// initializeP2P() will create a host and spawn the registration goroutine
+	require.NoError(t, a.initializeP2P())
+	defer func() {
+		if a.host != nil {
+			_ = a.host.Close()
+		}
+	}()
+
+	// ---- Wait for the registry handler to receive and validate the payload ----
+	select {
+	case m := <-got:
+		assert.Equal(t, a.did, m.did, "registry should receive the configured DID")
+		// PeerInfo must reference the actual connecting peer
+		assert.Contains(t, m.peerInfo, "/p2p/"+m.remotePID, "peer_info must contain /p2p/<agent peer id>")
+		// Avoid 0.0.0.0 in advertised addr
+		assert.NotContains(t, m.peerInfo, "0.0.0.0", "peer_info should not advertise 0.0.0.0")
+		assert.NotEmpty(t, m.peerInfo, "peer_info should not be empty")
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for auto DID registration to hit the registry handler")
+	}
 }

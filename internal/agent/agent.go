@@ -66,6 +66,8 @@ type PraxisAgent struct {
 	executionEngines     map[string]contracts.ExecutionEngine
 	appConfig            *appconfig.AppConfig
 	taskManager          *a2a.TaskManager // A2A Task Manager
+	registryMaddr        string
+	did                  string
 }
 
 type Config struct {
@@ -78,7 +80,9 @@ type Config struct {
 	MCPEnabled    bool
 	LogLevel      string
 	// Pass loaded application config so agent doesn't reload a hardcoded path
-	AppConfig *appconfig.AppConfig
+	AppConfig         *appconfig.AppConfig
+	RegistryMultiaddr string // e.g. "/ip4/127.0.0.1/tcp/4001/p2p/<REGISTRY_PEER_ID>"
+	DID               string // e.g. "did:key:z6Mk..."
 }
 
 func NewPraxisAgent(config Config) (*PraxisAgent, error) {
@@ -110,6 +114,8 @@ func NewPraxisAgent(config Config) (*PraxisAgent, error) {
 		logger:        logger,
 		ctx:           ctx,
 		cancel:        cancel,
+		registryMaddr: config.RegistryMultiaddr,
+		did:           config.DID,
 	}
 
 	// ADDED: Инициализация менеджера транспортов и исполнительных движков
@@ -243,6 +249,18 @@ func (a *PraxisAgent) initializeP2P() error {
 	// Start discovery
 	if err := a.discovery.Start(); err != nil {
 		return fmt.Errorf("failed to start discovery: %w", err)
+	}
+
+	if a.registryMaddr != "" && a.did != "" {
+		go func(regMaddr, did string) {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			if err := a.RegisterDIDWithRegistry(ctx, regMaddr, did); err != nil {
+				a.logger.Warnf("DID registration skipped/failed: %v (registry=%s did=%s)", err, regMaddr, did)
+			}
+		}(a.registryMaddr, a.did)
+	} else {
+		a.logger.Debug("DID auto-registration not configured (REGISTRY_MADDR or AGENT_DID missing)")
 	}
 
 	return nil
@@ -1089,14 +1107,16 @@ func boolPtr(b bool) *bool {
 
 func GetConfigFromEnv() Config {
 	config := Config{
-		AgentName:     getEnv("AGENT_NAME", "praxis-agent"),
-		AgentVersion:  getEnv("AGENT_VERSION", "1.0.0"),
-		HTTPPort:      getEnvInt("HTTP_PORT", 8000),
-		P2PPort:       getEnvInt("P2P_PORT", 4001),
-		SSEPort:       getEnvInt("SSE_PORT", 8090),
-		WebSocketPort: getEnvInt("WEBSOCKET_PORT", 9000),
-		MCPEnabled:    getEnvBool("MCP_ENABLED", true),
-		LogLevel:      getEnv("LOG_LEVEL", "info"),
+		AgentName:         getEnv("AGENT_NAME", "praxis-agent"),
+		AgentVersion:      getEnv("AGENT_VERSION", "1.0.0"),
+		HTTPPort:          getEnvInt("HTTP_PORT", 8000),
+		P2PPort:           getEnvInt("P2P_PORT", 4001),
+		SSEPort:           getEnvInt("SSE_PORT", 8090),
+		WebSocketPort:     getEnvInt("WEBSOCKET_PORT", 9000),
+		MCPEnabled:        getEnvBool("MCP_ENABLED", true),
+		LogLevel:          getEnv("LOG_LEVEL", "info"),
+		RegistryMultiaddr: getEnv("REGISTRY_MADDR", ""),
+		DID:               getEnv("AGENT_DID", ""),
 	}
 	return config
 }
