@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.2](https://github.com/prxs-ai/praxis-go-sdk/compare/v0.2.1...v0.2.2) (2025-10-05)
+
+
+### Features
+
+* add params and secrets tow workflow ([#22](https://github.com/prxs-ai/praxis-go-sdk/issues/22)) ([c0fd4bc](https://github.com/prxs-ai/praxis-go-sdk/commit/c0fd4bc3d792cf51a2c3e514939733499a0c8fbb))
+* **agent:** add method to register did ([#25](https://github.com/prxs-ai/praxis-go-sdk/issues/25)) ([3d9ca11](https://github.com/prxs-ai/praxis-go-sdk/commit/3d9ca1166c5083eb9b3f0739c897fcae67cdecc3))
+
+
+### Bug Fixes
+
+* address ([#17](https://github.com/prxs-ai/praxis-go-sdk/issues/17)) ([6f7ec6b](https://github.com/prxs-ai/praxis-go-sdk/commit/6f7ec6b77ec4c881a3af5fd4b52c14067e1e5b76))
+* address broken code lines ([#20](https://github.com/prxs-ai/praxis-go-sdk/issues/20)) ([f5a3454](https://github.com/prxs-ai/praxis-go-sdk/commit/f5a345404e3f40055ecf56ceea0f45cfd82f2185))
+
 ## [0.2.1](https://github.com/prxs-ai/praxis-go-sdk/compare/v0.2.0...v0.2.1) (2025-09-22)
 
 ### Major New Features
