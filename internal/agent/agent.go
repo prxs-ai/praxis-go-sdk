@@ -66,6 +66,8 @@ type PraxisAgent struct {
 	executionEngines     map[string]contracts.ExecutionEngine
 	appConfig            *appconfig.AppConfig
 	taskManager          *a2a.TaskManager // A2A Task Manager
+	registryMaddr        string
+	did                  string
 }
 
 type Config struct {
@@ -78,7 +80,9 @@ type Config struct {
 	MCPEnabled    bool
 	LogLevel      string
 	// Pass loaded application config so agent doesn't reload a hardcoded path
-	AppConfig *appconfig.AppConfig
+	AppConfig         *appconfig.AppConfig
+	RegistryMultiaddr string // e.g. "/ip4/127.0.0.1/tcp/4001/p2p/<REGISTRY_PEER_ID>"
+	DID               string // e.g. "did:key:z6Mk..."
 }
 
 func NewPraxisAgent(config Config) (*PraxisAgent, error) {
@@ -110,6 +114,8 @@ func NewPraxisAgent(config Config) (*PraxisAgent, error) {
 		logger:        logger,
 		ctx:           ctx,
 		cancel:        cancel,
+		registryMaddr: config.RegistryMultiaddr,
+		did:           config.DID,
 	}
 
 	// ADDED: Инициализация менеджера транспортов и исполнительных движков
@@ -243,6 +249,18 @@ func (a *PraxisAgent) initializeP2P() error {
 	// Start discovery
 	if err := a.discovery.Start(); err != nil {
 		return fmt.Errorf("failed to start discovery: %w", err)
+	}
+
+	if a.registryMaddr != "" && a.did != "" {
+		go func(regMaddr, did string) {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			if err := a.RegisterDIDWithRegistry(ctx, regMaddr, did); err != nil {
+				a.logger.Warnf("DID registration skipped/failed: %v (registry=%s did=%s)", err, regMaddr, did)
+			}
+		}(a.registryMaddr, a.did)
+	} else {
+		a.logger.Debug("DID auto-registration not configured (REGISTRY_MADDR or AGENT_DID missing)")
 	}
 
 	return nil
@@ -1089,14 +1107,16 @@ func boolPtr(b bool) *bool {
 
 func GetConfigFromEnv() Config {
 	config := Config{
-		AgentName:     getEnv("AGENT_NAME", "praxis-agent"),
-		AgentVersion:  getEnv("AGENT_VERSION", "1.0.0"),
-		HTTPPort:      getEnvInt("HTTP_PORT", 8000),
-		P2PPort:       getEnvInt("P2P_PORT", 4001),
-		SSEPort:       getEnvInt("SSE_PORT", 8090),
-		WebSocketPort: getEnvInt("WEBSOCKET_PORT", 9000),
-		MCPEnabled:    getEnvBool("MCP_ENABLED", true),
-		LogLevel:      getEnv("LOG_LEVEL", "info"),
+		AgentName:         getEnv("AGENT_NAME", "praxis-agent"),
+		AgentVersion:      getEnv("AGENT_VERSION", "1.0.0"),
+		HTTPPort:          getEnvInt("HTTP_PORT", 8000),
+		P2PPort:           getEnvInt("P2P_PORT", 4001),
+		SSEPort:           getEnvInt("SSE_PORT", 8090),
+		WebSocketPort:     getEnvInt("WEBSOCKET_PORT", 9000),
+		MCPEnabled:        getEnvBool("MCP_ENABLED", true),
+		LogLevel:          getEnv("LOG_LEVEL", "info"),
+		RegistryMultiaddr: getEnv("REGISTRY_MADDR", ""),
+		DID:               getEnv("AGENT_DID", ""),
 	}
 	return config
 }
@@ -2108,4 +2128,76 @@ func redactSecrets(secrets map[string]interface{}) map[string]interface{} {
 		redacted[k] = "***"
 	}
 	return redacted
+}
+
+// RegisterDIDWithRegistry connects to the AI Registry over libp2p and registers (or updates) DID->peer_info.
+// registryMaddr should be a full multiaddr: /ip4/<ip>/tcp/<port>/p2p/<REGISTRY_PEER_ID>
+func (a *PraxisAgent) RegisterDIDWithRegistry(ctx context.Context, registryMaddr string, did string) error {
+	if a.host == nil {
+		return fmt.Errorf("p2p host is not initialized")
+	}
+
+	maddr, err := multiaddr.NewMultiaddr(registryMaddr)
+	if err != nil {
+		return fmt.Errorf("invalid registry multiaddr: %w", err)
+	}
+	ai, err := peer.AddrInfoFromP2pAddr(maddr)
+	if err != nil {
+		return fmt.Errorf("failed to parse registry AddrInfo: %w", err)
+	}
+	if err := a.host.Connect(ctx, *ai); err != nil {
+		return fmt.Errorf("failed to connect to registry: %w", err)
+	}
+
+	var peerInfo string
+	ourPID := a.host.ID().String()
+	for _, addr := range a.host.Addrs() {
+		if strings.Contains(addr.String(), "/p2p/") {
+			continue
+		}
+		peerInfo = fmt.Sprintf("%s/p2p/%s", addr.String(), ourPID)
+		break
+	}
+	if peerInfo == "" {
+		return fmt.Errorf("no suitable listen address found to build peer_info")
+	}
+
+	stream, err := a.host.NewStream(ctx, ai.ID, p2p.ProtocolDidRegister)
+	if err != nil {
+		return fmt.Errorf("failed to open did-register stream: %w", err)
+	}
+	defer stream.Close()
+
+	payload := map[string]any{
+		"did":       did,
+		"peer_info": peerInfo,
+	}
+
+	enc := json.NewEncoder(stream)
+	if err := enc.Encode(payload); err != nil {
+		return fmt.Errorf("failed to send did-register payload: %w", err)
+	}
+
+	dec := json.NewDecoder(stream)
+	var resp map[string]any
+	if err := dec.Decode(&resp); err != nil {
+		return fmt.Errorf("failed to read did-register response: %w", err)
+	}
+
+	if status, _ := resp["status"].(string); status != "ok" {
+		if errStr, _ := resp["error"].(string); errStr != "" {
+			return fmt.Errorf("registry error: %s", errStr)
+		}
+		return fmt.Errorf("did-register failed: %+v", resp)
+	}
+
+	if respDid, _ := resp["did"].(string); respDid != did {
+		a.logger.Warnf("registry responded with different did: %q (expected %q)", respDid, did)
+	}
+	if respPI, _ := resp["peer_info"].(string); respPI != peerInfo {
+		a.logger.Warnf("registry responded with different peer_info")
+	}
+
+	a.logger.Infof("✅ DID registered with registry: did=%s peer_info=%s", did, peerInfo)
+	return nil
 }

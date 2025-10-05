@@ -1,7 +1,15 @@
 package agent
 
 import (
+	"encoding/json"
+	"time"
+
 	"context"
+	libp2p "github.com/libp2p/go-libp2p"
+	libhost "github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/multiformats/go-multiaddr"
+	"github.com/praxis/praxis-go-sdk/internal/p2p"
 	"testing"
 
 	mcpTypes "github.com/mark3labs/mcp-go/mcp"
@@ -129,4 +137,168 @@ func TestHandleExecuteWorkflow_InjectsParamsAndSecrets(t *testing.T) {
 
 	assert.Contains(t, textContent.Text, "Alice")     // param consumed
 	assert.NotContains(t, textContent.Text, "SECRET") // secret must not leak
+}
+func TestRegisterDIDWithRegistry_Succeeds(t *testing.T) {
+	// Many CI hooks run with -short; skip socket/libp2p integration in that mode.
+	if testing.Short() {
+		t.Skip("skipping libp2p DID registration test in -short mode")
+	}
+
+	// --- Spin up a fake "registry" libp2p host with the DID handler
+	registryHost, registryClose := mustNewHostIPv4(t)
+	defer registryClose()
+
+	// Minimal handler that echos back {status:"ok", did, peer_info}
+	registryHost.SetStreamHandler(p2p.ProtocolDidRegister, func(s network.Stream) {
+		defer s.Close()
+		var payload map[string]any
+		_ = json.NewDecoder(s).Decode(&payload)
+		_ = json.NewEncoder(s).Encode(map[string]any{
+			"status":    "ok",
+			"did":       payload["did"],
+			"peer_info": payload["peer_info"],
+		})
+	})
+
+	// Build a full registry multiaddr: /ip4/127.0.0.1/tcp/<port>/p2p/<peerID>
+	registryMaddr := firstFullP2pAddr(t, registryHost)
+
+	// --- Build an agent with its own libp2p host
+	agentHost, agentClose := mustNewHostIPv4(t)
+	defer agentClose()
+
+	a := &PraxisAgent{
+		logger: logrus.New(),
+		host:   agentHost,
+	}
+
+	// --- Call the new method with a generous CI-safe timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	did := "did:example:test-did-ci"
+	err := a.RegisterDIDWithRegistry(ctx, registryMaddr, did)
+	require.NoError(t, err, "RegisterDIDWithRegistry should succeed")
+}
+
+// mustNewHostIPv4 creates a libp2p host bound to a random local IPv4 port and returns a closer.
+func mustNewHostIPv4(t *testing.T) (libhost.Host, func()) {
+	t.Helper()
+	h, err := libp2p.New(
+		libp2p.ListenAddrStrings("/ip4/127.0.0.1/tcp/0"),
+	)
+	require.NoError(t, err)
+	return h, func() { _ = h.Close() }
+}
+
+// firstFullP2pAddr returns "<addr>/p2p/<peerID>" from the host’s first IPv4 listen addr.
+// If none found, it falls back to the first addr.
+func firstFullP2pAddr(t *testing.T, h libhost.Host) string {
+	t.Helper()
+	addrs := h.Addrs()
+	require.NotEmpty(t, addrs, "host has no listen addrs")
+
+	var base multiaddr.Multiaddr
+	for _, a := range addrs {
+		for _, p := range a.Protocols() {
+			if p.Name == "ip4" {
+				base = a
+				break
+			}
+		}
+		if base != nil {
+			break
+		}
+	}
+	if base == nil {
+		base = addrs[0]
+	}
+
+	pid := h.ID()
+	// don’t double-append /p2p
+	alreadyHasP2P := false
+	for _, p := range base.Protocols() {
+		if p.Name == "p2p" {
+			alreadyHasP2P = true
+			break
+		}
+	}
+	if alreadyHasP2P {
+		return base.String()
+	}
+	s, err := multiaddr.NewMultiaddr(base.String() + "/p2p/" + pid.String())
+	require.NoError(t, err)
+	return s.String()
+}
+
+func TestAutoRegisterDIDOnInitializeP2P(t *testing.T) {
+	// Skip on -short to keep CI fast if needed.
+	if testing.Short() {
+		t.Skip("skipping libp2p auto-registration test in -short mode")
+	}
+
+	// ---- Spin up a fake registry host that handles /praxis/did-register ----
+	registryHost, registryClose := mustNewHostIPv4(t)
+	defer registryClose()
+
+	type gotMsg struct {
+		did       string
+		peerInfo  string
+		remotePID string
+	}
+	got := make(chan gotMsg, 1)
+
+	registryHost.SetStreamHandler(p2p.ProtocolDidRegister, func(s network.Stream) {
+		defer s.Close()
+
+		var payload map[string]any
+		_ = json.NewDecoder(s).Decode(&payload)
+
+		// Echo OK so the agent sees success
+		_ = json.NewEncoder(s).Encode(map[string]any{
+			"status":    "ok",
+			"did":       payload["did"],
+			"peer_info": payload["peer_info"],
+		})
+
+		remote := s.Conn().RemotePeer().String()
+		did, _ := payload["did"].(string)
+		pi, _ := payload["peer_info"].(string)
+		got <- gotMsg{did: did, peerInfo: pi, remotePID: remote}
+	})
+
+	// Build full /p2p/ multiaddr for the registry
+	registryMaddr := firstFullP2pAddr(t, registryHost)
+
+	// ---- Create the agent and enable auto-registration ----
+	a := &PraxisAgent{
+		logger:        logrus.New(),
+		httpPort:      0,
+		p2pPort:       0, // random port
+		ssePort:       0,
+		websocketPort: 0,
+		registryMaddr: registryMaddr, // <- enable auto-registration
+		did:           "did:example:auto-init-test",
+	}
+
+	// initializeP2P() will create a host and spawn the registration goroutine
+	require.NoError(t, a.initializeP2P())
+	defer func() {
+		if a.host != nil {
+			_ = a.host.Close()
+		}
+	}()
+
+	// ---- Wait for the registry handler to receive and validate the payload ----
+	select {
+	case m := <-got:
+		assert.Equal(t, a.did, m.did, "registry should receive the configured DID")
+		// PeerInfo must reference the actual connecting peer
+		assert.Contains(t, m.peerInfo, "/p2p/"+m.remotePID, "peer_info must contain /p2p/<agent peer id>")
+		// Avoid 0.0.0.0 in advertised addr
+		assert.NotContains(t, m.peerInfo, "0.0.0.0", "peer_info should not advertise 0.0.0.0")
+		assert.NotEmpty(t, m.peerInfo, "peer_info should not be empty")
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for auto DID registration to hit the registry handler")
+	}
 }
