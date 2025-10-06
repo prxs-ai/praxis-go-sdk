@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
@@ -84,6 +86,42 @@ func validateConfig(config *AppConfig) error {
 		return fmt.Errorf("rendezvous string cannot be empty when P2P is enabled")
 	}
 
+	if config.P2P.AutoTLS.Enabled {
+		if config.P2P.Port <= 0 {
+			return fmt.Errorf("p2p.port must be a fixed, non-zero value when AutoTLS is enabled")
+		}
+		if config.P2P.AutoTLS.IdentityKeyPath == "" {
+			return fmt.Errorf("p2p.autotls.identity_key must be set when AutoTLS is enabled")
+		}
+		if config.P2P.AutoTLS.CertDir == "" {
+			return fmt.Errorf("p2p.autotls.cert_dir must be set when AutoTLS is enabled")
+		}
+		switch strings.ToLower(config.P2P.AutoTLS.CA) {
+		case "", "staging", "production":
+			if config.P2P.AutoTLS.CA == "" {
+				config.P2P.AutoTLS.CA = "staging"
+			}
+		default:
+			if !strings.HasPrefix(config.P2P.AutoTLS.CA, "http://") && !strings.HasPrefix(config.P2P.AutoTLS.CA, "https://") {
+				return fmt.Errorf("p2p.autotls.ca must be 'staging', 'production', or a custom HTTPS endpoint")
+			}
+		}
+		if config.P2P.AutoTLS.RegistrationDelaySec < 0 {
+			return fmt.Errorf("p2p.autotls.registration_delay_sec не может быть отрицательным")
+		}
+		if config.P2P.AutoTLS.ForgeDomain != "" && config.P2P.AutoTLS.RegistrationEndpoint == "" {
+			return fmt.Errorf("p2p.autotls.registration_endpoint must be set when forge_domain is provided")
+		}
+		if config.P2P.AutoTLS.TrustedRootsFile != "" {
+			if _, err := os.Stat(config.P2P.AutoTLS.TrustedRootsFile); err != nil {
+				return fmt.Errorf("p2p.autotls.trusted_roots_file is not accessible: %w", err)
+			}
+		}
+		if config.P2P.AutoTLS.ResolverNetwork == "" && config.P2P.AutoTLS.ResolverAddress != "" {
+			config.P2P.AutoTLS.ResolverNetwork = "udp"
+		}
+	}
+
 	// LLM validation
 	if config.LLM.Enabled {
 		if config.LLM.Provider == "" {
@@ -100,6 +138,12 @@ func validateConfig(config *AppConfig) error {
 			if err := validateMCPServer(&server); err != nil {
 				return err
 			}
+		}
+	}
+
+	if config.Agent.Security.SignCards || config.Agent.Security.VerifyPeerCards || config.Agent.Security.SignA2A || config.Agent.Security.VerifyA2A {
+		if config.Agent.Identity.DID == "" {
+			return fmt.Errorf("agent identity DID must be configured when security features are enabled")
 		}
 	}
 
@@ -152,6 +196,55 @@ func applyEnvironmentOverrides(config *AppConfig) {
 		}
 	}
 	config.P2P.Secure = !utils.BoolFromEnv("INSECURE_P2P", !config.P2P.Secure)
+	config.P2P.EnableNATPortMap = utils.BoolFromEnv("NAT_PORTMAP_ENABLED", config.P2P.EnableNATPortMap)
+	config.P2P.AutoTLS.Enabled = utils.BoolFromEnv("AUTOTLS_ENABLED", config.P2P.AutoTLS.Enabled)
+	if advertise := os.Getenv("P2P_ADVERTISE_ADDRS"); advertise != "" {
+		parts := strings.Split(advertise, ",")
+		config.P2P.AdvertiseAddrs = config.P2P.AdvertiseAddrs[:0]
+		for _, part := range parts {
+			addr := strings.TrimSpace(part)
+			if addr == "" {
+				continue
+			}
+			config.P2P.AdvertiseAddrs = append(config.P2P.AdvertiseAddrs, addr)
+		}
+	}
+	if ca := os.Getenv("AUTOTLS_CA"); ca != "" {
+		config.P2P.AutoTLS.CA = strings.ToLower(ca)
+	}
+	if dir := os.Getenv("AUTOTLS_CERT_DIR"); dir != "" {
+		config.P2P.AutoTLS.CertDir = dir
+	}
+	if key := os.Getenv("AUTOTLS_IDENTITY_KEY"); key != "" {
+		config.P2P.AutoTLS.IdentityKeyPath = key
+	}
+	if domain := os.Getenv("AUTOTLS_FORGE_DOMAIN"); domain != "" {
+		config.P2P.AutoTLS.ForgeDomain = domain
+	}
+	if endpoint := os.Getenv("AUTOTLS_REGISTRATION_ENDPOINT"); endpoint != "" {
+		config.P2P.AutoTLS.RegistrationEndpoint = endpoint
+	}
+	if token := os.Getenv("AUTOTLS_FORGE_AUTH_TOKEN"); token != "" {
+		config.P2P.AutoTLS.ForgeAuthToken = token
+	}
+	if roots := os.Getenv("AUTOTLS_TRUSTED_ROOTS_FILE"); roots != "" {
+		config.P2P.AutoTLS.TrustedRootsFile = roots
+	}
+	if resolverAddr := os.Getenv("AUTOTLS_RESOLVER_ADDR"); resolverAddr != "" {
+		config.P2P.AutoTLS.ResolverAddress = resolverAddr
+	}
+	if resolverNet := os.Getenv("AUTOTLS_RESOLVER_NET"); resolverNet != "" {
+		config.P2P.AutoTLS.ResolverNetwork = resolverNet
+	}
+	if delay := os.Getenv("AUTOTLS_REGISTRATION_DELAY_SEC"); delay != "" {
+		if v, err := strconv.Atoi(delay); err != nil {
+			logrus.Warnf("Invalid AUTOTLS_REGISTRATION_DELAY_SEC: %s", delay)
+		} else {
+			config.P2P.AutoTLS.RegistrationDelaySec = v
+		}
+	}
+	config.P2P.AutoTLS.AllowPrivateAddresses = utils.BoolFromEnv("AUTOTLS_ALLOW_PRIVATE_ADDRS", config.P2P.AutoTLS.AllowPrivateAddresses)
+	config.P2P.AutoTLS.ProduceShortAddrs = utils.BoolFromEnv("AUTOTLS_SHORT_ADDRS", config.P2P.AutoTLS.ProduceShortAddrs)
 
 	// HTTP overrides
 	config.HTTP.Enabled = utils.BoolFromEnv("HTTP_ENABLED", config.HTTP.Enabled)
@@ -176,5 +269,9 @@ func applyEnvironmentOverrides(config *AppConfig) {
 	// Logging overrides
 	if level := os.Getenv("LOG_LEVEL"); level != "" {
 		config.Logging.Level = level
+	}
+
+	if config.P2P.AutoTLS.ResolverNetwork == "" && config.P2P.AutoTLS.ResolverAddress != "" {
+		config.P2P.AutoTLS.ResolverNetwork = "udp"
 	}
 }

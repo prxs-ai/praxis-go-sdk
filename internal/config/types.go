@@ -23,6 +23,31 @@ type ToolConfig struct {
 	EngineSpec  map[string]interface{} `yaml:"engineSpec"`
 }
 
+// IdentityConfig configures DID identity and key management for the agent.
+type IdentityConfig struct {
+	DID       string            `yaml:"did" json:"did"`
+	DIDDocURI string            `yaml:"did_doc_uri" json:"did_doc_uri"`
+	Key       IdentityKeyConfig `yaml:"key" json:"key"`
+}
+
+// IdentityKeyConfig defines how the agent's signing key is sourced.
+type IdentityKeyConfig struct {
+	Type    string `yaml:"type" json:"type"`
+	Source  string `yaml:"source" json:"source"`
+	Path    string `yaml:"path" json:"path"`
+	Service string `yaml:"service" json:"service"`
+	Account string `yaml:"account" json:"account"`
+	ID      string `yaml:"id" json:"id"`
+}
+
+// AgentSecurityConfig toggles signing/verification features.
+type AgentSecurityConfig struct {
+	SignCards       bool `yaml:"sign_cards" json:"sign_cards"`
+	VerifyPeerCards bool `yaml:"verify_peer_cards" json:"verify_peer_cards"`
+	SignA2A         bool `yaml:"sign_a2a" json:"sign_a2a"`
+	VerifyA2A       bool `yaml:"verify_a2a" json:"verify_a2a"`
+}
+
 // ToolParamConfig описывает параметр инструмента
 type ToolParamConfig struct {
 	Name        string `yaml:"name"`
@@ -31,27 +56,57 @@ type ToolParamConfig struct {
 	Required    string `yaml:"required"`
 }
 
+type ExternalMCPConfig struct {
+	Name      string            `yaml:"name" json:"name"`
+	URL       string            `yaml:"url" json:"url"`
+	Transport string            `yaml:"transport" json:"transport"`
+	Headers   map[string]string `yaml:"headers" json:"headers"`
+}
+
 // AgentConfig contains basic agent information
 type AgentConfig struct {
-	Name                 string       `yaml:"name" json:"name"`
-	Version              string       `yaml:"version" json:"version"`
-	Description          string       `yaml:"description" json:"description"`
-	URL                  string       `yaml:"url" json:"url"`
-	SharedDir            string       `yaml:"shared_dir" json:"shared_dir"`                         // Base directory for filesystem tools
-	Tools                []ToolConfig `yaml:"tools"`                                                // Список инструментов, доступных агенту
-	ExternalMCPEndpoints []string     `yaml:"external_mcp_endpoints" json:"external_mcp_endpoints"` // Внешние MCP серверы для автообнаружения
-	ExternalMCPServers   []string     `yaml:"external_mcp_servers" json:"external_mcp_servers"`     // Alias для ExternalMCPEndpoints
+	Name                 string              `yaml:"name" json:"name"`
+	Version              string              `yaml:"version" json:"version"`
+	Description          string              `yaml:"description" json:"description"`
+	URL                  string              `yaml:"url" json:"url"`
+	SharedDir            string              `yaml:"shared_dir" json:"shared_dir"`                         // Base directory for filesystem tools
+	Tools                []ToolConfig        `yaml:"tools"`                                                // Список инструментов, доступных агенту
+	ExternalMCPEndpoints []ExternalMCPConfig `yaml:"external_mcp_endpoints" json:"external_mcp_endpoints"` // Внешние MCP серверы для автообнаружения
+	ExternalMCPServers   []ExternalMCPConfig `yaml:"external_mcp_servers" json:"external_mcp_servers"`     // Alias для ExternalMCPEndpoints
+	Identity             IdentityConfig      `yaml:"identity" json:"identity"`
+	Security             AgentSecurityConfig `yaml:"security" json:"security"`
+	DIDCacheTTL          time.Duration       `yaml:"did_cache_ttl" json:"did_cache_ttl"`
 }
 
 // P2PConfig contains libp2p configuration
 type P2PConfig struct {
-	Enabled        bool     `yaml:"enabled" json:"enabled"`
-	Port           int      `yaml:"port" json:"port"`
-	Secure         bool     `yaml:"secure" json:"secure"`
-	Rendezvous     string   `yaml:"rendezvous" json:"rendezvous"`
-	EnableMDNS     bool     `yaml:"enable_mdns" json:"enable_mdns"`
-	EnableDHT      bool     `yaml:"enable_dht" json:"enable_dht"`
-	BootstrapNodes []string `yaml:"bootstrap_nodes" json:"bootstrap_nodes"`
+	Enabled          bool          `yaml:"enabled" json:"enabled"`
+	Port             int           `yaml:"port" json:"port"`
+	Secure           bool          `yaml:"secure" json:"secure"`
+	Rendezvous       string        `yaml:"rendezvous" json:"rendezvous"`
+	EnableMDNS       bool          `yaml:"enable_mdns" json:"enable_mdns"`
+	EnableDHT        bool          `yaml:"enable_dht" json:"enable_dht"`
+	EnableNATPortMap bool          `yaml:"enable_nat_portmap" json:"enable_nat_portmap"`
+	AdvertiseAddrs   []string      `yaml:"advertise_addrs" json:"advertise_addrs"`
+	BootstrapNodes   []string      `yaml:"bootstrap_nodes" json:"bootstrap_nodes"`
+	AutoTLS          AutoTLSConfig `yaml:"autotls" json:"autotls"`
+}
+
+// AutoTLSConfig controls integration with libp2p AutoTLS (libp2p.direct).
+type AutoTLSConfig struct {
+	Enabled               bool   `yaml:"enabled" json:"enabled"`
+	CA                    string `yaml:"ca" json:"ca"`
+	CertDir               string `yaml:"cert_dir" json:"cert_dir"`
+	IdentityKeyPath       string `yaml:"identity_key" json:"identity_key"`
+	RegistrationDelaySec  int    `yaml:"registration_delay_sec" json:"registration_delay_sec"`
+	AllowPrivateAddresses bool   `yaml:"allow_private_addresses" json:"allow_private_addresses"`
+	ProduceShortAddrs     bool   `yaml:"produce_short_addrs" json:"produce_short_addrs"`
+	ForgeDomain           string `yaml:"forge_domain" json:"forge_domain"`
+	RegistrationEndpoint  string `yaml:"registration_endpoint" json:"registration_endpoint"`
+	ForgeAuthToken        string `yaml:"forge_auth_token" json:"forge_auth_token"`
+	TrustedRootsFile      string `yaml:"trusted_roots_file" json:"trusted_roots_file"`
+	ResolverAddress       string `yaml:"resolver_address" json:"resolver_address"`
+	ResolverNetwork       string `yaml:"resolver_network" json:"resolver_network"`
 }
 
 // HTTPConfig contains HTTP server configuration
@@ -143,6 +198,16 @@ func DefaultConfig() *AppConfig {
 			Version:     "1.0.0",
 			Description: "Go P2P Agent",
 			URL:         "http://localhost:8000",
+			Identity: IdentityConfig{
+				Key: IdentityKeyConfig{
+					Type:   "ed25519",
+					Source: "file",
+					Path:   "./configs/keys/ed25519.key",
+					ID:     "key-1",
+				},
+			},
+			Security:    AgentSecurityConfig{},
+			DIDCacheTTL: time.Minute,
 		},
 		P2P: P2PConfig{
 			Enabled:    true,
@@ -151,6 +216,13 @@ func DefaultConfig() *AppConfig {
 			Rendezvous: "praxis-agents",
 			EnableMDNS: true,
 			EnableDHT:  true,
+			AutoTLS: AutoTLSConfig{
+				Enabled:              false,
+				CA:                   "staging",
+				CertDir:              "./data/p2p-forge-certs",
+				IdentityKeyPath:      "./data/identity.key",
+				RegistrationDelaySec: 10,
+			},
 		},
 		HTTP: HTTPConfig{
 			Enabled: true,

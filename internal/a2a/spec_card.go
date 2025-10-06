@@ -78,6 +78,8 @@ type AgentCard struct {
 	Skills                            []AgentSkill          `json:"skills"`
 	SupportsAuthenticatedExtendedCard bool                  `json:"supportsAuthenticatedExtendedCard,omitempty"`
 	Signatures                        []AgentCardSignature  `json:"signatures,omitempty"`
+	DID                               string                `json:"did,omitempty"`
+	DIDDocURI                         string                `json:"didDocUri,omitempty"`
 
 	// ERC-8004 specific data at top-level per reference card
 	Registrations []ERC8004Registration `json:"registrations,omitempty"`

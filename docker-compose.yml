@@ -1,21 +1,23 @@
+version: '3.8'
+
 services:
   praxis-agent-1:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: praxis-agent-11
+    container_name: praxis-agent-1
     ports:
-      - "8000:8000"  # HTTP API
-      - "8090:8090"  # WebSocket
-      - "4001:4001"  # P2P
-      - "9000:9000"  # SSE
+      - "8000:8000"
+      - "8090:8090"
+      - "5003:5003"
+      - "9000:9000"
     environment:
       - AGENT_NAME=praxis-agent-1
       - AGENT_VERSION=1.0.0
       - AGENT_CONFIG=/app/configs/agent.yaml
       - HTTP_PORT=8000
       - WEBSOCKET_PORT=8090
-      - P2P_PORT=4001
+      - P2P_PORT=5003
       - SSE_PORT=9000
       - MCP_ENABLED=true
       - P2P_ENABLED=true
@@ -23,10 +25,25 @@ services:
       - LOG_LEVEL=debug
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - APIFY_API_TOKEN=${APIFY_API_TOKEN:-}
+      - AUTOTLS_ENABLED=true
+      - AUTOTLS_CERT_DIR=/app/data/p2p-forge-certs
+      - AUTOTLS_IDENTITY_KEY=/app/data/identity.key
+      - AUTOTLS_CA=https://acme-staging-v02.api.letsencrypt.org/directory
+      - AUTOTLS_TRUSTED_ROOTS_FILE=
+      - AUTOTLS_FORGE_DOMAIN=libp2p.direct
+      - AUTOTLS_REGISTRATION_ENDPOINT=https://registration.libp2p.direct
+      - AUTOTLS_RESOLVER_ADDR=1.1.1.1:53
+      - AUTOTLS_RESOLVER_NET=udp
+      - AUTOTLS_REGISTRATION_DELAY_SEC=10
+      - AUTOTLS_ALLOW_PRIVATE_ADDRS=true
+      - NAT_PORTMAP_ENABLED=true
+      - P2P_ADVERTISE_ADDRS=/ip4/124.68.105.199/tcp/5003
     volumes:
       - ./shared:/app/shared
       - ./configs:/app/configs
-      - /var/run/docker.sock:/var/run/docker.sock  # Docker socket for Dagger
+      - ./data/agent1:/app/data
+      - ./certs:/app/certs
+      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - praxis-network
     extra_hosts:
@@ -38,41 +55,57 @@ services:
       retries: 3
       start_period: 30s
 
-
-  praxis-agent-3:
+  praxis-agent-2:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: praxis-agent-33
-    command: ["./praxis-agent", "-config", "/app/configs/agent3.yaml"]
+    container_name: praxis-agent-2
+    command: ["./praxis-agent", "--config", "/app/configs/agent2_auto.yaml"]
     ports:
-      - "8002:8002"   # HTTP API
-      - "8093:8092"   # WebSocket (host 8093 -> container 8092) to avoid conflicts
-      - "4003:4003"   # P2P
-      - "9003:9002"   # SSE (host 9003 -> container 9002) to avoid conflicts
+      - "8001:8001"
+      - "8091:8091"
+      - "5004:5004"
+      - "9001:9001"
     environment:
-      - AGENT_NAME=praxis-agent-3
+      - AGENT_NAME=praxis-agent-2
       - AGENT_VERSION=1.0.0
-      - HTTP_PORT=8002
-      - WEBSOCKET_PORT=8092
-      - P2P_PORT=4003
-      - SSE_PORT=9002
+      - HTTP_PORT=8001
+      - WEBSOCKET_PORT=8091
+      - P2P_PORT=5004
+      - SSE_PORT=9001
       - MCP_ENABLED=true
       - P2P_ENABLED=true
       - MDNS_ENABLED=true
       - LOG_LEVEL=debug
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - APIFY_API_TOKEN=${APIFY_API_TOKEN:-}
+      - AUTOTLS_ENABLED=true
+      - AUTOTLS_CERT_DIR=/app/data/p2p-forge-certs
+      - AUTOTLS_IDENTITY_KEY=/app/data/identity.key
+      - AUTOTLS_CA=https://acme-staging-v02.api.letsencrypt.org/directory
+      - AUTOTLS_TRUSTED_ROOTS_FILE=
+      - AUTOTLS_FORGE_DOMAIN=libp2p.direct
+      - AUTOTLS_REGISTRATION_ENDPOINT=https://registration.libp2p.direct
+      - AUTOTLS_RESOLVER_ADDR=1.1.1.1:53
+      - AUTOTLS_RESOLVER_NET=udp
+      - AUTOTLS_REGISTRATION_DELAY_SEC=10
+      - AUTOTLS_ALLOW_PRIVATE_ADDRS=true
+      - NAT_PORTMAP_ENABLED=true
+      - P2P_ADVERTISE_ADDRS=/ip4/124.68.105.199/tcp/5004
     volumes:
       - ./shared:/app/shared
       - ./configs:/app/configs
-      - /var/run/docker.sock:/var/run/docker.sock # Docker socket for Dagger
+      - ./data/agent2:/app/data
+      - ./certs:/app/certs
+      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - praxis-network
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    depends_on:
+      - praxis-agent-1
     healthcheck:
-      test: ["CMD", "wget", "-O-", "--quiet", "--tries=1", "http://127.0.0.1:8002/health"]
+      test: ["CMD", "wget", "-O-", "--quiet", "--tries=1", "http://127.0.0.1:8001/health"]
       interval: 10s
       timeout: 5s
       retries: 3

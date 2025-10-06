@@ -20,6 +20,8 @@ type AgentCard struct {
 	IconURL                           string                 `json:"iconUrl,omitempty"`
 	DocumentationURL                  string                 `json:"documentationUrl,omitempty"`
 	Metadata                          interface{}            `json:"metadata,omitempty"`
+	DID                               string                 `json:"did,omitempty"`
+	DIDDocURI                         string                 `json:"didDocUri,omitempty"`
 }
 
 type AgentProvider struct {
