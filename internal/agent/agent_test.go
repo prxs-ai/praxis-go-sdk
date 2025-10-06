@@ -243,7 +243,7 @@ func TestAutoRegisterDIDOnInitializeP2P(t *testing.T) {
 
 	type gotMsg struct {
 		did       string
-		peerInfo  string
+		peerInfo  map[string]any
 		remotePID string
 	}
 	got := make(chan gotMsg, 1)
@@ -263,7 +263,7 @@ func TestAutoRegisterDIDOnInitializeP2P(t *testing.T) {
 
 		remote := s.Conn().RemotePeer().String()
 		did, _ := payload["did"].(string)
-		pi, _ := payload["peer_info"].(string)
+		pi, _ := payload["peer_info"].(map[string]any)
 		got <- gotMsg{did: did, peerInfo: pi, remotePID: remote}
 	})
 
@@ -293,11 +293,28 @@ func TestAutoRegisterDIDOnInitializeP2P(t *testing.T) {
 	select {
 	case m := <-got:
 		assert.Equal(t, a.did, m.did, "registry should receive the configured DID")
-		// PeerInfo must reference the actual connecting peer
-		assert.Contains(t, m.peerInfo, "/p2p/"+m.remotePID, "peer_info must contain /p2p/<agent peer id>")
-		// Avoid 0.0.0.0 in advertised addr
-		assert.NotContains(t, m.peerInfo, "0.0.0.0", "peer_info should not advertise 0.0.0.0")
-		assert.NotEmpty(t, m.peerInfo, "peer_info should not be empty")
+		require.NotNil(t, m.peerInfo, "peer_info should be provided")
+
+		peerID, ok := m.peerInfo["id"].(string)
+		require.True(t, ok, "peer_info.id must be a string")
+		assert.Equal(t, m.remotePID, peerID, "peer_info.id must match /p2p/<agent peer id>")
+
+		rawAddrs, ok := m.peerInfo["addrs"]
+		require.True(t, ok, "peer_info.addrs must be present")
+		addrInterfaces, ok := rawAddrs.([]interface{})
+		require.True(t, ok, "peer_info.addrs must be an array")
+		require.NotEmpty(t, addrInterfaces, "peer_info.addrs should not be empty")
+
+		validAddrFound := false
+		for _, addrVal := range addrInterfaces {
+			addrStr, ok := addrVal.(string)
+			require.True(t, ok, "peer_info.addrs must contain string values")
+			assert.NotContains(t, addrStr, "0.0.0.0", "peer_info should not advertise 0.0.0.0")
+			if _, err := multiaddr.NewMultiaddr(addrStr + "/p2p/" + m.remotePID); err == nil {
+				validAddrFound = true
+			}
+		}
+		assert.True(t, validAddrFound, "peer_info.addrs should include an address combinable with the peer id")
 	case <-time.After(5 * time.Second):
 		t.Fatal("timed out waiting for auto DID registration to hit the registry handler")
 	}

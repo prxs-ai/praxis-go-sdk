@@ -9,12 +9,10 @@ require (
 	github.com/caddyserver/certmagic v0.21.6
 	github.com/ethereum/go-ethereum v1.16.3
 	github.com/gibson042/canonicaljson-go v1.0.3
-	github.com/gin-contrib/cors v1.5.0
 	github.com/gin-gonic/gin v1.10.1
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/ipshipyard/p2p-forge v0.5.0
-	github.com/jackc/pgx/v5 v5.7.6
 	github.com/lestrrat-go/jwx/v2 v2.0.21
 	github.com/libp2p/go-libp2p v0.42.0
 	github.com/libp2p/go-libp2p-kad-dht v0.28.1
@@ -80,9 +78,6 @@ require (
 	github.com/ipfs/go-datastore v0.8.2 // indirect
 	github.com/ipfs/go-log/v2 v2.6.0 // indirect
 	github.com/ipld/go-ipld-prime v0.21.0 // indirect
-	github.com/jackc/pgpassfile v1.0.0 // indirect
-	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
-	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
 	github.com/jbenet/go-temp-err-catcher v0.1.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
