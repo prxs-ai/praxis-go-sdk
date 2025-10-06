@@ -31,6 +31,12 @@ p2p:
   enable_mdns: true
   enable_dht: true
   bootstrap_nodes: []
+  autotls:
+    enabled: false
+    ca: "staging"
+    cert_dir: "./data/p2p-forge-certs"
+    identity_key: "./data/identity.key"
+    registration_delay_sec: 10
 
 http:
   enabled: true

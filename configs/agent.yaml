@@ -2,10 +2,23 @@ agent:
   name: "praxis-agent-from-yaml"
   version: "1.0.0"
   description: "Praxis P2P Agent with Event-Driven Architecture"
-  url: "http://localhost:8000"
+  url: "http://praxis-agent-1:8000"
   shared_dir: "./shared"
-  external_mcp_endpoints:
-    - "http://host.docker.internal:8012/mcp"
+  external_mcp_endpoints: []
+  identity:
+    did: "did:web:praxis-agent-1%3A8000"
+    did_doc_uri: "http://praxis-agent-1:8000/.well-known/did.json"
+    key:
+      type: "ed25519"
+      source: "file"
+      path: "./configs/keys/ed25519.key"
+      id: "key-1"
+  security:
+    sign_cards: true
+    verify_peer_cards: true
+    sign_a2a: false
+    verify_a2a: false
+  did_cache_ttl: "60s"
   tools:
     - name: "python_analyzer"
       description: "Analyzes data using an external Python script"
@@ -58,12 +71,30 @@ agent:
 
 p2p:
   enabled: true
-  port: 4001
+  port: 5003
   secure: true
   rendezvous: "praxis-agents"
   enable_mdns: true
   enable_dht: true
+  enable_nat_portmap: true
+  # Optional list of externally reachable multiaddrs advertised to peers.
+  advertise_addrs:
+    - "/ip4/138.68.105.199/tcp/5003"
   bootstrap_nodes: []
+  autotls:
+    enabled: true
+    ca: "https://acme-staging-v02.api.letsencrypt.org/directory"
+    cert_dir: "./data/agent1/p2p-forge-certs"
+    identity_key: "./data/agent1/identity.key"
+    forge_domain: "libp2p.direct"
+    registration_endpoint: "https://registration.libp2p.direct"
+    forge_auth_token: ""
+    trusted_roots_file: ""
+    resolver_address: "1.1.1.1:53"
+    resolver_network: "udp"
+    registration_delay_sec: 10
+    allow_private_addresses: true
+    produce_short_addrs: false
 
 http:
   enabled: true
@@ -71,7 +102,7 @@ http:
   host: "0.0.0.0"
 
 mcp:
-  enabled: true
+  enabled: false
   servers: []
   limits:
     max_concurrent_requests: 100
@@ -84,7 +115,7 @@ mcp:
   log_level: "info"
 
 llm:
-  enabled: true
+  enabled: false
   provider: "openai"
   api_key: "${OPENAI_API_KEY}"
   model: "gpt-4o-mini"

@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.23-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 # Install build dependencies
 RUN apk update && apk add --no-cache git ca-certificates tzdata
@@ -9,6 +9,7 @@ WORKDIR /app
 
 # Copy go mod files
 COPY go.mod go.sum ./
+COPY p2p-forge/go.mod p2p-forge/go.sum ./p2p-forge/
 
 # Download dependencies
 RUN go mod download
@@ -35,7 +36,7 @@ COPY --from=builder /app/configs ./configs
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 # Create required directories
-RUN mkdir -p /data /app/examples /shared
+RUN mkdir -p /data /app/data /app/examples /shared
 
 # Expose ports
 EXPOSE 8000 8001 4001 4002 8090 8091

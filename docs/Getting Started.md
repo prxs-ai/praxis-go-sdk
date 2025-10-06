@@ -62,10 +62,14 @@ The agent uses environment variables for runtime configuration. Create a `.env` 
 ### Optional Variables
 - `OPENAI_API_KEY`: Enables natural language workflows via LLM integration.
 - `HTTP_PORT`: HTTP API port (default: 8000).
-- `P2P_PORT`: P2P communication port (default: 4001).
+- `P2P_PORT`: P2P communication port (default: 5500 in docker-compose).
 - `WEBSOCKET_PORT`: WebSocket port for frontend (default: 9000).
 - `LOG_LEVEL`: Logging level: debug, info, warn, error (default: info).
 - `MCP_ENABLED`: Enable MCP server (default: true).
+- `AUTOTLS_ENABLED`: Enable AutoTLS provisioning (default: true in docker-compose).
+- `AUTOTLS_CERT_DIR`: Directory for AutoTLS certificates (default: `/app/data/p2p-forge-certs`).
+- `AUTOTLS_IDENTITY_KEY`: Path to persisted libp2p key (default: `/app/data/identity.key`).
+- `AUTOTLS_CA`: ACME endpoint (`staging` or `production`).
 
 Example `.env`:
 ```bash
@@ -116,8 +120,16 @@ agent:
 
 p2p:
   enabled: true
-  port: 4001
+  port: 5500
   secure: true
+  autotls:
+    enabled: true
+    ca: "staging"
+    cert_dir: "./data/p2p-forge-certs"
+    identity_key: "./data/identity.key"
+    registration_delay_sec: 10
+    allow_private_addresses: true
+    produce_short_addrs: false
 
 http:
   enabled: true
@@ -170,6 +182,8 @@ You can run the Praxis agent either directly or via Docker.
    ```bash
    docker-compose -f docker-compose.yml up -d
    ```
+
+> **Note:** AutoTLS provisioning relies on the public reachability of the P2P ports (5500/5501). Make sure these ports are forwarded through your firewall/NAT when running outside of a cloud VM with a public IP.
 
 The agent initializes components in this order:
 1. Parses command-line flags
@@ -330,12 +344,12 @@ This section addresses frequent setup issues and their resolutions.
 http:
   port: 8002
 p2p:
-  port: 4002
+  port: 5502
 ```
 Or set:
 ```bash
 export HTTP_PORT=8002
-export P2P_PORT=4002
+export P2P_PORT=5502
 ```
 
 ### Docker Permissions
@@ -365,6 +379,13 @@ export OPENAI_API_KEY=your_key_here
 ### WebSocket Connection Failures
 **Issue**: WebSocket connection rejected.
 **Solution**: Check if `WEBSOCKET_PORT` matches the client connection and ensure no firewall is blocking the port.
+
+### AutoTLS Certificate Not Issued
+**Issue**: Logs show repeated AutoTLS retries and the `/tls/sni/...libp2p.direct/ws` address never appears.
+**Solution**:
+- Verify that the P2P port (5500/5501 by default) is reachable from the public internet.
+- Ensure `AUTOTLS_ENABLED=true` and the correct `AUTOTLS_CA` (`staging` or `production`).
+- Delete the cached certificate directory (`data/agent*/p2p-forge-certs`) only after stopping the agent, then restart to retry issuance.
 
 **Section sources**
 - [README.md](file://README.md#L1-L177)

@@ -10,6 +10,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/discovery/mdns"
 	"github.com/multiformats/go-multiaddr"
+	"github.com/praxis/praxis-go-sdk/internal/a2a"
 	"github.com/sirupsen/logrus"
 )
 
@@ -36,7 +37,7 @@ type PeerInfo struct {
 	FoundAt     time.Time
 	LastSeen    time.Time
 	AgentCard   interface{}
-	A2ACard     interface{} // каноническая A2A карта пира
+	A2ACard     *a2a.AgentCard // каноническая A2A карта пира
 	IsConnected bool
 }
 
@@ -267,11 +268,11 @@ func (d *Discovery) GetPeerInfo(peerID peer.ID) (*PeerInfo, bool) {
 }
 
 // GetPeerA2ACards returns A2A cards from all connected peers
-func (d *Discovery) GetPeerA2ACards() map[peer.ID]interface{} {
+func (d *Discovery) GetPeerA2ACards() map[peer.ID]*a2a.AgentCard {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
-	a2aCards := make(map[peer.ID]interface{})
+	a2aCards := make(map[peer.ID]*a2a.AgentCard)
 	for peerID, peerInfo := range d.foundPeers {
 		if peerInfo.A2ACard != nil {
 			a2aCards[peerID] = peerInfo.A2ACard

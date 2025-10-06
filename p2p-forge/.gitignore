@@ -1,0 +1,8 @@
+cmd/db.*
+cmd/Corefile
+cmd/cmd
+p2p-forge
+p2p-forge-certs/
+badger.libp2p-direct-challenges/
+registration_libp2p_direct-certs/
+.env

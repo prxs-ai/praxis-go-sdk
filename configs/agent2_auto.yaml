@@ -2,24 +2,55 @@ agent:
   name: "praxis-agent-2"
   version: "1.0.0"
   description: "Agent with Auto-discovered External MCP Tools"
-  url: "http://localhost:8001"
+  url: "http://praxis-agent-2:8001"
   shared_dir: "./shared"
 
-  # External MCP servers for automatic tool discovery
-  external_mcp_servers:
-    - "http://host.docker.internal:8012/mcp"  # CUA computer-use MCP server on host
+  identity:
+    did: "did:web:praxis-agent-2%3A8001"
+    did_doc_uri: "http://praxis-agent-2:8001/.well-known/did.json"
+    key:
+      type: "ed25519"
+      source: "file"
+      path: "./configs/keys/ed25519-agent2.key"
+      id: "key-1"
 
+  security:
+    sign_cards: true
+    verify_peer_cards: true
+    sign_a2a: false
+    verify_a2a: false
+  did_cache_ttl: "60s"
+
+  # External MCP servers for automatic tool discovery
+  external_mcp_servers: []
   # No manual tools - all will be auto-discovered
   tools: []
 
 p2p:
   enabled: true
-  port: 4002
-  secure: false
+  port: 5004
+  secure: true
   rendezvous: "praxis-network"
   enable_mdns: true
   enable_dht: true
+  enable_nat_portmap: true
+  advertise_addrs:
+    - "/ip4/138.68.105.199/tcp/5004"
   bootstrap_nodes: []
+  autotls:
+    enabled: true
+    ca: "https://acme-staging-v02.api.letsencrypt.org/directory"
+    cert_dir: "./data/agent2/p2p-forge-certs"
+    identity_key: "./data/agent2/identity.key"
+    forge_domain: "libp2p.direct"
+    registration_endpoint: "https://registration.libp2p.direct"
+    forge_auth_token: ""
+    trusted_roots_file: ""
+    resolver_address: "1.1.1.1:53"
+    resolver_network: "udp"
+    registration_delay_sec: 10
+    allow_private_addresses: true
+    produce_short_addrs: false
 
 http:
   enabled: true
@@ -27,7 +58,7 @@ http:
   host: "0.0.0.0"
 
 mcp:
-  enabled: true
+  enabled: false
   servers: []
   limits:
     max_concurrent_requests: 10

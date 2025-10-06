@@ -2,34 +2,49 @@ package agent
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"math"
+	"net"
+	"net/http"
+	"net/url"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/caddyserver/certmagic"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	p2pforge "github.com/ipshipyard/p2p-forge/client"
 	"github.com/libp2p/go-libp2p"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/muxer/yamux"
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
+	ws "github.com/libp2p/go-libp2p/p2p/transport/websocket"
 	mcpTypes "github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/multiformats/go-multiaddr"
+	maddr "github.com/multiformats/go-multiaddr"
 	"github.com/praxis/praxis-go-sdk/internal/a2a"
 	"github.com/praxis/praxis-go-sdk/internal/api"
 	"github.com/praxis/praxis-go-sdk/internal/bus"
 	appconfig "github.com/praxis/praxis-go-sdk/internal/config"
 	"github.com/praxis/praxis-go-sdk/internal/contracts"
 	"github.com/praxis/praxis-go-sdk/internal/dagger"
+	"github.com/praxis/praxis-go-sdk/internal/did"
+	didweb "github.com/praxis/praxis-go-sdk/internal/did/web"
+	didwebvh "github.com/praxis/praxis-go-sdk/internal/did/webvh"
 	"github.com/praxis/praxis-go-sdk/internal/dsl"
 	applogger "github.com/praxis/praxis-go-sdk/internal/logger"
 	"github.com/praxis/praxis-go-sdk/internal/mcp"
@@ -37,6 +52,8 @@ import (
 	"github.com/praxis/praxis-go-sdk/internal/workflow"
 	"github.com/sirupsen/logrus"
 )
+
+const autoTLSUserAgent = "praxis-agent/autotls"
 
 type PraxisAgent struct {
 	name                 string
@@ -60,6 +77,7 @@ type PraxisAgent struct {
 	ctx                  context.Context
 	cancel               context.CancelFunc
 	wg                   sync.WaitGroup
+	cardMu               sync.RWMutex
 	card                 *AgentCard
 	a2aCard              *a2a.AgentCard // Canonical A2A Agent Card
 	transportManager     *mcp.TransportManager
@@ -68,6 +86,11 @@ type PraxisAgent struct {
 	taskManager          *a2a.TaskManager // A2A Task Manager
 	registryMaddr        string
 	did                  string
+	identityManager      *IdentityManager
+	didResolver          did.Resolver
+	securityConfig       appconfig.AgentSecurityConfig
+	autoTLSCertMgr       *p2pforge.P2PForgeCertMgr
+	httpSrv              *http.Server
 }
 
 type Config struct {
@@ -141,6 +164,7 @@ func NewPraxisAgent(config Config) (*PraxisAgent, error) {
 		logger.Warn("AppConfig not provided to agent; using defaults")
 		agent.appConfig = appconfig.DefaultConfig()
 	}
+	agent.securityConfig = agent.appConfig.Agent.Security
 
 	if err := agent.initializeP2P(); err != nil {
 		cancel()
@@ -152,6 +176,11 @@ func NewPraxisAgent(config Config) (*PraxisAgent, error) {
 
 	// Initialize A2A card after P2P host is available
 	agent.initializeA2ACard()
+
+	if err := agent.initializeIdentity(); err != nil {
+		cancel()
+		return nil, fmt.Errorf("failed to initialize identity: %w", err)
+	}
 
 	// Initialize HTTP server AFTER A2A card is initialized
 	agent.initializeHTTP()
@@ -199,39 +228,162 @@ func NewPraxisAgent(config Config) (*PraxisAgent, error) {
 }
 
 func (a *PraxisAgent) initializeP2P() error {
-	priv, _, err := crypto.GenerateKeyPair(crypto.Ed25519, -1)
+	var (
+		priv crypto.PrivKey
+		err  error
+	)
+
+	identityPath := ""
+	if a.appConfig != nil {
+		identityPath = a.appConfig.P2P.AutoTLS.IdentityKeyPath
+	}
+	priv, err = loadOrCreateP2PIdentity(identityPath, a.logger)
 	if err != nil {
-		return fmt.Errorf("failed to generate key pair: %w", err)
+		return fmt.Errorf("failed to initialize P2P identity: %w", err)
 	}
 
-	listenAddr := fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", a.p2pPort)
-	sourceMultiAddr, err := multiaddr.NewMultiaddr(listenAddr)
-	if err != nil {
-		return fmt.Errorf("failed to create multiaddr: %w", err)
+	listenAddrs := []string{
+		fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", a.p2pPort),
+		fmt.Sprintf("/ip6/::/tcp/%d", a.p2pPort),
 	}
 
-	host, err := libp2p.New(
-		libp2p.ListenAddrs(sourceMultiAddr),
+	var (
+		tlsConfig   *tls.Config
+		forgeDomain = p2pforge.DefaultForgeDomain
+	)
+	if a.appConfig != nil && a.appConfig.P2P.AutoTLS.Enabled {
+		mgr, err := a.initAutoTLS()
+		if err != nil {
+			return fmt.Errorf("failed to initialize AutoTLS: %w", err)
+		}
+		a.autoTLSCertMgr = mgr
+		if domain := strings.TrimSpace(a.appConfig.P2P.AutoTLS.ForgeDomain); domain != "" {
+			forgeDomain = domain
+		}
+		listenAddrs = append(listenAddrs,
+			fmt.Sprintf("/ip4/0.0.0.0/tcp/%d/tls/sni/*.%s/ws", a.p2pPort, forgeDomain),
+			fmt.Sprintf("/ip6/::/tcp/%d/tls/sni/*.%s/ws", a.p2pPort, forgeDomain),
+		)
+		tlsConfig = mgr.TLSConfig()
+	} else {
+		a.autoTLSCertMgr = nil
+	}
+
+	opts := []libp2p.Option{
 		libp2p.Identity(priv),
-		libp2p.Transport(tcp.NewTCPTransport),
 		libp2p.Muxer("/yamux/1.0.0", yamux.DefaultTransport),
 		libp2p.Security(noise.ID, noise.New),
-		libp2p.DefaultPeerstore,
-		libp2p.EnableRelay(),
-	)
+		libp2p.Transport(tcp.NewTCPTransport),
+		libp2p.ListenAddrStrings(listenAddrs...),
+		libp2p.DisableRelay(),
+		libp2p.UserAgent(autoTLSUserAgent),
+	}
+
+	if a.appConfig == nil || a.appConfig.P2P.EnableNATPortMap {
+		a.logger.Info("Attempting UPnP/NAT-PMP port mapping")
+		opts = append(opts, libp2p.NATPortMap())
+	} else {
+		a.logger.Debug("UPnP/NAT-PMP port mapping disabled via configuration")
+	}
+
+	if a.autoTLSCertMgr != nil {
+		opts = append(opts,
+			libp2p.ShareTCPListener(),
+			libp2p.Transport(ws.New, ws.WithTLSConfig(tlsConfig)),
+		)
+	}
+
+	var advertisedAddrs []maddr.Multiaddr
+	if a.appConfig != nil {
+		for _, addrStr := range a.appConfig.P2P.AdvertiseAddrs {
+			addrStr = strings.TrimSpace(addrStr)
+			if addrStr == "" {
+				continue
+			}
+			ma, err := maddr.NewMultiaddr(addrStr)
+			if err != nil {
+				a.logger.Warnf("Ignoring invalid advertise multiaddr %q: %v", addrStr, err)
+				continue
+			}
+			advertisedAddrs = append(advertisedAddrs, ma)
+		}
+		if len(advertisedAddrs) > 0 {
+			a.logger.Infof("Advertising additional reachability addresses: %s", strings.Join(multiaddrStrings(advertisedAddrs), ", "))
+		}
+	}
+
+	var addrFactory func([]maddr.Multiaddr) []maddr.Multiaddr
+	if a.autoTLSCertMgr != nil {
+		mgrFactory := a.autoTLSCertMgr.AddressFactory()
+		addrFactory = func(addrs []maddr.Multiaddr) []maddr.Multiaddr {
+			return mgrFactory(addrs)
+		}
+	}
+
+	if len(advertisedAddrs) > 0 {
+		prevFactory := addrFactory
+		addrFactory = func(addrs []maddr.Multiaddr) []maddr.Multiaddr {
+			var out []maddr.Multiaddr
+			if prevFactory != nil {
+				out = prevFactory(addrs)
+			} else {
+				out = append([]maddr.Multiaddr{}, addrs...)
+			}
+			out = append(out, advertisedAddrs...)
+			return dedupeMultiaddrs(out)
+		}
+	}
+
+	if addrFactory != nil {
+		opts = append(opts, libp2p.AddrsFactory(addrFactory))
+	}
+
+	host, err := libp2p.New(opts...)
 	if err != nil {
 		return fmt.Errorf("failed to create libp2p host: %w", err)
 	}
 
 	a.host = host
+	if err := host.Peerstore().AddPrivKey(host.ID(), priv); err != nil {
+		return fmt.Errorf("failed to add private key to peerstore: %w", err)
+	}
+	if err := host.Peerstore().AddPubKey(host.ID(), priv.GetPublic()); err != nil {
+		return fmt.Errorf("failed to add public key to peerstore: %w", err)
+	}
 	a.logger.Infof("P2P host created with ID: %s", host.ID())
 
 	for _, addr := range host.Addrs() {
 		a.logger.Infof("Listening on: %s/p2p/%s", addr, host.ID())
 	}
 
+	// AutoTLS: provide host and private key explicitly to avoid peerstore issues, then start
+	if a.autoTLSCertMgr != nil {
+		a.autoTLSCertMgr.ProvideHostAndPrivKey(host, priv)
+		if err := a.autoTLSCertMgr.Start(); err != nil {
+			return fmt.Errorf("failed to start AutoTLS manager: %w", err)
+		}
+	}
+
+	if a.appConfig != nil && a.appConfig.P2P.EnableDHT {
+		go func() {
+			dhtClient, err := dht.New(a.ctx, host, dht.Mode(dht.ModeClient))
+			if err != nil {
+				a.logger.Warnf("DHT init failed: %v", err)
+				return
+			}
+			if err := dhtClient.Bootstrap(a.ctx); err != nil {
+				a.logger.Warnf("DHT bootstrap failed: %v", err)
+			}
+		}()
+	}
+
 	// Initialize P2P protocol handler for direct P2P communication
 	a.p2pProtocol = p2p.NewP2PProtocolHandler(host, a.logger)
+	a.p2pProtocol.ConfigureSecurity(p2p.SecurityOptions{
+		VerifyPeerCards: a.securityConfig.VerifyPeerCards,
+		SignA2A:         a.securityConfig.SignA2A,
+		VerifyA2A:       a.securityConfig.VerifyA2A,
+	})
 
 	// Set agent interface for A2A protocol
 	a.p2pProtocol.SetAgent(a)
@@ -264,6 +416,215 @@ func (a *PraxisAgent) initializeP2P() error {
 	}
 
 	return nil
+}
+
+func dedupeMultiaddrs(addrs []maddr.Multiaddr) []maddr.Multiaddr {
+	seen := make(map[string]struct{}, len(addrs))
+	result := make([]maddr.Multiaddr, 0, len(addrs))
+	for _, addr := range addrs {
+		key := addr.String()
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		result = append(result, addr)
+	}
+	return result
+}
+
+func multiaddrsToStrings(addrs []maddr.Multiaddr) []string {
+	result := make([]string, 0, len(addrs))
+	for _, addr := range addrs {
+		result = append(result, addr.String())
+	}
+	return result
+}
+
+func (a *PraxisAgent) RegisterDIDWithRegistry(ctx context.Context, registryMultiaddr, did string) error {
+	if a == nil || a.host == nil {
+		return fmt.Errorf("p2p host not initialized")
+	}
+	if registryMultiaddr == "" {
+		return fmt.Errorf("registry multiaddr is empty")
+	}
+	if did == "" {
+		return fmt.Errorf("did is empty")
+	}
+
+	addr, err := maddr.NewMultiaddr(registryMultiaddr)
+	if err != nil {
+		return fmt.Errorf("parse registry multiaddr: %w", err)
+	}
+
+	info, err := peer.AddrInfoFromP2pAddr(addr)
+	if err != nil {
+		return fmt.Errorf("extract registry peer info: %w", err)
+	}
+
+	ctxConnect, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	if err := a.host.Connect(ctxConnect, *info); err != nil {
+		if !strings.Contains(err.Error(), "already connected") {
+			return fmt.Errorf("connect to registry %s: %w", info.ID, err)
+		}
+	}
+
+	stream, err := a.host.NewStream(ctx, info.ID, p2p.ProtocolDidRegister)
+	if err != nil {
+		return fmt.Errorf("open did-register stream: %w", err)
+	}
+	defer stream.Close()
+
+	payload := map[string]interface{}{
+		"did": did,
+		"peer_info": map[string]interface{}{
+			"id":    a.host.ID().String(),
+			"addrs": multiaddrsToStrings(dedupeMultiaddrs(a.host.Addrs())),
+		},
+	}
+
+	if err := json.NewEncoder(stream).Encode(payload); err != nil {
+		return fmt.Errorf("send did registration: %w", err)
+	}
+
+	var resp map[string]interface{}
+	if err := json.NewDecoder(stream).Decode(&resp); err != nil {
+		return fmt.Errorf("read registry response: %w", err)
+	}
+
+	if status, _ := resp["status"].(string); strings.ToLower(status) != "ok" {
+		return fmt.Errorf("registry returned status %v", resp["status"])
+	}
+
+	a.logger.Infof("✅ Registered DID %s with registry %s", did, registryMultiaddr)
+	return nil
+}
+
+func multiaddrStrings(addrs []maddr.Multiaddr) []string {
+	strs := make([]string, 0, len(addrs))
+	for _, addr := range addrs {
+		strs = append(strs, addr.String())
+	}
+	return strs
+}
+
+func (a *PraxisAgent) initAutoTLS() (*p2pforge.P2PForgeCertMgr, error) {
+	if a.appConfig == nil {
+		return nil, fmt.Errorf("app config not loaded")
+	}
+
+	cfg := a.appConfig.P2P.AutoTLS
+	if !cfg.Enabled {
+		return nil, nil
+	}
+
+	caEndpoint := p2pforge.DefaultCATestEndpoint
+	switch strings.ToLower(cfg.CA) {
+	case "production":
+		caEndpoint = p2pforge.DefaultCAEndpoint
+	case "staging", "":
+		// use staging endpoint
+	default:
+		// allow overriding with fully qualified URL if provided
+		caEndpoint = cfg.CA
+	}
+
+	storagePath := cfg.CertDir
+	if storagePath == "" {
+		storagePath = p2pforge.DefaultStorageLocation
+	}
+
+	options := []p2pforge.P2PForgeCertMgrOptions{
+		p2pforge.WithCAEndpoint(caEndpoint),
+		p2pforge.WithCertificateStorage(&certmagic.FileStorage{Path: storagePath}),
+		p2pforge.WithUserAgent(autoTLSUserAgent),
+	}
+
+	if domain := strings.TrimSpace(cfg.ForgeDomain); domain != "" {
+		options = append(options, p2pforge.WithForgeDomain(domain))
+	}
+	if endpoint := strings.TrimSpace(cfg.RegistrationEndpoint); endpoint != "" {
+		options = append(options, p2pforge.WithForgeRegistrationEndpoint(endpoint))
+		if parsed, err := url.Parse(endpoint); err == nil {
+			hostHeader := parsed.Hostname()
+			if hostHeader != "" {
+				options = append(options, p2pforge.WithModifiedForgeRequest(func(r *http.Request) error {
+					r.Host = hostHeader
+					r.Header.Set("Host", hostHeader)
+					return nil
+				}))
+			}
+		} else {
+			a.logger.Warnf("invalid AutoTLS registration endpoint: %v", err)
+		}
+	}
+	if token := strings.TrimSpace(cfg.ForgeAuthToken); token != "" {
+		options = append(options, p2pforge.WithForgeAuth(token))
+	}
+
+	if cfg.RegistrationDelaySec > 0 {
+		options = append(options, p2pforge.WithRegistrationDelay(time.Duration(cfg.RegistrationDelaySec)*time.Second))
+	}
+	if cfg.AllowPrivateAddresses {
+		options = append(options, p2pforge.WithAllowPrivateForgeAddrs())
+	}
+	if cfg.ProduceShortAddrs {
+		options = append(options, p2pforge.WithShortForgeAddrs(true))
+	}
+	if roots := strings.TrimSpace(cfg.TrustedRootsFile); roots != "" {
+		pool, err := loadTrustedRoots(roots)
+		if err != nil {
+			return nil, fmt.Errorf("load trusted roots: %w", err)
+		}
+		options = append(options, p2pforge.WithTrustedRoots(pool))
+	}
+	if cfg.ResolverAddress != "" {
+		resolver := buildResolver(strings.TrimSpace(cfg.ResolverNetwork), strings.TrimSpace(cfg.ResolverAddress))
+		options = append(options, p2pforge.WithResolver(resolver))
+	}
+
+	options = append(options, p2pforge.WithOnCertLoaded(func() {
+		if a.host == nil {
+			return
+		}
+		a.logger.Info("AutoTLS certificate loaded")
+		for _, addr := range a.host.Addrs() {
+			a.logger.Infof("AutoTLS address: %s/p2p/%s", addr, a.host.ID())
+		}
+	}))
+
+	mgr, err := p2pforge.NewP2PForgeCertMgr(options...)
+	if err != nil {
+		return nil, err
+	}
+
+	return mgr, nil
+}
+
+func loadTrustedRoots(path string) (*x509.CertPool, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	pool := x509.NewCertPool()
+	if !pool.AppendCertsFromPEM(data) {
+		return nil, fmt.Errorf("no certificates found in %s", path)
+	}
+	return pool, nil
+}
+
+func buildResolver(network, address string) *net.Resolver {
+	if network == "" {
+		network = "udp"
+	}
+	dialer := &net.Dialer{}
+	return &net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, _, _ string) (net.Conn, error) {
+			return dialer.DialContext(ctx, network, address)
+		},
+	}
 }
 
 func (a *PraxisAgent) initializeMCP() error {
@@ -590,11 +951,15 @@ func (a *PraxisAgent) updateP2PCardWithTools() {
 func (a *PraxisAgent) initializeHTTP() {
 	gin.SetMode(gin.ReleaseMode)
 	a.httpServer = gin.New()
-	a.httpServer.Use(gin.Recovery())
+	a.httpServer.Use(gin.Logger(), gin.Recovery())
 
 	// Serve generated artifacts (reports) as static files
-	// Files are saved by tools to /app/shared/reports (mounted from ./shared)
-	a.httpServer.Static("/reports", "/app/shared/reports")
+	sharedDir := "./shared"
+	if a.appConfig != nil && a.appConfig.Agent.SharedDir != "" {
+		sharedDir = a.appConfig.Agent.SharedDir
+	}
+	reportsDir := filepath.Join(sharedDir, "reports")
+	a.httpServer.Static("/reports", reportsDir)
 
 	a.httpServer.GET("/health", a.handleHealth)
 	a.httpServer.GET("/agent/card", a.handleGetCard)
@@ -602,6 +967,9 @@ func (a *PraxisAgent) initializeHTTP() {
 	a.httpServer.POST("/execute", a.handleExecuteDSL)
 	a.httpServer.GET("/p2p/cards", a.handleGetP2PCards)
 	a.httpServer.POST("/p2p/tool", a.handleInvokeP2PTool)
+	if a.identityManager != nil {
+		a.httpServer.GET("/.well-known/did.json", a.handleGetDIDDocument)
+	}
 
 	// A2A endpoints
 	a.httpServer.POST("/a2a/message/send", a.handleA2AMessageSend)
@@ -738,7 +1106,7 @@ func (a *PraxisAgent) initializeA2ACard() {
 	// Derive dynamic skills (engines + tools) for canonical A2A card
 	dynamicSkills := a.buildA2ASkillsFromConfig()
 
-	a.a2aCard = &a2a.AgentCard{
+	card := &a2a.AgentCard{
 		ProtocolVersion: "0.2.9",
 		Name:            a.name,
 		Description:     "Praxis P2P Agent with A2A and MCP support",
@@ -780,7 +1148,93 @@ func (a *PraxisAgent) initializeA2ACard() {
 		},
 	}
 
+	a.cardMu.Lock()
+	a.a2aCard = card
+	a.cardMu.Unlock()
+
 	a.logger.Infof("✅ Canonical A2A Agent Card initialized for agent '%s' on port %d", a.name, a.httpPort)
+	a.signA2ACard()
+}
+
+func (a *PraxisAgent) initializeIdentity() error {
+	cfg := a.appConfig.Agent.Identity
+	if cfg.DID == "" {
+		a.logger.Warn("DID identity not configured; skipping DID endpoints")
+		return nil
+	}
+
+	manager, err := NewIdentityManager(a.appConfig.Agent, a.logger)
+	if err != nil {
+		return fmt.Errorf("initialize identity manager: %w", err)
+	}
+	a.identityManager = manager
+
+	if a.card != nil {
+		a.card.DID = manager.DID()
+		a.card.DIDDocURI = manager.DIDDocumentURI()
+	}
+
+	a.cardMu.Lock()
+	if a.a2aCard != nil {
+		a.a2aCard.DID = manager.DID()
+		a.a2aCard.DIDDocURI = manager.DIDDocumentURI()
+	}
+	a.cardMu.Unlock()
+
+	a.signA2ACard()
+
+	allowInsecure := strings.HasPrefix(strings.ToLower(manager.DIDDocumentURI()), "http://") || strings.HasPrefix(strings.ToLower(a.appConfig.Agent.URL), "http://")
+	webResolver := &didweb.Resolver{AllowInsecure: allowInsecure}
+	webvhResolver := &didwebvh.Resolver{WebResolver: webResolver}
+
+	options := []did.MultiResolverOption{
+		did.WithWebResolver(webResolver),
+		did.WithWebVHResolver(webvhResolver),
+	}
+	if ttl := a.appConfig.Agent.DIDCacheTTL; ttl > 0 {
+		options = append(options, did.WithCacheTTL(ttl))
+	}
+
+	a.didResolver = did.NewMultiResolver(options...)
+
+	if a.p2pProtocol != nil {
+		a.p2pProtocol.SetDIDResolver(a.didResolver)
+	}
+
+	return nil
+}
+
+func (a *PraxisAgent) signA2ACard() {
+	if a.identityManager == nil {
+		return
+	}
+	a.cardMu.Lock()
+	defer a.cardMu.Unlock()
+	if a.a2aCard == nil {
+		return
+	}
+	if err := a.identityManager.SignAgentCard(a.a2aCard); err != nil {
+		a.logger.Errorf("Failed to sign A2A card: %v", err)
+	}
+}
+
+func (a *PraxisAgent) snapshotA2ACard() *a2a.AgentCard {
+	a.cardMu.RLock()
+	defer a.cardMu.RUnlock()
+	if a.a2aCard == nil {
+		return nil
+	}
+	data, err := json.Marshal(a.a2aCard)
+	if err != nil {
+		a.logger.Errorf("Failed to marshal A2A card snapshot: %v", err)
+		return nil
+	}
+	var clone a2a.AgentCard
+	if err := json.Unmarshal(data, &clone); err != nil {
+		a.logger.Errorf("Failed to unmarshal A2A card snapshot: %v", err)
+		return nil
+	}
+	return &clone
 }
 
 // buildSkillsFromConfig constructs internal AgentCard skills from the loaded configuration.
@@ -908,10 +1362,16 @@ func humanizeName(s string) string {
 }
 
 func (a *PraxisAgent) Start() error {
+	srv := &http.Server{
+		Addr:    fmt.Sprintf(":%d", a.httpPort),
+		Handler: a.httpServer,
+	}
+	a.httpSrv = srv
+
 	a.wg.Add(1)
 	go func() {
 		defer a.wg.Done()
-		if err := a.httpServer.Run(fmt.Sprintf(":%d", a.httpPort)); err != nil {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			a.logger.Errorf("HTTP server error: %v", err)
 		}
 	}()
@@ -939,8 +1399,20 @@ func (a *PraxisAgent) Stop() error {
 
 	a.cancel()
 
+	if a.autoTLSCertMgr != nil {
+		a.autoTLSCertMgr.Stop()
+		a.autoTLSCertMgr = nil
+	}
+
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
+	if a.httpSrv != nil {
+		if err := a.httpSrv.Shutdown(shutdownCtx); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			a.logger.Errorf("Failed to shutdown HTTP server: %v", err)
+		}
+		a.httpSrv = nil
+	}
 
 	// Stop execution engines
 	for engineName, engine := range a.executionEngines {
@@ -1101,6 +1573,109 @@ func (a *PraxisAgent) handleInvokeP2PTool(c *gin.Context) {
 	c.JSON(200, gin.H{"result": response})
 }
 
+var secretKeyHints = []string{"secret", "token", "key", "password", "credential", "auth", "api"}
+
+func normalizeArgs(raw map[string]interface{}) map[string]interface{} {
+	if raw == nil {
+		return map[string]interface{}{}
+	}
+	normalized := make(map[string]interface{}, len(raw))
+	for key, value := range raw {
+		normalized[key] = normalizeValue(value)
+	}
+	return normalized
+}
+
+func normalizeValue(value interface{}) interface{} {
+	switch v := value.(type) {
+	case map[string]interface{}:
+		return normalizeArgs(v)
+	case []interface{}:
+		result := make([]interface{}, len(v))
+		for i, item := range v {
+			result[i] = normalizeValue(item)
+		}
+		return result
+	case float64:
+		if !math.IsNaN(v) && !math.IsInf(v, 0) && math.Mod(v, 1) == 0 {
+			return int(v)
+		}
+		return v
+	case json.Number:
+		if i, err := v.Int64(); err == nil {
+			return int(i)
+		}
+		if f, err := v.Float64(); err == nil {
+			if math.Mod(f, 1) == 0 {
+				return int(f)
+			}
+			return f
+		}
+		return v.String()
+	default:
+		return v
+	}
+}
+
+func redactSecrets(secrets map[string]interface{}) map[string]interface{} {
+	if secrets == nil {
+		return map[string]interface{}{}
+	}
+	masked := make(map[string]interface{}, len(secrets))
+	for key := range secrets {
+		masked[key] = "***"
+	}
+	return masked
+}
+
+func redactSecretsDeep(value interface{}) interface{} {
+	switch v := value.(type) {
+	case map[string]interface{}:
+		result := make(map[string]interface{}, len(v))
+		for key, val := range v {
+			if looksLikeSecretKey(key) {
+				result[key] = "***"
+				continue
+			}
+			result[key] = redactSecretsDeep(val)
+		}
+		return result
+	case []interface{}:
+		result := make([]interface{}, len(v))
+		for i, item := range v {
+			result[i] = redactSecretsDeep(item)
+		}
+		return result
+	case string:
+		if looksLikeSecretValue(v) {
+			return "***"
+		}
+		return v
+	default:
+		return v
+	}
+}
+
+func looksLikeSecretKey(key string) bool {
+	lower := strings.ToLower(key)
+	for _, hint := range secretKeyHints {
+		if strings.Contains(lower, hint) {
+			return true
+		}
+	}
+	return false
+}
+
+func looksLikeSecretValue(value string) bool {
+	lower := strings.ToLower(value)
+	for _, hint := range secretKeyHints {
+		if strings.Contains(lower, hint) {
+			return true
+		}
+	}
+	return false
+}
+
 func boolPtr(b bool) *bool {
 	return &b
 }
@@ -1148,6 +1723,7 @@ func AdaptAppConfigToAgentConfig(appConfig *appconfig.AppConfig) Config {
 		WebSocketPort: websocketPort,
 		MCPEnabled:    appConfig.MCP.Enabled,
 		LogLevel:      appConfig.Logging.Level,
+		AppConfig:     appConfig,
 	}
 }
 
@@ -1297,11 +1873,29 @@ func (a *PraxisAgent) discoverAndRegisterExternalTools(ctx context.Context) {
 	// Create discovery service
 	discoveryService := mcp.NewToolDiscoveryService(a.logger)
 
-	for _, addr := range endpoints {
+	for _, endpoint := range endpoints {
+		addr := strings.TrimSpace(endpoint.URL)
+		if addr == "" {
+			a.logger.Warn("External MCP endpoint missing URL, skipping")
+			continue
+		}
+
+		name := endpoint.Name
+		if name == "" {
+			name = addr
+		}
+
 		a.logger.Infof("🔗 Discovering tools from external MCP server at %s", addr)
 
-		// Register the endpoint in TransportManager first
-		a.transportManager.RegisterSSEEndpoint(addr, addr, nil)
+		switch strings.ToLower(endpoint.Transport) {
+		case "", "sse":
+			a.transportManager.RegisterSSEEndpoint(name, addr, endpoint.Headers)
+		case "http", "stream", "streamable_http":
+			a.transportManager.RegisterHTTPEndpoint(name, addr, endpoint.Headers)
+		default:
+			a.logger.Warnf("Unsupported transport '%s' for %s, defaulting to SSE", endpoint.Transport, addr)
+			a.transportManager.RegisterSSEEndpoint(name, addr, endpoint.Headers)
+		}
 
 		// Discover tools using the discovery service
 		discoveredTools, err := discoveryService.DiscoverToolsFromServer(ctx, addr)
@@ -1706,11 +2300,13 @@ func (a *PraxisAgent) handleTasksCancel(params map[string]interface{}) (interfac
 func (a *PraxisAgent) handleGetAuthenticatedExtendedCard(params map[string]interface{}) (interface{}, *a2a.RPCError) {
 	// For now, return the same canonical A2A card
 	// In a full implementation, this would include extended information for authenticated clients
-	if a.a2aCard == nil {
+	a.signA2ACard()
+	card := a.snapshotA2ACard()
+	if card == nil {
 		return nil, a2a.NewRPCError(a2a.ErrorCodeInternalError, "A2A card not initialized")
 	}
 
-	return a.a2aCard, nil
+	return card, nil
 }
 
 // HandoffA2AOverP2P sends A2A message/send request over P2P JSON-RPC
@@ -1950,24 +2546,47 @@ func (a *PraxisAgent) handleA2ATasksList(c *gin.Context) {
 
 // handleGetA2ACard handles GET /.well-known/agent-card.json requests
 func (a *PraxisAgent) handleGetA2ACard(c *gin.Context) {
+	a.signA2ACard()
 	a.logger.Infof("📋 A2A card requested via /.well-known/agent-card.json endpoint")
 
-	if a.a2aCard == nil {
+	card := a.snapshotA2ACard()
+	if card == nil {
 		a.logger.Error("❌ A2A card is nil when requested!")
 		c.JSON(503, gin.H{"error": "A2A card not initialized"})
 		return
 	}
 
-	a.logger.Infof("✅ Serving A2A card for agent '%s' (protocol version: %s)",
-		a.a2aCard.Name, a.a2aCard.ProtocolVersion)
+	a.logger.Infof("✅ Serving A2A card for agent '%s' (protocol version: %s)", card.Name, card.ProtocolVersion)
 
 	c.Header("Content-Type", "application/json")
-	c.JSON(200, a.a2aCard)
+	c.JSON(200, card)
+}
+
+func (a *PraxisAgent) handleGetDIDDocument(c *gin.Context) {
+	if a.identityManager == nil {
+		c.JSON(404, gin.H{"error": "DID identity not configured"})
+		return
+	}
+
+	doc := a.identityManager.DIDDocument()
+	if doc == nil {
+		c.JSON(503, gin.H{"error": "DID document not available"})
+		return
+	}
+
+	docCopy := *doc
+	docCopy.Context = normalizeContexts(docCopy.Context)
+
+	a.logger.Infof("📄 Serving DID document for %s", docCopy.ID)
+	c.Header("Content-Type", "application/json")
+	c.JSON(200, &docCopy)
 }
 
 // handleGetAuthenticatedExtendedCardHTTP handles GET /v1/card requests
 func (a *PraxisAgent) handleGetAuthenticatedExtendedCardHTTP(c *gin.Context) {
-	if a.a2aCard == nil {
+	a.signA2ACard()
+	card := a.snapshotA2ACard()
+	if card == nil {
 		c.JSON(503, gin.H{"error": "A2A card not initialized"})
 		return
 	}
@@ -1975,12 +2594,13 @@ func (a *PraxisAgent) handleGetAuthenticatedExtendedCardHTTP(c *gin.Context) {
 	// For authenticated extended card, we could add additional information
 	// For now, return the canonical card
 	c.Header("Content-Type", "application/json")
-	c.JSON(200, a.a2aCard)
+	c.JSON(200, card)
 }
 
 // GetA2ACard returns the canonical A2A Agent Card (implements A2ACardProvider interface)
 func (a *PraxisAgent) GetA2ACard() *a2a.AgentCard {
-	return a.a2aCard
+	a.signA2ACard()
+	return a.snapshotA2ACard()
 }
 
 // handleA2AJSONRPC handles A2A JSON-RPC 2.0 requests
@@ -2027,7 +2647,9 @@ func (a *PraxisAgent) handleValidationResponses(c *gin.Context) {
 // SetERC8004Registration updates the A2A card with an on-chain registration record.
 // Use this after successful IdentityRegistry.NewAgent/UpdateAgent calls.
 func (a *PraxisAgent) SetERC8004Registration(chainID uint64, agentID uint64, agentAddress string, signature string) {
+	a.cardMu.Lock()
 	if a.a2aCard == nil {
+		a.cardMu.Unlock()
 		return
 	}
 	caip10 := fmt.Sprintf("eip155:%d:%s", chainID, strings.ToLower(agentAddress))
@@ -2036,7 +2658,19 @@ func (a *PraxisAgent) SetERC8004Registration(chainID uint64, agentID uint64, age
 		AgentAddress: caip10,
 		Signature:    signature,
 	}
-	a.a2aCard.Registrations = append(a.a2aCard.Registrations, reg)
+	replaced := false
+	for i, existing := range a.a2aCard.Registrations {
+		if existing.AgentID == reg.AgentID && strings.EqualFold(existing.AgentAddress, reg.AgentAddress) {
+			a.a2aCard.Registrations[i] = reg
+			replaced = true
+			break
+		}
+	}
+	if !replaced {
+		a.a2aCard.Registrations = append(a.a2aCard.Registrations, reg)
+	}
+	a.cardMu.Unlock()
+	a.signA2ACard()
 }
 
 // handleAdminSetRegistration allows adding a registration entry via HTTP (for testing/admin flows).
@@ -2064,140 +2698,4 @@ func (a *PraxisAgent) handleAdminSetRegistration(c *gin.Context) {
 	}
 	a.SetERC8004Registration(req.ChainID, req.AgentID, eoa, req.Signature)
 	c.JSON(200, gin.H{"status": "ok"})
-}
-
-func normalizeArgs(raw map[string]interface{}) map[string]interface{} {
-	out := make(map[string]interface{})
-	for k, v := range raw {
-		switch val := v.(type) {
-		case float64:
-			if float64(int(val)) == val {
-				out[k] = int(val)
-			} else {
-				out[k] = val
-			}
-		default:
-			out[k] = v
-		}
-	}
-	return out
-}
-
-func redactSecretsDeep(v interface{}) interface{} {
-	switch val := v.(type) {
-	case map[string]interface{}:
-		out := make(map[string]interface{}, len(val))
-		for k, v2 := range val {
-			if isSecretKey(k) {
-				out[k] = "***"
-			} else {
-				out[k] = redactSecretsDeep(v2)
-			}
-		}
-		return out
-	case map[string]string:
-		out := make(map[string]string, len(val))
-		for k, v2 := range val {
-			if isSecretKey(k) {
-				out[k] = "***"
-			} else {
-				out[k] = v2
-			}
-		}
-		return out
-	case []interface{}:
-		out := make([]interface{}, len(val))
-		for i, v2 := range val {
-			out[i] = redactSecretsDeep(v2)
-		}
-		return out
-	case []string:
-		return val
-	default:
-		return val
-	}
-}
-
-func isSecretKey(key string) bool {
-	return key == "api_key" || key == "API_KEY" || key == "token" || key == "TOKEN"
-}
-
-func redactSecrets(secrets map[string]interface{}) map[string]interface{} {
-	redacted := make(map[string]interface{})
-	for k := range secrets {
-		redacted[k] = "***"
-	}
-	return redacted
-}
-
-// RegisterDIDWithRegistry connects to the AI Registry over libp2p and registers (or updates) DID->peer_info.
-// registryMaddr should be a full multiaddr: /ip4/<ip>/tcp/<port>/p2p/<REGISTRY_PEER_ID>
-func (a *PraxisAgent) RegisterDIDWithRegistry(ctx context.Context, registryMaddr string, did string) error {
-	if a.host == nil {
-		return fmt.Errorf("p2p host is not initialized")
-	}
-
-	maddr, err := multiaddr.NewMultiaddr(registryMaddr)
-	if err != nil {
-		return fmt.Errorf("invalid registry multiaddr: %w", err)
-	}
-	ai, err := peer.AddrInfoFromP2pAddr(maddr)
-	if err != nil {
-		return fmt.Errorf("failed to parse registry AddrInfo: %w", err)
-	}
-	if err := a.host.Connect(ctx, *ai); err != nil {
-		return fmt.Errorf("failed to connect to registry: %w", err)
-	}
-
-	var peerInfo string
-	ourPID := a.host.ID().String()
-	for _, addr := range a.host.Addrs() {
-		if strings.Contains(addr.String(), "/p2p/") {
-			continue
-		}
-		peerInfo = fmt.Sprintf("%s/p2p/%s", addr.String(), ourPID)
-		break
-	}
-	if peerInfo == "" {
-		return fmt.Errorf("no suitable listen address found to build peer_info")
-	}
-
-	stream, err := a.host.NewStream(ctx, ai.ID, p2p.ProtocolDidRegister)
-	if err != nil {
-		return fmt.Errorf("failed to open did-register stream: %w", err)
-	}
-	defer stream.Close()
-
-	payload := map[string]any{
-		"did":       did,
-		"peer_info": peerInfo,
-	}
-
-	enc := json.NewEncoder(stream)
-	if err := enc.Encode(payload); err != nil {
-		return fmt.Errorf("failed to send did-register payload: %w", err)
-	}
-
-	dec := json.NewDecoder(stream)
-	var resp map[string]any
-	if err := dec.Decode(&resp); err != nil {
-		return fmt.Errorf("failed to read did-register response: %w", err)
-	}
-
-	if status, _ := resp["status"].(string); status != "ok" {
-		if errStr, _ := resp["error"].(string); errStr != "" {
-			return fmt.Errorf("registry error: %s", errStr)
-		}
-		return fmt.Errorf("did-register failed: %+v", resp)
-	}
-
-	if respDid, _ := resp["did"].(string); respDid != did {
-		a.logger.Warnf("registry responded with different did: %q (expected %q)", respDid, did)
-	}
-	if respPI, _ := resp["peer_info"].(string); respPI != peerInfo {
-		a.logger.Warnf("registry responded with different peer_info")
-	}
-
-	a.logger.Infof("✅ DID registered with registry: did=%s peer_info=%s", did, peerInfo)
-	return nil
 }
