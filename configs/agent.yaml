@@ -79,7 +79,7 @@ p2p:
   enable_nat_portmap: true
   # Optional list of externally reachable multiaddrs advertised to peers.
   advertise_addrs:
-    - "/ip4/138.68.105.199/tcp/5003"
+    - "/ip4/124.68.105.199/tcp/5003"
   bootstrap_nodes: []
   autotls:
     enabled: true

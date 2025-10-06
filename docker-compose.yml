@@ -37,7 +37,7 @@ services:
       - AUTOTLS_REGISTRATION_DELAY_SEC=10
       - AUTOTLS_ALLOW_PRIVATE_ADDRS=true
       - NAT_PORTMAP_ENABLED=true
-      - P2P_ADVERTISE_ADDRS=/ip4/138.68.105.199/tcp/5003
+      - P2P_ADVERTISE_ADDRS=/ip4/124.68.105.199/tcp/5003
     volumes:
       - ./shared:/app/shared
       - ./configs:/app/configs
@@ -91,7 +91,7 @@ services:
       - AUTOTLS_REGISTRATION_DELAY_SEC=10
       - AUTOTLS_ALLOW_PRIVATE_ADDRS=true
       - NAT_PORTMAP_ENABLED=true
-      - P2P_ADVERTISE_ADDRS=/ip4/138.68.105.199/tcp/5004
+      - P2P_ADVERTISE_ADDRS=/ip4/124.68.105.199/tcp/5004
     volumes:
       - ./shared:/app/shared
       - ./configs:/app/configs

@@ -35,7 +35,7 @@ p2p:
   enable_dht: true
   enable_nat_portmap: true
   advertise_addrs:
-    - "/ip4/138.68.105.199/tcp/5004"
+    - "/ip4/124.68.105.199/tcp/5004"
   bootstrap_nodes: []
   autotls:
     enabled: true
