@@ -50,14 +50,14 @@ participant Client
 participant Agent
 participant DaggerEngine
 participant Container
-Client->>Agent : Execute task request
-Agent->>DaggerEngine : Create container from image
-DaggerEngine->>DaggerEngine : Mount host directories
-DaggerEngine->>DaggerEngine : Set environment variables
-DaggerEngine->>Container : Execute command
-Container-->>DaggerEngine : Return stdout/stderr
-DaggerEngine-->>Agent : Return execution result
-Agent-->>Client : Return result
+Client->>Agent: Execute task request
+Agent->>DaggerEngine: Create container from image
+DaggerEngine->>DaggerEngine: Mount host directories
+DaggerEngine->>DaggerEngine: Set environment variables
+DaggerEngine->>Container: Execute command
+Container-->>DaggerEngine: Return stdout/stderr
+DaggerEngine-->>Agent: Return execution result
+Agent-->>Client: Return result
 ```
 
 **Diagram sources**
@@ -111,14 +111,14 @@ participant Agent
 participant RemoteEngine
 participant TransportManager
 participant RemoteAgent
-Client->>Agent : Execute remote task
-Agent->>RemoteEngine : Execute contract
-RemoteEngine->>TransportManager : Register SSE endpoint
-TransportManager->>RemoteAgent : Establish SSE connection
-RemoteEngine->>RemoteAgent : Call remote tool
-RemoteAgent-->>RemoteEngine : Return result
-RemoteEngine-->>Agent : Return processed result
-Agent-->>Client : Return final result
+Client->>Agent: Execute remote task
+Agent->>RemoteEngine: Execute contract
+RemoteEngine->>TransportManager: Register SSE endpoint
+TransportManager->>RemoteAgent: Establish SSE connection
+RemoteEngine->>RemoteAgent: Call remote tool
+RemoteAgent-->>RemoteEngine: Return result
+RemoteEngine-->>Agent: Return processed result
+Agent-->>Client: Return final result
 ```
 
 **Diagram sources**
@@ -208,17 +208,17 @@ The task execution flow demonstrates how the Dagger engine processes a contract:
 flowchart TD
 Start([Execute Contract]) --> ValidateSpec["Validate EngineSpec"]
 ValidateSpec --> ImageValid{"Image Spec Valid?"}
-ImageValid --> |No| ReturnError["Return Error"]
-ImageValid --> |Yes| CreateContainer["Create Container from Image"]
+ImageValid -->|No| ReturnError["Return Error"]
+ImageValid -->|Yes| CreateContainer["Create Container from Image"]
 CreateContainer --> MountDirs["Mount Host Directories"]
 MountDirs --> SetEnv["Set Environment Variables"]
 SetEnv --> ApplyArgs["Apply Args as Env Variables"]
 ApplyArgs --> AddCacheBust["Add Cache-Busting Env"]
 AddCacheBust --> ExecCommand["Execute Command"]
 ExecCommand --> CheckResult{"Execution Successful?"}
-CheckResult --> |No| GetStderr["Get Stderr"]
+CheckResult -->|No| GetStderr["Get Stderr"]
 GetStderr --> ReturnFailure["Return Error with Stderr"]
-CheckResult --> |Yes| ExportDirs["Export Modified Directories"]
+CheckResult -->|Yes| ExportDirs["Export Modified Directories"]
 ExportDirs --> ReturnResult["Return Stdout"]
 ReturnError --> End([Exit])
 ReturnFailure --> End
@@ -265,12 +265,13 @@ The orchestrator also supports backward compatibility with legacy handlers while
 ```mermaid
 graph TD
 A[Incoming Task] --> B{Engine Type}
-B --> |dagger| C[Get/Initialize Dagger Engine]
-B --> |remote-mcp| D[Get Remote MCP Engine]
-B --> |Other| E[Return Error]
+B -->|dagger| C[Get/Initialize Dagger Engine]
+B -->|remote-mcp| D[Get Remote MCP Engine]
+B -->|Other| E[Return Error]
 C --> F[Execute Contract]
 D --> F
 F --> G[Return Result]
+E --> H[Exit]
 ```
 
 **Diagram sources**

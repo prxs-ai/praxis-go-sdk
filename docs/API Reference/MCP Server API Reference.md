@@ -49,7 +49,7 @@ sequenceDiagram
 participant Client
 participant Server
 Client->>Server : POST /mcp (SSE)
-Server->>Client : data : {response}\n\n
+Server->>Client : data: {response}
 Note right of Server : Server sends data events
 ```
 

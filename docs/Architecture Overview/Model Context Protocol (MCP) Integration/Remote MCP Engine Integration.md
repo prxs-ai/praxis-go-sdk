@@ -118,39 +118,39 @@ The RemoteMCPEngine is responsible for executing tool contracts on remote MCP se
 ```mermaid
 classDiagram
 class RemoteMCPEngine {
-+*TransportManager : transportManager
-+Execute(ctx: Context, contract: ToolContract, args: Map) : (String, Error)
++TransportManager transportManager
++Execute(ctx Context, contract ToolContract, args map~string,interface~) string, error
 }
 class TransportManager {
-+MCPClientWrapper] : clients Map[String,
-+*ClientFactory : factory
-+RegisterSSEEndpoint(name: url, headers)
-+RegisterHTTPEndpoint(name: url, headers)
-+RegisterSTDIOEndpoint(name: command, args)
-+GetClient(name) : (MCPClientWrapper, Error)
-+CallRemoteTool(ctx: clientName, toolName: args) : (CallToolResult, Error)
++map~string,MCPClientWrapper~ clients
++ClientFactory factory
++RegisterSSEEndpoint(name string, url string, headers map~string,string~)
++RegisterHTTPEndpoint(name string, url string, headers map~string,string~)
++RegisterSTDIOEndpoint(name string, command string, args string[])
++GetClient(name string) MCPClientWrapper, error
++CallRemoteTool(ctx Context, clientName string, toolName string, args map~string,interface~) CallToolResult, error
 +Close()
 }
 class ResilientSSEClient {
-+String : baseURL
-+String] : headers Map[String,
-+*client.Client : client
-+Context : ctx
-+CancelFunc : cancel
-+Channel : reconnectCh
-+connect() : Error
++string baseURL
++map~string,string~ headers
++client.Client client
++Context ctx
++CancelFunc cancel
++chan~struct~ reconnectCh
++connect() error
 +reconnectLoop()
-+CallTool(ctx: CallToolRequest, req: CallToolRequest) : (CallToolResult, Error)
-+Close() : Error
++CallTool(ctx Context, req CallToolRequest) CallToolResult, error
++Close() error
 }
 class StreamableHTTPClientPool {
-+Channel[*MCPClientWrapper] : clients
-+factory Func() : MCPClientWrapper
-+Int : maxSize
-+String : baseURL
-+Get() : MCPClientWrapper
-+Put(c: MCPClientWrapper)
-+CallTool(ctx: name, args) : (CallToolResult, Error)
++chan~MCPClientWrapper~ clients
++func MCPClientWrapper factory
++int maxSize
++string baseURL
++Get() MCPClientWrapper
++Put(c MCPClientWrapper)
++CallTool(ctx Context, name string, args map~string,interface~) CallToolResult, error
 +Close()
 }
 RemoteMCPEngine --> TransportManager : "uses"

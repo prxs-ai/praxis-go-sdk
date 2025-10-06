@@ -21,11 +21,11 @@ The DSL processing functionality is primarily located in the `internal/dsl` and 
 
 ```mermaid
 graph TD
-subgraph "DSL Processing"
+subgraph DSLProcessing["DSL Processing"]
 A[analyzer.go] --> B[orchestrator.go]
 B --> C[workflow_orchestrator.go]
 end
-subgraph "Integration"
+subgraph Integration["Integration"]
 D[client.go] --> B
 E[config/types.go] --> A
 F[agent.go] --> A
@@ -57,28 +57,28 @@ The DSL processing pipeline begins with a natural language input, which is token
 
 ```mermaid
 sequenceDiagram
-participant User
-participant Gateway
-participant Analyzer
-participant Orchestrator
-participant LLMClient
-participant WorkflowOrchestrator
-participant EventBus
-User->>Gateway : Send DSL command
-Gateway->>Analyzer : AnalyzeDSL()
-Analyzer->>Analyzer : tokenize() and parse()
+participant User as User
+participant Gateway as Gateway
+participant Analyzer as Analyzer
+participant Orchestrator as Orchestrator
+participant LLMClient as LLMClient
+participant WorkflowOrchestrator as WorkflowOrchestrator
+participant EventBus as EventBus
+User->>Gateway: Send DSL command
+Gateway->>Analyzer: AnalyzeDSL()
+Analyzer->>Analyzer: tokenize() and parse()
 alt Simple Command
-Analyzer->>Analyzer : executeNode()
-Analyzer->>EventBus : Publish result
+Analyzer->>Analyzer: executeNode()
+Analyzer->>EventBus: Publish result
 else Complex Command
-Analyzer->>Orchestrator : AnalyzeWithOrchestration()
-Orchestrator->>LLMClient : Generate workflow plan
-LLMClient-->>Orchestrator : Return WorkflowPlan
-Orchestrator->>WorkflowOrchestrator : Execute workflow
-WorkflowOrchestrator->>EventBus : Publish execution status
+Analyzer->>Orchestrator: AnalyzeWithOrchestration()
+Orchestrator->>LLMClient: Generate workflow plan
+LLMClient-->>Orchestrator: Return WorkflowPlan
+Orchestrator->>WorkflowOrchestrator: Execute workflow
+WorkflowOrchestrator->>EventBus: Publish execution status
 end
-EventBus-->>Gateway : Send result
-Gateway-->>User : Display result
+EventBus-->>Gateway: Send result
+Gateway-->>User: Display result
 ```
 
 **Diagram sources**
@@ -131,25 +131,25 @@ Caching is implemented via `llm.ToolCache` with a default of 1000 entries and 5-
 
 ```mermaid
 flowchart TD
-Start([AnalyzeDSL]) --> Tokenize["tokenize(dsl)"]
-Tokenize --> Parse["parse(tokens) → AST"]
-Parse --> Execute["execute(ast)"]
+Start([AnalyzeDSL]) --> Tokenize[tokenize dsl]
+Tokenize --> Parse[parse tokens to AST]
+Parse --> Execute[execute ast]
 Execute --> Loop{For each node}
 Loop --> NodeType{node.Type}
-NodeType --> |CALL| ExecuteCall["executeCall()"]
-NodeType --> |PARALLEL| ExecuteParallel["executeParallel()"]
-NodeType --> |SEQUENCE| ExecuteSequence["executeSequence()"]
-ExecuteCall --> CacheCheck{"Cache hit?"}
-CacheCheck --> |Yes| ReturnCached["Return cached result"]
-CacheCheck --> |No| LocalCheck{"HasLocalTool?"}
-LocalCheck --> |Yes| ExecuteLocal["ExecuteLocalTool()"]
-LocalCheck --> |No| FindAgent["FindAgentWithTool()"]
-FindAgent --> |Found| ExecuteRemote["ExecuteRemoteTool()"]
-FindAgent --> |Not Found| ReturnError["Return error"]
-ExecuteLocal --> CacheStore["Cache result"]
+NodeType -->|CALL| ExecuteCall[executeCall]
+NodeType -->|PARALLEL| ExecuteParallel[executeParallel]
+NodeType -->|SEQUENCE| ExecuteSequence[executeSequence]
+ExecuteCall --> CacheCheck{Cache hit?}
+CacheCheck -->|Yes| ReturnCached[Return cached result]
+CacheCheck -->|No| LocalCheck{HasLocalTool?}
+LocalCheck -->|Yes| ExecuteLocal[ExecuteLocalTool]
+LocalCheck -->|No| FindAgent[FindAgentWithTool]
+FindAgent -->|Found| ExecuteRemote[ExecuteRemoteTool]
+FindAgent -->|Not Found| ReturnError[Return error]
+ExecuteLocal --> CacheStore[Cache result]
 ExecuteRemote --> CacheStore
-CacheStore --> ReturnResult["Return result"]
-Loop --> |Done| ReturnResults["Return all results"]
+CacheStore --> ReturnResult[Return result]
+Loop -->|Done| ReturnResults[Return all results]
 ```
 
 **Diagram sources**
@@ -186,17 +186,17 @@ The `workflow_orchestrator.go` executes plans with support for:
 
 ```mermaid
 flowchart TD
-StartPlan([Start Workflow]) --> Order["calculateExecutionOrder()"]
-Order --> Group["identifyParallelGroups()"]
+StartPlan([Start Workflow]) --> Order[calculateExecutionOrder]
+Order --> Group[identifyParallelGroups]
 Group --> LoopNode{For each node in order}
 LoopNode --> IsParallel{In parallel group?}
-IsParallel --> |Yes| Fork["Execute in goroutine"]
-IsParallel --> |No| Exec["Execute synchronously"]
-Fork --> Wait["WaitGroup.Wait()"]
-Exec --> NextNode
+IsParallel -->|Yes| Fork[Execute in goroutine]
+IsParallel -->|No| Exec[Execute synchronously]
+Fork --> Wait[WaitGroup.Wait]
+Exec --> NextNode[Next Node]
 Wait --> NextNode
 NextNode --> LoopNode
-LoopNode --> |Done| Complete["Workflow Complete"]
+LoopNode -->|Done| Complete[Workflow Complete]
 ```
 
 **Diagram sources**

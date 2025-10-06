@@ -117,40 +117,41 @@ The MCPServerWrapper struct serves as the primary interface for the MCP Server, 
 ```mermaid
 classDiagram
 class MCPServerWrapper {
-+server : MCPServer
-+sseServer : SSEServer
-+httpServer : StreamableHTTPServer
-+logger : Logger
-+agentName : string
-+agentVersion : string
-+toolHandlers : Map<string, ToolHandlerFunc>
-+registeredTools : List<Tool>
-+NewMCPServer(config: ServerConfig) : MCPServerWrapper
-+AddTool(tool: Tool, handler: ToolHandlerFunc) : void
-+AddResource(resource: Resource, handler: ResourceHandlerFunc) : void
-+AddPrompt(prompt: Prompt, handler: PromptHandlerFunc) : void
-+StartSSE(port: string) : error
-+StartHTTP(port: string) : error
-+StartSTDIO() : error
-+Shutdown(ctx: Context) : error
-+FindToolHandler(toolName: string) : ToolHandlerFunc
-+HasTool(toolName: string) : bool
-+GetRegisteredTools() : List<Tool>
++MCPServer server
++SSEServer sseServer
++StreamableHTTPServer httpServer
++Logger logger
++string agentName
++string agentVersion
++map~string,ToolHandlerFunc~ toolHandlers
++Tool[] registeredTools
++NewMCPServer(config ServerConfig) MCPServerWrapper
++AddTool(tool Tool, handler ToolHandlerFunc) void
++AddResource(resource Resource, handler ResourceHandlerFunc) void
++AddPrompt(prompt Prompt, handler PromptHandlerFunc) void
++StartSSE(port string) error
++StartHTTP(port string) error
++StartSTDIO() error
++Shutdown(ctx Context) error
++FindToolHandler(toolName string) ToolHandlerFunc
++HasTool(toolName string) bool
++GetRegisteredTools() Tool[]
 }
 class ServerConfig {
-+Name : string
-+Version : string
-+Transport : TransportType
-+Port : string
-+Logger : Logger
-+EnableTools : bool
-+EnableResources : bool
-+EnablePrompts : bool
++string Name
++string Version
++TransportType Transport
++string Port
++Logger Logger
++bool EnableTools
++bool EnableResources
++bool EnablePrompts
 }
 class TransportType {
-+TransportSTDIO
-+TransportSSE
-+TransportHTTP
+<<enumeration>>
+TransportSTDIO
+TransportSSE
+TransportHTTP
 }
 MCPServerWrapper --> ServerConfig : "uses"
 MCPServerWrapper --> TransportType : "uses"
@@ -169,48 +170,48 @@ The TransportManager component provides a centralized mechanism for managing con
 ```mermaid
 classDiagram
 class TransportManager {
-+clients : Map<string, MCPClientWrapper>
-+factory : ClientFactory
-+logger : Logger
-+mu : RWMutex
-+NewTransportManager(logger: Logger) : TransportManager
-+RegisterSSEEndpoint(name: string, url: string, headers: Map<string, string>) : void
-+RegisterHTTPEndpoint(name: string, url: string, headers: Map<string, string>) : void
-+RegisterSTDIOEndpoint(name: string, command: string, args: List<string>) : void
-+GetClient(name: string) : (MCPClientWrapper, error)
-+CallRemoteTool(ctx: Context, clientName: string, toolName: string, args: Map<string, interface>) : (CallToolResult, error)
-+Close() : void
++map~string,MCPClientWrapper~ clients
++ClientFactory factory
++Logger logger
++RWMutex mu
++NewTransportManager(logger Logger) TransportManager
++RegisterSSEEndpoint(name string, url string, headers map~string,string~) void
++RegisterHTTPEndpoint(name string, url string, headers map~string,string~) void
++RegisterSTDIOEndpoint(name string, command string, args string[]) void
++GetClient(name string) MCPClientWrapper, error
++CallRemoteTool(ctx Context, clientName string, toolName string, args map~string,interface~) CallToolResult, error
++Close() void
 }
 class ResilientSSEClient {
-+baseURL : string
-+headers : Map<string, string>
-+client : Client
-+ctx : Context
-+cancel : CancelFunc
-+reconnectCh : Chan<struct>
-+mutex : RWMutex
-+logger : Logger
-+NewResilientSSEClient(baseURL: string, headers: Map<string, string>, logger: Logger) : ResilientSSEClient
-+connect() : error
-+reconnectLoop() : void
-+CallTool(ctx: Context, req: CallToolRequest) : (CallToolResult, error)
-+Close() : error
++string baseURL
++map~string,string~ headers
++Client client
++Context ctx
++CancelFunc cancel
++chan~struct~ reconnectCh
++RWMutex mutex
++Logger logger
++NewResilientSSEClient(baseURL string, headers map~string,string~, logger Logger) ResilientSSEClient
++connect() error
++reconnectLoop() void
++CallTool(ctx Context, req CallToolRequest) CallToolResult, error
++Close() error
 }
 class StreamableHTTPClientPool {
-+clients : Chan<MCPClientWrapper>
-+func() : MCPClientWrapper factory
-+maxSize : int
-+baseURL : string
-+logger : Logger
-+NewStreamableHTTPClientPool(baseURL: string, maxSize: int, logger: Logger) : StreamableHTTPClientPool
-+Get() : MCPClientWrapper
-+Put(c: MCPClientWrapper) : void
-+CallTool(ctx: Context, name: string, args: Map<string, interface>) : (CallToolResult, error)
-+Close() : void
++chan~MCPClientWrapper~ clients
++func MCPClientWrapper factory
++int maxSize
++string baseURL
++Logger logger
++NewStreamableHTTPClientPool(baseURL string, maxSize int, logger Logger) StreamableHTTPClientPool
++Get() MCPClientWrapper
++Put(c MCPClientWrapper) void
++CallTool(ctx Context, name string, args map~string,interface~) CallToolResult, error
++Close() void
 }
 TransportManager --> MCPClientWrapper : "manages"
 TransportManager --> ClientFactory : "uses"
-ResilientSSEClient --> client.Client : "wraps"
+ResilientSSEClient --> Client : "wraps"
 StreamableHTTPClientPool --> MCPClientWrapper : "pools"
 ```
 
@@ -228,42 +229,42 @@ The MCPClientWrapper provides a unified interface for communicating with remote 
 ```mermaid
 classDiagram
 class MCPClientWrapper {
-+client : Client
-+clientType : ClientType
-+serverInfo : InitializeResult
-+logger : Logger
-+ctx : Context
-+cancel : CancelFunc
-+mu : RWMutex
-+initialized : bool
-+Initialize(ctx: Context) : error
-+ListTools(ctx: Context) : (ListToolsResult, error)
-+CallTool(ctx: Context, name: string, args: Map<string, interface>) : (CallToolResult, error)
-+ListResources(ctx: Context) : (ListResourcesResult, error)
-+ReadResource(ctx: Context, uri: string) : (ReadResourceResult, error)
-+ListPrompts(ctx: Context) : (ListPromptsResult, error)
-+GetPrompt(ctx: Context, name: string, args: Map<string, string>) : (GetPromptResult, error)
-+Close() : error
-+IsInitialized() : bool
-+GetServerInfo() : InitializeResult
++Client client
++ClientType clientType
++InitializeResult serverInfo
++Logger logger
++Context ctx
++CancelFunc cancel
++RWMutex mu
++bool initialized
++Initialize(ctx Context) error
++ListTools(ctx Context) ListToolsResult, error
++CallTool(ctx Context, name string, args map~string,interface~) CallToolResult, error
++ListResources(ctx Context) ListResourcesResult, error
++ReadResource(ctx Context, uri string) ReadResourceResult, error
++ListPrompts(ctx Context) ListPromptsResult, error
++GetPrompt(ctx Context, name string, args map~string,string~) GetPromptResult, error
++Close() error
++IsInitialized() bool
++GetServerInfo() InitializeResult
 }
 class ClientConfig {
-+Type : ClientType
-+Address : string
-+Command : string
-+Args : List<string>
-+Headers : Map<string, string>
-+Logger : Logger
++ClientType Type
++string Address
++string Command
++string[] Args
++map~string,string~ Headers
++Logger Logger
 }
 class ClientFactory {
-+configs : Map<string, ClientConfig>
-+clients : Map<string, MCPClientWrapper>
-+mu : RWMutex
-+logger : Logger
-+NewClientFactory(logger: Logger) : ClientFactory
-+RegisterConfig(name: string, config: ClientConfig) : void
-+GetOrCreateClient(name: string) : (MCPClientWrapper, error)
-+CloseAll() : void
++map~string,ClientConfig~ configs
++map~string,MCPClientWrapper~ clients
++RWMutex mu
++Logger logger
++NewClientFactory(logger Logger) ClientFactory
++RegisterConfig(name string, config ClientConfig) void
++GetOrCreateClient(name string) MCPClientWrapper, error
++CloseAll() void
 }
 MCPClientWrapper --> ClientType : "uses"
 ClientFactory --> ClientConfig : "stores"
@@ -285,28 +286,28 @@ The EventBus component enables real-time communication between different parts o
 ```mermaid
 classDiagram
 class EventBus {
-+mu : RWMutex
-+handlers : Map<EventType, List<EventHandler>>
-+logger : Logger
-+eventChan : Chan<Event>
-+stopChan : Chan<struct>
-+NewEventBus(logger: Logger) : EventBus
-+Subscribe(eventType: EventType, handler: EventHandler) : void
-+SubscribeAll(handler: EventHandler) : void
-+Publish(event: Event) : void
-+PublishAsync(eventType: EventType, payload: Map<string, interface>) : void
-+processEvents() : void
-+handleEvent(event: Event) : void
-+Stop() : void
-+PublishDSLProgress(stage: string, message: string, details: Map<string, interface>) : void
-+PublishNodeStatusUpdate(workflowID: nodeID, status: string) : void
-+PublishWorkflowLog(workflowID: level, message: source, nodeID: string) : void
-+PublishWorkflowComplete(workflowID: string, result: Map<string, interface>) : void
-+PublishWorkflowError(workflowID: message, nodeID: string) : void
++RWMutex mu
++map~EventType,EventHandler[]~ handlers
++Logger logger
++chan~Event~ eventChan
++chan~struct~ stopChan
++NewEventBus(logger Logger) EventBus
++Subscribe(eventType EventType, handler EventHandler) void
++SubscribeAll(handler EventHandler) void
++Publish(event Event) void
++PublishAsync(eventType EventType, payload map~string,interface~) void
++processEvents() void
++handleEvent(event Event) void
++Stop() void
++PublishDSLProgress(stage string, message string, details map~string,interface~) void
++PublishNodeStatusUpdate(workflowID string, nodeID string, status string) void
++PublishWorkflowLog(workflowID string, level string, message string, source string, nodeID string) void
++PublishWorkflowComplete(workflowID string, result map~string,interface~) void
++PublishWorkflowError(workflowID string, message string, nodeID string) void
 }
 class Event {
-+Type : EventType
-+Payload : Map<string, interface>
++EventType Type
++map~string,interface~ Payload
 }
 class EventHandler {
 <<function>>

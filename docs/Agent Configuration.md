@@ -22,65 +22,65 @@ The agent configuration is defined in YAML format and structured around several 
 ```mermaid
 classDiagram
 class AppConfig {
-+Agent : AgentConfig
-+P2P : P2PConfig
-+HTTP : HTTPConfig
-+MCP : MCPBridgeConfig
-+LLM : LLMConfig
-+Logging : LogConfig
++Agent: AgentConfig
++P2P: P2PConfig
++HTTP: HTTPConfig
++MCP: MCPBridgeConfig
++LLM: LLMConfig
++Logging: LogConfig
 }
 class AgentConfig {
-+Name : string
-+Version : string
-+Description : string
-+URL : string
-+SharedDir : string
-+Tools : List<ToolConfig>
-+ExternalMCPEndpoints : List<string>
++Name: string
++Version: string
++Description: string
++URL: string
++SharedDir: string
++Tools: List~ToolConfig~
++ExternalMCPEndpoints: List~string~
 }
 class P2PConfig {
-+Enabled : bool
-+Port : int
-+Secure : bool
-+Rendezvous : string
-+EnableMDNS : bool
-+EnableDHT : bool
-+BootstrapNodes : List<string>
++Enabled: bool
++Port: int
++Secure: bool
++Rendezvous: string
++EnableMDNS: bool
++EnableDHT: bool
++BootstrapNodes: List~string~
 }
 class HTTPConfig {
-+Enabled : bool
-+Port : int
-+Host : string
++Enabled: bool
++Port: int
++Host: string
 }
 class MCPBridgeConfig {
-+Enabled : bool
-+Servers : List<MCPServerConfig>
-+Limits : MCPLimits
-+LogLevel : string
++Enabled: bool
++Servers: List~MCPServerConfig~
++Limits: MCPLimits
++LogLevel: string
 }
 class LLMConfig {
-+Enabled : bool
-+Provider : string
-+APIKey : string
-+Model : string
-+MaxTokens : int
-+Temperature : float32
-+Timeout : Duration
-+FunctionCalling : LLMFunctionConfig
-+Caching : LLMCacheConfig
-+RateLimiting : LLMRateConfig
++Enabled: bool
++Provider: string
++APIKey: string
++Model: string
++MaxTokens: int
++Temperature: float32
++Timeout: Duration
++FunctionCalling: LLMFunctionConfig
++Caching: LLMCacheConfig
++RateLimiting: LLMRateConfig
 }
 class LogConfig {
-+Level : string
-+Format : string
-+File : string
++Level: string
++Format: string
++File: string
 }
-AppConfig --> AgentConfig : "contains"
-AppConfig --> P2PConfig : "contains"
-AppConfig --> HTTPConfig : "contains"
-AppConfig --> MCPBridgeConfig : "contains"
-AppConfig --> LLMConfig : "contains"
-AppConfig --> LogConfig : "contains"
+AppConfig --> AgentConfig: "contains"
+AppConfig --> P2PConfig: "contains"
+AppConfig --> HTTPConfig: "contains"
+AppConfig --> MCPBridgeConfig: "contains"
+AppConfig --> LLMConfig: "contains"
+AppConfig --> LogConfig: "contains"
 ```
 
 **Diagram sources**
@@ -153,7 +153,7 @@ The system validates MCP server configurations to ensure:
 
 ```mermaid
 flowchart TD
-Start([Validate MCP Server]) --> CheckName["Check Name Not Empty"]
+Start(["Validate MCP Server"]) --> CheckName["Check Name Not Empty"]
 CheckName --> NameValid{"Name Valid?"}
 NameValid --> |No| ReturnError1["Return Error: Name Required"]
 NameValid --> |Yes| CheckTransport["Check Transport Valid"]
@@ -164,16 +164,16 @@ CheckTransportRequirements --> TransportType{"Transport Type?"}
 TransportType --> |stdio| CheckCommand["Command Provided?"]
 TransportType --> |sse| CheckURL["URL Provided?"]
 CheckCommand --> CommandProvided{"Command Provided?"}
-CheckCommand --> |No| ReturnError3["Return Error: Command Required for stdio"]
+CommandProvided --> |No| ReturnError3["Return Error: Command Required for stdio"]
 CheckURL --> URLProvided{"URL Provided?"}
-CheckURL --> |No| ReturnError4["Return Error: URL Required for sse"]
-CommandProvided --> |Yes| Success([Valid Configuration])
+URLProvided --> |No| ReturnError4["Return Error: URL Required for sse"]
+CommandProvided --> |Yes| Success(["Valid Configuration"])
 URLProvided --> |Yes| Success
-ReturnError1 --> End([Configuration Invalid])
+ReturnError1 --> End(["Configuration Invalid"])
 ReturnError2 --> End
 ReturnError3 --> End
 ReturnError4 --> End
-Success --> End([Configuration Valid])
+Success --> EndValid(["Configuration Valid"])
 ```
 
 **Diagram sources**
@@ -230,29 +230,29 @@ The agent maintains a registry of execution engines and initializes them as need
 
 ```mermaid
 sequenceDiagram
-participant Agent as "PraxisAgent"
-participant Engines as "executionEngines map"
-participant Dagger as "DaggerEngine"
-participant Remote as "RemoteMCPEngine"
-Agent->>Agent : Start initialization
-Agent->>Engines : Initialize map
-Agent->>Remote : Initialize RemoteMCPEngine
-Agent->>Agent : Store in engines["remote-mcp"]
-Agent->>Agent : Log "Remote MCP Engine initialized"
-Agent->>Agent : Store dagger initialization for later
-Agent->>Agent : Log "Dagger Engine will be initialized on first use"
-Note over Agent,Remote : Remote engine initialized immediately
+participant Agent as PraxisAgent
+participant Engines as executionEngines map
+participant Dagger as DaggerEngine
+participant Remote as RemoteMCPEngine
+Agent->>Agent: Start initialization
+Agent->>Engines: Initialize map
+Agent->>Remote: Initialize RemoteMCPEngine
+Agent->>Agent: Store in engines["remote-mcp"]
+Agent->>Agent: Log "Remote MCP Engine initialized"
+Agent->>Agent: Store dagger initialization for later
+Agent->>Agent: Log "Dagger Engine will be initialized on first use"
+Note over Agent,Remote: Remote engine initialized immediately
 loop When first Dagger tool is called
-Agent->>Engines : Check for "dagger" engine
-Engines-->>Agent : Not found
-Agent->>Dagger : Create NewEngine()
-Dagger-->>Agent : Return engine or error
+Agent->>Engines: Check for "dagger" engine
+Engines-->>Agent: Not found
+Agent->>Dagger: Create NewEngine()
+Dagger-->>Agent: Return engine or error
 alt Engine created successfully
-Agent->>Engines : Store engine
-Agent->>Agent : Log success
+Agent->>Engines: Store engine
+Agent->>Agent: Log success
 else Engine creation failed
-Agent->>Agent : Log error
-Agent->>Caller : Return initialization error
+Agent->>Agent: Log error
+Agent->>Caller: Return initialization error
 end
 end
 ```
@@ -348,30 +348,30 @@ This allows sensitive data like API keys to be kept out of configuration files a
 
 ```mermaid
 sequenceDiagram
-participant File as "config.yaml"
-participant Loader as "LoadConfig"
-participant Expander as "ExpandEnvVars"
-participant Parser as "YAML Parser"
-participant Validator as "validateConfig"
-participant Overrider as "applyEnvironmentOverrides"
-participant Agent as "Agent"
-Loader->>File : Read file content
-File-->>Loader : YAML content
-Loader->>Expander : Expand environment variables
-Expander-->>Loader : Expanded content
-Loader->>Parser : Parse YAML
-Parser-->>Loader : AppConfig struct
-Loader->>Validator : Validate configuration
-Validator-->>Loader : Validation result
+participant File as config.yaml
+participant Loader as LoadConfig
+participant Expander as ExpandEnvVars
+participant Parser as YAML Parser
+participant Validator as validateConfig
+participant Overrider as applyEnvironmentOverrides
+participant Agent as Agent
+Loader->>File: Read file content
+File-->>Loader: YAML content
+Loader->>Expander: Expand environment variables
+Expander-->>Loader: Expanded content
+Loader->>Parser: Parse YAML
+Parser-->>Loader: AppConfig struct
+Loader->>Validator: Validate configuration
+Validator-->>Loader: Validation result
 alt Configuration invalid
-Loader->>Loader : Return error
+Loader->>Loader: Return error
 else Configuration valid
-Loader->>Overrider : Apply environment overrides
-Overrider-->>Loader : Modified config
-Loader->>Agent : Return final configuration
+Loader->>Overrider: Apply environment overrides
+Overrider-->>Loader: Modified config
+Loader->>Agent: Return final configuration
 end
-Note over Expander,Parser : Environment variables in ${} syntax are expanded
-Note over Overrider : Direct environment variable overrides applied
+Note over Expander,Parser: Environment variables in ${} syntax are expanded
+Note over Overrider: Direct environment variable overrides applied
 ```
 
 **Diagram sources**
@@ -526,7 +526,7 @@ When loading a configuration file, the system follows this process:
 
 ```mermaid
 flowchart TD
-Start([Load Configuration]) --> FileExists["Check if file exists"]
+Start(["Load Configuration"]) --> FileExists["Check if file exists"]
 FileExists --> Exists{"File exists?"}
 Exists --> |No| UseDefaults["Use default configuration"]
 Exists --> |Yes| ReadFile["Read file content"]
@@ -538,8 +538,8 @@ Valid --> |No| ReturnError["Return validation error"]
 Valid --> |Yes| ApplyEnvOverrides["Apply environment variable overrides"]
 ApplyEnvOverrides --> ReturnConfig["Return final configuration"]
 UseDefaults --> ApplyEnvOverrides
-ReturnError --> End([Failed to load config])
-ReturnConfig --> End([Configuration loaded])
+ReturnError --> End(["Failed to load config"])
+ReturnConfig --> EndSuccess(["Configuration loaded"])
 style ValidateStruct fill:#f9f,stroke:#333
 style ApplyEnvOverrides fill:#bbf,stroke:#333
 ```

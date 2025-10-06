@@ -21,16 +21,16 @@ The messaging system is organized within the `internal` directory, with core com
 
 ```mermaid
 graph TB
-subgraph "Internal"
+subgraph Internal["Internal"]
 bus[event_bus.go]
 api[websocket_gateway.go]
 dsl[dsl/orchestrator.go]
 logger[logger/hooks.go]
 end
-bus --> api : "Subscribes to"
-api --> bus : "Publishes events"
-dsl --> bus : "Publishes progress/result"
-logger --> bus : "Logs events"
+bus --> api
+api --> bus
+dsl --> bus
+logger --> bus
 style bus fill:#4CAF50,stroke:#388E3C
 style api fill:#2196F3,stroke:#1976D2
 ```
@@ -55,16 +55,16 @@ The messaging architecture follows an event-driven design where components publi
 
 ```mermaid
 graph LR
-A[DSL Analyzer] --> |Publish| B(EventBus)
-C[Workflow Orchestrator] --> |Publish| B
-D[Task Manager] --> |Publish| B
-E[A2A Protocol] --> |Publish| B
-B --> |Deliver| F[WebSocket Gateway]
-B --> |Deliver| G[Logger Hook]
-B --> |Deliver| H[Other Subscribers]
-F --> |Broadcast| I[Client 1]
-F --> |Broadcast| J[Client 2]
-F --> |Broadcast| K[Client N]
+A[DSL Analyzer] -->|Publish| B(EventBus)
+C[Workflow Orchestrator] -->|Publish| B
+D[Task Manager] -->|Publish| B
+E[A2A Protocol] -->|Publish| B
+B -->|Deliver| F[WebSocket Gateway]
+B -->|Deliver| G[Logger Hook]
+B -->|Deliver| H[Other Subscribers]
+F -->|Broadcast| I[Client 1]
+F -->|Broadcast| J[Client 2]
+F -->|Broadcast| K[Client N]
 style B fill:#FF9800,stroke:#F57C00
 style F fill:#9C27B0,stroke:#7B1FA2
 ```
@@ -82,28 +82,28 @@ The EventBus struct provides thread-safe event handling using `sync.RWMutex` for
 ```mermaid
 classDiagram
 class EventBus {
--mu : RWMutex
--handlers : Map<EventType, List<EventHandler>>
--logger : Logger
--eventChan : Chan<Event>
--stopChan : Chan<struct>
-+Subscribe(eventType: handler)
+-mu RWMutex
+-handlers Map~EventType List~
+-logger Logger
+-eventChan Chan~Event~
+-stopChan Chan~struct~
++Subscribe(eventType, handler)
 +SubscribeAll(handler)
 +Publish(event)
-+PublishAsync(eventType: payload)
++PublishAsync(eventType, payload)
 +Stop()
 }
 class Event {
-+Type : EventType
-+Payload : Map<string, interface>
++Type EventType
++Payload Map~string interface~
 }
 class EventHandler {
 <<function>>
 EventHandler(event Event)
 }
-EventBus --> Event : "Handles"
-EventBus --> EventHandler : "Stores"
-EventBus --> "logrus.Logger" : "Uses"
+EventBus --> Event: Handles
+EventBus --> EventHandler: Stores
+EventBus --> Logger: Uses
 ```
 
 **Diagram sources**
@@ -176,17 +176,17 @@ The WebSocketGateway subscribes to all events on the EventBus and broadcasts the
 #### WebSocket Connection Flow
 ```mermaid
 flowchart TD
-A[Client] --> |Upgrade Request| B[WebSocketGateway]
+A[Client] -->|Upgrade Request| B[WebSocketGateway]
 B --> C{Valid?}
-C --> |Yes| D[Register Client]
-C --> |No| E[Reject]
+C -->|Yes| D[Register Client]
+C -->|No| E[Reject]
 D --> F[Start readPump]
 D --> G[Start writePump]
 F --> H[Parse Message]
 H --> I[Route to Handler]
 G --> J[Send Messages]
 J --> A
-F --> |Disconnect| K[Unregister]
+F -->|Disconnect| K[Unregister]
 ```
 
 **Diagram sources**

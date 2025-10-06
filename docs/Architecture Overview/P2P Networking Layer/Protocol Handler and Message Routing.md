@@ -68,13 +68,13 @@ The handler maintains several key data structures:
 ```mermaid
 classDiagram
 class P2PProtocolHandler {
-+Host : host
-+Logger : logger
-+Map[ProtocolID]StreamHandler : handlers
-+Map[PeerID]AgentCard : peerCards
-+AgentCard : ourCard
-+P2PMCPBridge : mcpBridge
-+A2AAgent : agent
++host Host
++logger Logger
++handlers Map~ProtocolID,StreamHandler~
++peerCards Map~PeerID,AgentCard~
++ourCard AgentCard
++mcpBridge P2PMCPBridge
++agent A2AAgent
 +SetMCPBridge(bridge)
 +SetAgent(agent)
 +handleMCPStream(stream)
@@ -83,35 +83,35 @@ class P2PProtocolHandler {
 +handleA2AStream(stream)
 }
 class AgentCard {
-+string : Name
-+string : Version
-+string : PeerID
-+string[] : Capabilities
-+ToolSpec[] : Tools
-+int64 : Timestamp
++Name string
++Version string
++PeerID string
++Capabilities []string
++Tools []ToolSpec
++Timestamp int64
 }
 class ToolSpec {
-+string : Name
-+string : Description
-+ToolParameter[] : Parameters
++Name string
++Description string
++Parameters []ToolParameter
 }
 class ToolParameter {
-+string : Name
-+string : Type
-+string : Description
-+bool : Required
++Name string
++Type string
++Description string
++Required bool
 }
 class P2PMessage {
-+string : Type
-+string : ID
-+string : Method
-+interface{} : Params
-+interface{} : Result
-+P2PError : Error
++Type string
++ID string
++Method string
++Params interface{}
++Result interface{}
++Error P2PError
 }
 class P2PError {
-+int : Code
-+string : Message
++Code int
++Message string
 }
 P2PProtocolHandler --> AgentCard : "maintains"
 P2PProtocolHandler --> ToolSpec : "uses"

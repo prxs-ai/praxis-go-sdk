@@ -142,38 +142,39 @@ The MCP server implementation in `server.go` exposes tools via SSE, HTTP, and ST
 ```mermaid
 classDiagram
 class MCPServerWrapper {
-+*server.MCPServer : server
-+*server.SSEServer : sseServer
-+*server.StreamableHTTPServer : httpServer
-+*logrus.Logger : logger
-+string : agentName
-+string : agentVersion
-+map[string]server.ToolHandlerFunc : toolHandlers
-+[]mcpTypes.Tool : registeredTools
-+NewMCPServer(config: ServerConfig) : MCPServerWrapper
-+AddTool(tool: Tool, handler: ToolHandlerFunc)
-+FindToolHandler(toolName: string) : ToolHandlerFunc
-+HasTool(toolName: string) : bool
-+GetRegisteredTools() : List<Tool>
-+StartSSE(port: string) : error
-+StartHTTP(port: string) : error
-+StartSTDIO() : error
-+Shutdown(ctx: Context) : error
++server.MCPServer server
++server.SSEServer sseServer
++server.StreamableHTTPServer httpServer
++logrus.Logger logger
++string agentName
++string agentVersion
++map~string,server.ToolHandlerFunc~ toolHandlers
++mcpTypes.Tool[] registeredTools
++NewMCPServer(config ServerConfig) MCPServerWrapper
++AddTool(tool Tool, handler ToolHandlerFunc)
++FindToolHandler(toolName string) ToolHandlerFunc
++HasTool(toolName string) bool
++GetRegisteredTools() Tool[]
++StartSSE(port string) error
++StartHTTP(port string) error
++StartSTDIO() error
++Shutdown(ctx Context) error
 }
 class ServerConfig {
-+string : Name
-+string : Version
-+TransportType : Transport
-+string : Port
-+*logrus.Logger : Logger
-+bool : EnableTools
-+bool : EnableResources
-+bool : EnablePrompts
++string Name
++string Version
++TransportType Transport
++string Port
++logrus.Logger Logger
++bool EnableTools
++bool EnableResources
++bool EnablePrompts
 }
 class TransportType {
-+TransportSTDIO
-+TransportSSE
-+TransportHTTP
+<<enumeration>>
+TransportSTDIO
+TransportSSE
+TransportHTTP
 }
 MCPServerWrapper --> ServerConfig : "uses"
 MCPServerWrapper --> TransportType : "references"
@@ -214,21 +215,21 @@ The adapter pattern in `remote_engine.go` bridges local execution engines with e
 ```mermaid
 classDiagram
 class RemoteMCPEngine {
-+*TransportManager : transportManager
-+NewRemoteMCPEngine(tm: TransportManager) : RemoteMCPEngine
-+Execute(ctx: Context, contract: ToolContract, args: Map<string, interface>) : (string, error)
++TransportManager transportManager
++NewRemoteMCPEngine(tm TransportManager) RemoteMCPEngine
++Execute(ctx Context, contract ToolContract, args map~string,interface~) string, error
 }
 class TransportManager {
-+map[string]*MCPClientWrapper : clients
-+*ClientFactory : factory
-+*logrus.Logger : logger
-+RegisterSSEEndpoint(name: string, url: string, headers: Map<string, string>)
-+GetClient(name: string) : (MCPClientWrapper, error)
-+CallRemoteTool(ctx: Context, clientName: string, toolName: string, args: Map<string, interface>) : (CallToolResult, error)
++map~string,MCPClientWrapper~ clients
++ClientFactory factory
++logrus.Logger logger
++RegisterSSEEndpoint(name string, url string, headers map~string,string~)
++GetClient(name string) MCPClientWrapper, error
++CallRemoteTool(ctx Context, clientName string, toolName string, args map~string,interface~) CallToolResult, error
 }
 class ExecutionEngine {
 <<interface>>
-+Execute(ctx: Context, contract: ToolContract, args: Map<string, interface>) : (string, error)
++Execute(ctx Context, contract ToolContract, args map~string,interface~) string, error
 }
 RemoteMCPEngine --> TransportManager : "uses"
 RemoteMCPEngine --|> ExecutionEngine : "implements"

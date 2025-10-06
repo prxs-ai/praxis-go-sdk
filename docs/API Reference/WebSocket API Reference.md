@@ -42,7 +42,7 @@ sequenceDiagram
 participant Client
 participant Gateway
 participant Hub
-Client->>Gateway : Connect to ws : //host : port/ws/workflow
+Client->>Gateway : Connect to ws://host:port/ws/workflow
 Gateway->>Hub : Register new client
 Hub-->>Gateway : Client registered
 Gateway->>Client : Connection established
@@ -316,17 +316,17 @@ participant Client
 participant WebSocketGateway
 participant WorkflowOrchestrator
 participant EventBus
-Client->>WebSocketGateway : EXECUTE_WORKFLOW (workflowId : "123")
-WebSocketGateway->>EventBus : Publish(workflowStart, workflowId : "123")
+Client->>WebSocketGateway : EXECUTE_WORKFLOW (workflowId="123")
+WebSocketGateway->>EventBus : Publish(workflowStart, workflowId="123")
 EventBus->>WebSocketGateway : workflowStart event
-WebSocketGateway->>Client : workflowStart event (workflowId : "123")
-WebSocketGateway->>WorkflowOrchestrator : ExecuteWorkflow(workflowId : "123")
-WorkflowOrchestrator->>EventBus : Publish(nodeStatusUpdate, workflowId : "123")
+WebSocketGateway->>Client : workflowStart event (workflowId="123")
+WebSocketGateway->>WorkflowOrchestrator : ExecuteWorkflow(workflowId="123")
+WorkflowOrchestrator->>EventBus : Publish(nodeStatusUpdate, workflowId="123")
 EventBus->>WebSocketGateway : nodeStatusUpdate event
-WebSocketGateway->>Client : nodeStatusUpdate event (workflowId : "123")
-WorkflowOrchestrator->>EventBus : Publish(workflowComplete, workflowId : "123")
+WebSocketGateway->>Client : nodeStatusUpdate event (workflowId="123")
+WorkflowOrchestrator->>EventBus : Publish(workflowComplete, workflowId="123")
 EventBus->>WebSocketGateway : workflowComplete event
-WebSocketGateway->>Client : workflowComplete event (workflowId : "123")
+WebSocketGateway->>Client : workflowComplete event (workflowId="123")
 ```
 
 **Diagram sources**

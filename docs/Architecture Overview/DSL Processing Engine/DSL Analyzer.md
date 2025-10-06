@@ -21,11 +21,11 @@ The DSL Analyzer resides in the `internal/dsl` directory and consists of two pri
 
 ```mermaid
 graph TD
-subgraph "DSL Analyzer"
+subgraph DSLAnalyzer["DSL Analyzer"]
 A[Analyzer]
 O[OrchestratorAnalyzer]
 end
-subgraph "Integration Points"
+subgraph IntegrationPoints["Integration Points"]
 LLM[LLMClient]
 BUS[EventBus]
 AGENT[AgentInterface]
@@ -63,7 +63,7 @@ Parser --> AST[Abstract Syntax Tree]
 AST --> Validator[Semantic Validation]
 Validator --> Resolver[Tool Resolution]
 Resolver --> Executor[Execution Engine]
-subgraph "Execution Targets"
+subgraph ExecutionTargets["Execution Targets"]
 Local[Local Tools]
 Remote[P2P Agents]
 A2A[Agent-to-Agent]
@@ -73,7 +73,7 @@ Executor --> Remote
 Executor --> A2A
 LLM[LLM Orchestration] --> Planner[Workflow Planning]
 Planner --> AST
-EventBus[Event Bus] <- --> Orchestrator[OrchestratorAnalyzer]
+EventBus[Event Bus] <--> Orchestrator[OrchestratorAnalyzer]
 style LLM fill:#f9f,stroke:#333
 style EventBus fill:#bbf,stroke:#333
 ```
@@ -109,21 +109,21 @@ The analyzer supports multiple node types for different workflow constructs:
 ```mermaid
 classDiagram
 class ASTNode {
-+Type : NodeType
-+Value : string
-+ToolName : string
-+Args : Map<string, interface>
-+Children : List<ASTNode>
++Type NodeType
++Value string
++ToolName string
++Args Map~string interface~
++Children List~ASTNode~
 }
 class NodeType {
-+NodeTypeWorkflow : string
-+NodeTypeTask : string
-+NodeTypeAgent : string
-+NodeTypeCall : string
-+NodeTypeParallel : string
-+NodeTypeSequence : string
++NodeTypeWorkflow string
++NodeTypeTask string
++NodeTypeAgent string
++NodeTypeCall string
++NodeTypeParallel string
++NodeTypeSequence string
 }
-ASTNode --> NodeType : "has type"
+ASTNode --> NodeType: has type
 ```
 
 **Diagram sources**

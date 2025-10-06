@@ -21,16 +21,16 @@ The project follows a layered architecture with clear separation of concerns. Th
 
 ```mermaid
 graph TD
-subgraph "Execution Layer"
+subgraph Execution_Layer["Execution Layer"]
 contracts[contracts/execution.go]
 dagger[dagger/engine.go]
 mcp[remote_engine.go]
 end
-subgraph "Configuration"
+subgraph Configuration["Configuration"]
 config[config/config.go]
 types[config/types.go]
 end
-subgraph "Integration"
+subgraph Integration["Integration"]
 agent[agent/agent.go]
 main[agent/main.go]
 end
@@ -75,34 +75,36 @@ The execution engine architecture implements a strategy pattern through a centra
 classDiagram
 class ExecutionEngine {
 <<interface>>
-+Execute(ctx: contract, args) : string, error
++Execute(ctx, contract, args) string, error
 }
 class DaggerEngine {
--*dagger.Client : client
-+Execute(ctx: contract, args) : string, error
+-client *dagger.Client
++Execute(ctx, contract, args) string, error
 +Close()
 }
 class RemoteMCPEngine {
--*TransportManager : transportManager
-+Execute(ctx: contract, args) : string, error
+-transportManager *TransportManager
++Execute(ctx, contract, args) string, error
 }
 class PraxisAgent {
--map[string]ExecutionEngine : executionEngines
--*TransportManager : transportManager
+-executionEngines map[string]ExecutionEngine
+-transportManager *TransportManager
 +handleExecuteTool()
 +handleDaggerTool()
 }
 class ToolContract {
-+string : Engine
-+string : Name
-+map[string]interface{} : EngineSpec
++Engine string
++Name string
++EngineSpec map[string]interface{}
+}
+class TransportManager {
 }
 ExecutionEngine <|-- DaggerEngine
 ExecutionEngine <|-- RemoteMCPEngine
-PraxisAgent --> ExecutionEngine : "uses"
-PraxisAgent --> ToolContract : "executes"
-PraxisAgent --> TransportManager : "manages"
-RemoteMCPEngine --> TransportManager : "uses"
+PraxisAgent --> ExecutionEngine : uses
+PraxisAgent --> ToolContract : executes
+PraxisAgent --> TransportManager : manages
+RemoteMCPEngine --> TransportManager : uses
 ```
 
 **Diagram sources**
@@ -136,17 +138,17 @@ participant Client
 participant Agent
 participant DaggerEngine
 participant Container
-Client->>Agent : Execute Tool Request
-Agent->>DaggerEngine : Execute(contract, args)
-DaggerEngine->>DaggerEngine : Validate EngineSpec
-DaggerEngine->>DaggerEngine : Create Container from Image
-DaggerEngine->>DaggerEngine : Mount Host Directories
-DaggerEngine->>DaggerEngine : Set Environment Variables
-DaggerEngine->>Container : Execute Command
-Container-->>DaggerEngine : Return Stdout
-DaggerEngine->>DaggerEngine : Export Modified Directories
-DaggerEngine-->>Agent : Return Result
-Agent-->>Client : Return Response
+Client->>Agent: Execute Tool Request
+Agent->>DaggerEngine: Execute(contract, args)
+DaggerEngine->>DaggerEngine: Validate EngineSpec
+DaggerEngine->>DaggerEngine: Create Container from Image
+DaggerEngine->>DaggerEngine: Mount Host Directories
+DaggerEngine->>DaggerEngine: Set Environment Variables
+DaggerEngine->>Container: Execute Command
+Container-->>DaggerEngine: Return Stdout
+DaggerEngine->>DaggerEngine: Export Modified Directories
+DaggerEngine-->>Agent: Return Result
+Agent-->>Client: Return Response
 ```
 
 **Diagram sources**
@@ -174,16 +176,16 @@ participant Agent
 participant RemoteMCPEngine
 participant TransportManager
 participant RemoteServer
-Client->>Agent : Execute Remote Tool
-Agent->>RemoteMCPEngine : Execute(contract, args)
-RemoteMCPEngine->>RemoteMCPEngine : Extract Address from EngineSpec
-RemoteMCPEngine->>TransportManager : RegisterSSEEndpoint(address)
-RemoteMCPEngine->>TransportManager : CallRemoteTool(clientName, toolName, args)
-TransportManager->>RemoteServer : SSE Request
-RemoteServer-->>TransportManager : Streamed Response
-TransportManager-->>RemoteMCPEngine : Return Result
-RemoteMCPEngine-->>Agent : Return Parsed Text
-Agent-->>Client : Return Response
+Client->>Agent: Execute Remote Tool
+Agent->>RemoteMCPEngine: Execute(contract, args)
+RemoteMCPEngine->>RemoteMCPEngine: Extract Address from EngineSpec
+RemoteMCPEngine->>TransportManager: RegisterSSEEndpoint(address)
+RemoteMCPEngine->>TransportManager: CallRemoteTool(clientName, toolName, args)
+TransportManager->>RemoteServer: SSE Request
+RemoteServer-->>TransportManager: Streamed Response
+TransportManager-->>RemoteMCPEngine: Return Result
+RemoteMCPEngine-->>Agent: Return Parsed Text
+Agent-->>Client: Return Response
 ```
 
 **Diagram sources**
@@ -201,11 +203,11 @@ The factory pattern is implemented within the `PraxisAgent` class, which manages
 flowchart TD
 Start([Tool Execution Request]) --> GetEngine["Get Engine by Contract.Engine"]
 GetEngine --> EngineExists{"Engine Exists?"}
-EngineExists --> |No| InitializeEngine["Initialize Engine"]
-EngineExists --> |Yes| UseExistingEngine["Use Existing Engine"]
+EngineExists -->|No| InitializeEngine["Initialize Engine"]
+EngineExists -->|Yes| UseExistingEngine["Use Existing Engine"]
 InitializeEngine --> DaggerEngine{"Engine is Dagger?"}
-DaggerEngine --> |Yes| LazyInitDagger["NewEngine(ctx)"]
-DaggerEngine --> |No| InitRemote["NewRemoteMCPEngine()"]
+DaggerEngine -->|Yes| LazyInitDagger["NewEngine(ctx)"]
+DaggerEngine -->|No| InitRemote["NewRemoteMCPEngine()"]
 LazyInitDagger --> StoreEngine["Store in executionEngines"]
 InitRemote --> StoreEngine
 StoreEngine --> ExecuteTool["Execute(contract, args)"]

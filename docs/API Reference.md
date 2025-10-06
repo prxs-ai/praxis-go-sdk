@@ -192,17 +192,17 @@ participant Client
 participant Gateway
 participant EventBus
 participant Orchestrator
-Client->>Gateway : Connect to /ws/workflow
-Gateway->>Gateway : Assign clientID, register in hub
-Gateway->>Client : Connection established
-Client->>Gateway : Send {type : "DSL_COMMAND", payload : {...}}
-Gateway->>Gateway : Parse message
-Gateway->>EventBus : Publish dslProgress event
-Gateway->>Orchestrator : AnalyzeWithOrchestration(command)
-Orchestrator-->>Gateway : Return result
-Gateway->>EventBus : Publish dslResult event
-EventBus->>Gateway : Broadcast to all clients
-Gateway->>Client : Send dslResult event
+Client->>Gateway: Connect to /ws/workflow
+Gateway->>Gateway: Assign clientID, register in hub
+Gateway->>Client: Connection established
+Client->>Gateway: Send {type: "DSL_COMMAND", payload: {...}}
+Gateway->>Gateway: Parse message
+Gateway->>EventBus: Publish dslProgress event
+Gateway->>Orchestrator: AnalyzeWithOrchestration(command)
+Orchestrator-->>Gateway: Return result
+Gateway->>EventBus: Publish dslResult event
+EventBus->>Gateway: Broadcast to all clients
+Gateway->>Client: Send dslResult event
 ```
 
 **Diagram sources**
@@ -344,28 +344,28 @@ The agent enforces rate limiting at multiple levels:
 
 ```mermaid
 flowchart TD
-A[Client Connect] --> B{Connection Valid?}
-B --> |Yes| C[Register Client]
-C --> D[Start readPump]
-D --> E[Start writePump]
-E --> F[Listen for Messages]
-F --> G{Message Type}
-G --> |DSL_COMMAND| H[Process DSL Command]
-G --> |EXECUTE_WORKFLOW| I[Execute Workflow]
-G --> |CHAT_MESSAGE| J[Process Chat Message]
-G --> |Unknown| K[Log Warning]
-H --> L[Publish dslProgress]
-H --> M[Publish dslResult]
-I --> N[Publish workflowStart]
-I --> O[Execute Nodes]
-O --> P[Publish nodeStatusUpdate]
-O --> Q{Success?}
-Q --> |Yes| R[Publish workflowComplete]
-Q --> |No| S[Publish workflowError]
-J --> T[Publish chatMessage]
-F --> U{Connection Active?}
-U --> |No| V[Unregister Client]
-V --> W[Close Connection]
+A["Client Connect"] --> B{"Connection Valid?"}
+B --> |Yes| C["Register Client"]
+C --> D["Start readPump"]
+D --> E["Start writePump"]
+E --> F["Listen for Messages"]
+F --> G{"Message Type"}
+G --> |DSL_COMMAND| H["Process DSL Command"]
+G --> |EXECUTE_WORKFLOW| I["Execute Workflow"]
+G --> |CHAT_MESSAGE| J["Process Chat Message"]
+G --> |Unknown| K["Log Warning"]
+H --> L["Publish dslProgress"]
+H --> M["Publish dslResult"]
+I --> N["Publish workflowStart"]
+I --> O["Execute Nodes"]
+O --> P["Publish nodeStatusUpdate"]
+O --> Q{"Success?"}
+Q --> |Yes| R["Publish workflowComplete"]
+Q --> |No| S["Publish workflowError"]
+J --> T["Publish chatMessage"]
+F --> U{"Connection Active?"}
+U --> |No| V["Unregister Client"]
+V --> W["Close Connection"]
 ```
 
 **Diagram sources**

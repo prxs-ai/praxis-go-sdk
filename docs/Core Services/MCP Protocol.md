@@ -130,34 +130,34 @@ The MCP server implementation wraps the underlying `github.com/mark3labs/mcp-go/
 ```mermaid
 classDiagram
 class MCPServerWrapper {
-+*server.MCPServer : server
-+*server.SSEServer : sseServer
-+*server.StreamableHTTPServer : httpServer
-+*logrus.Logger : logger
-+string : agentName
-+string : agentVersion
-+map[string]server.ToolHandlerFunc : toolHandlers
-+[]mcpTypes.Tool : registeredTools
-+AddTool(tool: Tool, handler: ToolHandlerFunc)
-+FindToolHandler(toolName: string) : ToolHandlerFunc
-+HasTool(toolName: string) : bool
-+GetRegisteredTools() : List<Tool>
-+AddResource(resource: Resource, handler: ResourceHandlerFunc)
-+AddPrompt(prompt: Prompt, handler: PromptHandlerFunc)
-+StartSSE(port: string) : error
-+StartHTTP(port: string) : error
-+StartSTDIO() : error
-+Shutdown(ctx: Context) : error
++server.MCPServer server
++server.SSEServer sseServer
++server.StreamableHTTPServer httpServer
++logrus.Logger logger
++string agentName
++string agentVersion
++map~string,server.ToolHandlerFunc~ toolHandlers
++mcpTypes.Tool[] registeredTools
++AddTool(tool Tool, handler ToolHandlerFunc)
++FindToolHandler(toolName string) ToolHandlerFunc
++HasTool(toolName string) bool
++GetRegisteredTools() Tool[]
++AddResource(resource Resource, handler ResourceHandlerFunc)
++AddPrompt(prompt Prompt, handler PromptHandlerFunc)
++StartSSE(port string) error
++StartHTTP(port string) error
++StartSTDIO() error
++Shutdown(ctx Context) error
 }
 class ServerConfig {
-+string : Name
-+string : Version
-+TransportType : Transport
-+string : Port
-+*logrus.Logger : Logger
-+bool : EnableTools
-+bool : EnableResources
-+bool : EnablePrompts
++string Name
++string Version
++TransportType Transport
++string Port
++logrus.Logger Logger
++bool EnableTools
++bool EnableResources
++bool EnablePrompts
 }
 class TransportType {
 <<enumeration>>
@@ -201,32 +201,32 @@ The MCP client implementation provides a wrapper around the underlying MCP clien
 ```mermaid
 classDiagram
 class MCPClientWrapper {
-+*client.Client : client
-+ClientType : clientType
-+*mcp.InitializeResult : serverInfo
-+*logrus.Logger : logger
-+context.Context : ctx
-+context.CancelFunc : cancel
-+sync.RWMutex : mu
-+bool : initialized
-+Initialize(ctx: Context) : error
-+ListTools(ctx: Context) : (ListToolsResult, error)
-+CallTool(ctx: Context, name: string, args: Map<string, interface>) : (CallToolResult, error)
-+ListResources(ctx: Context) : (ListResourcesResult, error)
-+ReadResource(ctx: Context, uri: string) : (ReadResourceResult, error)
-+ListPrompts(ctx: Context) : (ListPromptsResult, error)
-+GetPrompt(ctx: Context, name: string, args: Map<string, string>) : (GetPromptResult, error)
-+Close() : error
-+IsInitialized() : bool
-+GetServerInfo() : InitializeResult
++client.Client client
++ClientType clientType
++mcp.InitializeResult serverInfo
++logrus.Logger logger
++context.Context ctx
++context.CancelFunc cancel
++sync.RWMutex mu
++bool initialized
++Initialize(ctx Context) error
++ListTools(ctx Context) ListToolsResult, error
++CallTool(ctx Context, name string, args map~string,interface~) CallToolResult, error
++ListResources(ctx Context) ListResourcesResult, error
++ReadResource(ctx Context, uri string) ReadResourceResult, error
++ListPrompts(ctx Context) ListPromptsResult, error
++GetPrompt(ctx Context, name string, args map~string,string~) GetPromptResult, error
++Close() error
++IsInitialized() bool
++GetServerInfo() InitializeResult
 }
 class ClientConfig {
-+ClientType : Type
-+string : Address
-+string : Command
-+[]string : Args
-+map[string]string : Headers
-+*logrus.Logger : Logger
++ClientType Type
++string Address
++string Command
++string[] Args
++map~string,string~ Headers
++logrus.Logger Logger
 }
 class ClientType {
 <<enumeration>>
@@ -278,39 +278,39 @@ The transport layer provides abstraction over different communication methods an
 ```mermaid
 classDiagram
 class TransportManager {
-+map[string]*MCPClientWrapper : clients
-+*ClientFactory : factory
-+*logrus.Logger : logger
-+sync.RWMutex : mu
-+RegisterSSEEndpoint(name: string, url: string, headers: Map<string, string>)
-+RegisterHTTPEndpoint(name: string, url: string, headers: Map<string, string>)
-+RegisterSTDIOEndpoint(name: string, command: string, args: List<string>)
-+GetClient(name: string) : (MCPClientWrapper, error)
-+CallRemoteTool(ctx: Context, clientName: string, toolName: string, args: Map<string, interface>) : (CallToolResult, error)
++map~string,MCPClientWrapper~ clients
++ClientFactory factory
++logrus.Logger logger
++sync.RWMutex mu
++RegisterSSEEndpoint(name string, url string, headers map~string,string~)
++RegisterHTTPEndpoint(name string, url string, headers map~string,string~)
++RegisterSTDIOEndpoint(name string, command string, args string[])
++GetClient(name string) MCPClientWrapper, error
++CallRemoteTool(ctx Context, clientName string, toolName string, args map~string,interface~) CallToolResult, error
 +Close()
 }
 class ClientFactory {
-+map[string]ClientConfig : configs
-+map[string]*MCPClientWrapper : clients
-+sync.RWMutex : mu
-+*logrus.Logger : logger
-+RegisterConfig(name: string, config: ClientConfig)
-+GetOrCreateClient(name: string) : (MCPClientWrapper, error)
++map~string,ClientConfig~ configs
++map~string,MCPClientWrapper~ clients
++sync.RWMutex mu
++logrus.Logger logger
++RegisterConfig(name string, config ClientConfig)
++GetOrCreateClient(name string) MCPClientWrapper, error
 +CloseAll()
 }
 class ResilientSSEClient {
-+string : baseURL
-+map[string]string : headers
-+*client.Client : client
-+context.Context : ctx
-+context.CancelFunc : cancel
-+struct{} : reconnectCh chan
-+sync.RWMutex : mutex
-+*logrus.Logger : logger
-+connect() : error
++string baseURL
++map~string,string~ headers
++client.Client client
++context.Context ctx
++context.CancelFunc cancel
++chan~struct~ reconnectCh
++sync.RWMutex mutex
++logrus.Logger logger
++connect() error
 +reconnectLoop()
-+CallTool(ctx: Context, req: CallToolRequest) : (CallToolResult, error)
-+Close() : error
++CallTool(ctx Context, req CallToolRequest) CallToolResult, error
++Close() error
 }
 TransportManager --> ClientFactory : "contains"
 TransportManager --> ResilientSSEClient : "uses for SSE"
@@ -435,19 +435,19 @@ The `ToolContract` struct defines a language-agnostic API contract for tools, sp
 ```mermaid
 classDiagram
 class ToolContract {
-+string : Engine
-+string : Name
-+map[string]interface{} : EngineSpec
++string Engine
++string Name
++map~string,interface~ EngineSpec
 }
 class ExecutionEngine {
 <<interface>>
-+Execute(ctx: Context, contract: ToolContract, args: Map<string, interface>) : (string, error)
++Execute(ctx Context, contract ToolContract, args map~string,interface~) string, error
 }
 class DaggerEngine {
-+Execute(ctx: Context, contract: ToolContract, args: Map<string, interface>) : (string, error)
++Execute(ctx Context, contract ToolContract, args map~string,interface~) string, error
 }
 class RemoteMCPEngine {
-+Execute(ctx: Context, contract: ToolContract, args: Map<string, interface>) : (string, error)
++Execute(ctx Context, contract ToolContract, args map~string,interface~) string, error
 }
 ToolContract --> ExecutionEngine : "executed by"
 ExecutionEngine <|-- DaggerEngine
