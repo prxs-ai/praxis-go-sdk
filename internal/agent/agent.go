@@ -48,6 +48,7 @@ import (
 	"github.com/praxis/praxis-go-sdk/internal/dsl"
 	applogger "github.com/praxis/praxis-go-sdk/internal/logger"
 	"github.com/praxis/praxis-go-sdk/internal/mcp"
+	"github.com/praxis/praxis-go-sdk/internal/metrics"
 	"github.com/praxis/praxis-go-sdk/internal/p2p"
 	"github.com/praxis/praxis-go-sdk/internal/workflow"
 	"github.com/sirupsen/logrus"
@@ -91,6 +92,7 @@ type PraxisAgent struct {
 	securityConfig       appconfig.AgentSecurityConfig
 	autoTLSCertMgr       *p2pforge.P2PForgeCertMgr
 	httpSrv              *http.Server
+	metricsCollector     *metrics.MetricsCollector
 }
 
 type Config struct {
@@ -170,6 +172,11 @@ func NewPraxisAgent(config Config) (*PraxisAgent, error) {
 		cancel()
 		return nil, fmt.Errorf("failed to initialize P2P: %w", err)
 	}
+
+	// Initialize metrics collector after P2P is ready (to get peer_id)
+	peerID := agent.host.ID().String()
+	agent.metricsCollector = metrics.NewMetricsCollector(logger, config.AgentName, config.AgentVersion, peerID)
+	logger.Info("📊 Metrics collector initialized")
 
 	agent.initializeDSL()
 	agent.initializeAgentCard()
@@ -1388,6 +1395,21 @@ func (a *PraxisAgent) Start() error {
 		a.logger.Infof("WebSocket gateway started on port %d", a.websocketPort)
 	}
 
+	// Start Prometheus remote writer if enabled
+	if a.appConfig.Prometheus.Enabled && a.appConfig.Prometheus.RemoteWriteURL != "" {
+		if err := a.metricsCollector.StartRemoteWriter(
+			a.appConfig.Prometheus.RemoteWriteURL,
+			a.appConfig.Prometheus.PushInterval,
+			a.appConfig.Prometheus.Username,
+			a.appConfig.Prometheus.Password,
+		); err != nil {
+			a.logger.Errorf("Failed to start Prometheus remote writer: %v", err)
+		} else {
+			a.logger.Infof("📊 Prometheus remote writer started, pushing to %s every %s",
+				a.appConfig.Prometheus.RemoteWriteURL, a.appConfig.Prometheus.PushInterval)
+		}
+	}
+
 	a.logger.Infof("Agent %s started on HTTP port %d, P2P port %d, SSE port %d",
 		a.name, a.httpPort, a.p2pPort, a.ssePort)
 
@@ -1430,6 +1452,11 @@ func (a *PraxisAgent) Stop() error {
 		a.logger.Info("Transport manager stopped")
 	}
 
+	// Stop Prometheus remote writer
+	if a.metricsCollector != nil {
+		a.metricsCollector.StopRemoteWriter()
+	}
+
 	if a.mcpServer != nil {
 		if err := a.mcpServer.Shutdown(shutdownCtx); err != nil {
 			a.logger.Errorf("Failed to shutdown MCP server: %v", err)
@@ -1453,6 +1480,29 @@ func (a *PraxisAgent) Stop() error {
 }
 
 func (a *PraxisAgent) handleHealth(c *gin.Context) {
+	// Update metrics
+	if a.metricsCollector != nil {
+		a.metricsCollector.UpdateHealthStatus(true)
+
+		// Update peer count
+		if a.discovery != nil {
+			peers := a.discovery.GetConnectedPeers()
+			a.metricsCollector.UpdatePeerCount(len(peers))
+		}
+
+		// Update connection count
+		if a.host != nil {
+			connections := a.host.Network().Conns()
+			a.metricsCollector.UpdateConnectionCount(len(connections))
+		}
+
+		// Update MCP tools count
+		if a.mcpServer != nil {
+			tools := a.mcpServer.GetRegisteredTools()
+			a.metricsCollector.UpdateMCPToolsCount(len(tools))
+		}
+	}
+
 	c.JSON(200, gin.H{
 		"status":  "healthy",
 		"agent":   a.name,

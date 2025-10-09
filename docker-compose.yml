@@ -38,6 +38,9 @@ services:
       - AUTOTLS_ALLOW_PRIVATE_ADDRS=true
       - NAT_PORTMAP_ENABLED=true
       - P2P_ADVERTISE_ADDRS=/ip4/124.68.105.199/tcp/5003
+      - PROMETHEUS_ENABLED=true
+      - PROMETHEUS_REMOTE_WRITE_URL=https://monitoring.prxs.ai/prometheus/api/v1/write
+      - PROMETHEUS_PUSH_INTERVAL=30s
     volumes:
       - ./shared:/app/shared
       - ./configs:/app/configs
@@ -92,6 +95,9 @@ services:
       - AUTOTLS_ALLOW_PRIVATE_ADDRS=true
       - NAT_PORTMAP_ENABLED=true
       - P2P_ADVERTISE_ADDRS=/ip4/124.68.105.199/tcp/5004
+      - PROMETHEUS_ENABLED=true
+      - PROMETHEUS_REMOTE_WRITE_URL=https://monitoring.prxs.ai/prometheus/api/v1/write
+      - PROMETHEUS_PUSH_INTERVAL=30s
     volumes:
       - ./shared:/app/shared
       - ./configs:/app/configs
