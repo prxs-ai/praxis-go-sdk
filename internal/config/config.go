@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
@@ -269,6 +270,25 @@ func applyEnvironmentOverrides(config *AppConfig) {
 	// Logging overrides
 	if level := os.Getenv("LOG_LEVEL"); level != "" {
 		config.Logging.Level = level
+	}
+
+	// Prometheus overrides
+	config.Prometheus.Enabled = utils.BoolFromEnv("PROMETHEUS_ENABLED", config.Prometheus.Enabled)
+	if remoteWriteURL := os.Getenv("PROMETHEUS_REMOTE_WRITE_URL"); remoteWriteURL != "" {
+		config.Prometheus.RemoteWriteURL = remoteWriteURL
+	}
+	if pushIntervalStr := os.Getenv("PROMETHEUS_PUSH_INTERVAL"); pushIntervalStr != "" {
+		if duration, err := time.ParseDuration(pushIntervalStr); err == nil {
+			config.Prometheus.PushInterval = duration
+		} else {
+			logrus.Warnf("Invalid PROMETHEUS_PUSH_INTERVAL: %s", pushIntervalStr)
+		}
+	}
+	if username := os.Getenv("PROMETHEUS_USERNAME"); username != "" {
+		config.Prometheus.Username = username
+	}
+	if password := os.Getenv("PROMETHEUS_PASSWORD"); password != "" {
+		config.Prometheus.Password = password
 	}
 
 	if config.P2P.AutoTLS.ResolverNetwork == "" && config.P2P.AutoTLS.ResolverAddress != "" {
