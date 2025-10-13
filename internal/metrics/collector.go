@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -27,6 +28,10 @@ type MetricsCollector struct {
 
 	// Agent info
 	agentInfo *prometheus.GaugeVec
+
+	// HTTP metrics
+	httpRequestsTotal   *prometheus.CounterVec
+	httpRequestDuration *prometheus.HistogramVec
 
 	// Registry
 	registry *prometheus.Registry
@@ -94,6 +99,17 @@ func NewMetricsCollector(logger *logrus.Logger, agentName string, agentVersion s
 			Name: "praxis_agent_info",
 			Help: "Agent information",
 		}, []string{"agent_name", "agent_version", "libp2p_peer_id", "health_status"}),
+
+		httpRequestsTotal: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "praxis_http_requests_total",
+			Help: "Total number of HTTP requests",
+		}, []string{"agent_name", "agent_version", "libp2p_peer_id", "health_status", "method", "endpoint", "status_code"}),
+
+		httpRequestDuration: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+			Name:    "praxis_http_request_duration_seconds",
+			Help:    "HTTP request duration in seconds",
+			Buckets: []float64{0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0},
+		}, []string{"agent_name", "agent_version", "libp2p_peer_id", "health_status", "method", "endpoint"}),
 	}
 
 	// Register all metrics
@@ -106,6 +122,8 @@ func NewMetricsCollector(logger *logrus.Logger, agentName string, agentVersion s
 		collector.mcpRequestsTotal,
 		collector.mcpErrorsTotal,
 		collector.agentInfo,
+		collector.httpRequestsTotal,
+		collector.httpRequestDuration,
 	)
 
 	// Set agent info to 1 (it's a constant label metric)
@@ -227,4 +245,17 @@ func (c *MetricsCollector) StopRemoteWriter() {
 		c.remoteWriter = nil
 		c.logger.Info("Remote writer stopped")
 	}
+}
+
+// RecordHTTPRequest records an HTTP request with method, endpoint, status code and duration
+func (c *MetricsCollector) RecordHTTPRequest(method, endpoint string, statusCode int, duration float64) {
+	labels := c.getLabels()
+
+	// Add method, endpoint, status_code for counter
+	extendedLabels := append(labels, method, endpoint, fmt.Sprintf("%d", statusCode))
+	c.httpRequestsTotal.WithLabelValues(extendedLabels...).Inc()
+
+	// Add method, endpoint for histogram
+	durationLabels := append(labels, method, endpoint)
+	c.httpRequestDuration.WithLabelValues(durationLabels...).Observe(duration)
 }

@@ -955,10 +955,36 @@ func (a *PraxisAgent) updateP2PCardWithTools() {
 	a.logger.Infof("Updated P2P card with %d tool specifications", len(toolSpecs))
 }
 
+// metricsMiddleware records metrics for all HTTP requests
+func (a *PraxisAgent) metricsMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		start := time.Now()
+
+		// Process request
+		c.Next()
+
+		// Record metrics after request completes
+		if a.metricsCollector != nil {
+			duration := time.Since(start).Seconds()
+			method := c.Request.Method
+			endpoint := c.FullPath() // Returns route pattern like "/tasks/:id"
+			if endpoint == "" {
+				endpoint = c.Request.URL.Path // Fallback to actual path
+			}
+			statusCode := c.Writer.Status()
+
+			a.metricsCollector.RecordHTTPRequest(method, endpoint, statusCode, duration)
+		}
+	}
+}
+
 func (a *PraxisAgent) initializeHTTP() {
 	gin.SetMode(gin.ReleaseMode)
 	a.httpServer = gin.New()
 	a.httpServer.Use(gin.Logger(), gin.Recovery())
+
+	// Add metrics middleware to collect HTTP request metrics
+	a.httpServer.Use(a.metricsMiddleware())
 
 	// Serve generated artifacts (reports) as static files
 	sharedDir := "./shared"
