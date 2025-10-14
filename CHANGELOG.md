@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.3](https://github.com/prxs-ai/praxis-go-sdk/compare/v0.2.2...v0.2.3) (2025-10-14)
+
+
+### Features
+
+* : [PRXS-393] :: Add metrics to /health route and pushing them to Prometheus ([#28](https://github.com/prxs-ai/praxis-go-sdk/issues/28)) ([efa5f5e](https://github.com/prxs-ai/praxis-go-sdk/commit/efa5f5eed2f4c9db7e632f1629a51cc7f41a4cd9))
+
 ## [0.2.2](https://github.com/prxs-ai/praxis-go-sdk/compare/v0.2.1...v0.2.2) (2025-10-06)
 
 
