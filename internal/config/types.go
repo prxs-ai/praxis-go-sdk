@@ -6,12 +6,13 @@ import (
 
 // AppConfig is the main configuration structure for the application
 type AppConfig struct {
-	Agent   AgentConfig     `yaml:"agent" json:"agent"`
-	P2P     P2PConfig       `yaml:"p2p" json:"p2p"`
-	HTTP    HTTPConfig      `yaml:"http" json:"http"`
-	MCP     MCPBridgeConfig `yaml:"mcp" json:"mcp"`
-	LLM     LLMConfig       `yaml:"llm" json:"llm"`
-	Logging LogConfig       `yaml:"logging" json:"logging"`
+	Agent      AgentConfig        `yaml:"agent" json:"agent"`
+	P2P        P2PConfig          `yaml:"p2p" json:"p2p"`
+	HTTP       HTTPConfig         `yaml:"http" json:"http"`
+	MCP        MCPBridgeConfig    `yaml:"mcp" json:"mcp"`
+	LLM        LLMConfig          `yaml:"llm" json:"llm"`
+	Logging    LogConfig          `yaml:"logging" json:"logging"`
+	Prometheus PrometheusConfig   `yaml:"prometheus" json:"prometheus"`
 }
 
 // ToolConfig определяет конфигурацию одного инструмента в YAML.
@@ -190,6 +191,15 @@ type LogConfig struct {
 	File   string `yaml:"file" json:"file"`
 }
 
+// PrometheusConfig contains Prometheus metrics configuration
+type PrometheusConfig struct {
+	Enabled         bool          `yaml:"enabled" json:"enabled"`
+	RemoteWriteURL  string        `yaml:"remote_write_url" json:"remote_write_url"`
+	PushInterval    time.Duration `yaml:"push_interval" json:"push_interval"`
+	Username        string        `yaml:"username" json:"username"`
+	Password        string        `yaml:"password" json:"password"`
+}
+
 // DefaultConfig returns the default configuration
 func DefaultConfig() *AppConfig {
 	return &AppConfig{
@@ -267,6 +277,13 @@ func DefaultConfig() *AppConfig {
 		Logging: LogConfig{
 			Level:  "info",
 			Format: "text",
+		},
+		Prometheus: PrometheusConfig{
+			Enabled:        false,
+			RemoteWriteURL: "",
+			PushInterval:   30 * time.Second,
+			Username:       "",
+			Password:       "",
 		},
 	}
 }
