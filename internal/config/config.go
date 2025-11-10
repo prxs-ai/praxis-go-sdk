@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/knadh/koanf/parsers/yaml"
 	"github.com/knadh/koanf/providers/env/v2"
@@ -30,15 +29,7 @@ func LoadConfig(path string, logger *logrus.Logger) (*AppConfig, error) {
 		}
 	}
 
-	// Read envs
-	k.Load(env.Provider(".", env.Opt{
-		TransformFunc: func(k, v string) (string, any) {
-			// Transform the key.
-			k = strings.ReplaceAll(strings.ToLower(k), "_", ".")
-
-			return k, v
-		},
-	}), nil)
+	k = applyEnvs(k)
 
 	k.Unmarshal("", &config)
 
@@ -72,4 +63,38 @@ func SaveConfig(config *AppConfig, path string) error {
 	}
 
 	return nil
+}
+
+func applyEnvs(k *koanf.Koanf) *koanf.Koanf {
+	convertor := envsConvertor()
+
+	k.Load(env.Provider(".", env.Opt{
+		TransformFunc: func(k, v string) (string, any) {
+			if newK, exists := convertor[k]; exists {
+				k = newK
+			}
+
+			return k, v
+		},
+	}), nil)
+
+	return k
+}
+
+func envsConvertor() map[string]string {
+	return map[string]string{
+		"HTTP_ENABLED": "http.enabled",
+		"HTTP_PORT":    "http.port",
+
+		"MCP_ENABLED": "mcp.enabled",
+
+		"LOG_LEVEL": "logging.level",
+
+		"AGENT_NAME":        "agent.name",
+		"AGENT_VERSION":     "agent.version",
+		"AGENT_DESCRIPTION": "agent.description",
+		"AGENT_URL":         "agent.url",
+
+		"OPENAI_API_KEY": "llm.api_key",
+	}
 }
