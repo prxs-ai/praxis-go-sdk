@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
+	"github.com/knadh/koanf/parsers/yaml"
+	"github.com/knadh/koanf/providers/env/v2"
+	"github.com/knadh/koanf/providers/file"
+	"github.com/knadh/koanf/v2"
 	"github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v3"
-
-	"github.com/praxis/praxis-go-sdk/pkg/utils"
 )
 
 // LoadConfig loads configuration from a YAML file
@@ -17,35 +19,33 @@ func LoadConfig(path string, logger *logrus.Logger) (*AppConfig, error) {
 	// Start with default configuration
 	config := DefaultConfig()
 
+	k := koanf.New(".")
+
 	// Check if the config file exists
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		logger.Warnf("Configuration file %s not found, using defaults", path)
-		// Still apply environment overrides even with defaults
-		applyEnvironmentOverrides(config)
-		return config, nil
+	} else {
+		if err := k.Load(file.Provider(path), yaml.Parser()); err != nil {
+			return nil, fmt.Errorf("failed to parse config file: %w", err)
+		}
 	}
 
-	// Read the configuration file
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read config file: %w", err)
-	}
+	// Read envs
+	k.Load(env.Provider(".", env.Opt{
+		TransformFunc: func(k, v string) (string, any) {
+			// Transform the key.
+			k = strings.ReplaceAll(strings.ToLower(k), "_", ".")
 
-	// Expand environment variables in the configuration
-	configString := utils.ExpandEnvVars(string(data))
+			return k, v
+		},
+	}), nil)
 
-	// Parse YAML
-	if err := yaml.Unmarshal([]byte(configString), config); err != nil {
-		return nil, fmt.Errorf("failed to parse config file: %w", err)
-	}
+	k.Unmarshal("", &config)
 
 	// Validate the configuration
 	if err := validateConfig(config); err != nil {
 		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
-
-	// Override with environment variables
-	applyEnvironmentOverrides(config)
 
 	return config, nil
 }
@@ -58,8 +58,10 @@ func SaveConfig(config *AppConfig, path string) error {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
+	k := koanf.New(".")
+
 	// Marshal to YAML
-	data, err := yaml.Marshal(config)
+	data, err := k.Marshal(yaml.Parser())
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
