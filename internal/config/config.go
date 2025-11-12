@@ -95,6 +95,33 @@ func envsConvertor() map[string]string {
 		"AGENT_DESCRIPTION": "agent.description",
 		"AGENT_URL":         "agent.url",
 
+		"P2P_ENABLED":         "p2p.enabled",
+		"P2P_PORT":            "p2p.port",
+		"INSECURE_P2P":        "p2p.secure",
+		"NAT_PORTMAP_ENABLED": "p2p.enable_nat_portmap",
+		"P2P_ADVERTISE_ADDRS": "p2p.advertise_addrs",
+
+		"AUTOTLS_ENABLED":                "p2p.autotls.enabled",
+		"AUTOTLS_CA":                     "p2p.autotls.ca",
+		"AUTOTLS_CERT_DIR":               "p2p.autotls.cert_dir",
+		"AUTOTLS_IDENTITY_KEY":           "p2p.autotls.identity_key",
+		"AUTOTLS_FORGE_DOMAIN":           "p2p.autotls.forge_domain",
+		"AUTOTLS_REGISTRATION_ENDPOINT":  "p2p.autotls.registration_endpoint",
+		"AUTOTLS_FORGE_AUTH_TOKEN":       "p2p.autotls.forge_auth_token",
+		"AUTOTLS_TRUSTED_ROOTS_FILE":     "p2p.autotls.trusted_roots_file",
+		"AUTOTLS_RESOLVER_ADDR":          "p2p.autotls.resolver_address",
+		"AUTOTLS_RESOLVER_NET":           "p2p.autotls.resolver_network",
+		"AUTOTLS_REGISTRATION_DELAY_SEC": "p2p.autotls.registration_delay_sec",
+		"AUTOTLS_ALLOW_PRIVATE_ADDRS":    "p2p.autotls.allow_private_addresses",
+
+		"LLM_ENABLED":    "llm.enabled",
 		"OPENAI_API_KEY": "llm.api_key",
+		"LLM_MODEL":      "llm.model",
+
+		"PROMETHEUS_ENABLED":          "prometheus.enabled",
+		"PROMETHEUS_REMOTE_WRITE_URL": "prometheus.remote_write_url",
+		"PROMETHEUS_PUSH_INTERVAL":    "prometheus.push_interval",
+		"PROMETHEUS_USERNAME":         "prometheus.username",
+		"PROMETHEUS_PASSWORD":         "prometheus.password",
 	}
 }
