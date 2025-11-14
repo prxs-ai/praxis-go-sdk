@@ -28,6 +28,11 @@ func validateConfig(config *AppConfig) error {
 		return err
 	}
 
+	// Fix AutoTLS config
+	if config.P2P.AutoTLS.ResolverNetwork == "" && config.P2P.AutoTLS.ResolverAddress != "" {
+		config.P2P.AutoTLS.ResolverNetwork = "udp"
+	}
+
 	return nil
 }
 
