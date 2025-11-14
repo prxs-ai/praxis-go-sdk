@@ -6,13 +6,13 @@ import (
 
 // AppConfig is the main configuration structure for the application
 type AppConfig struct {
-	Agent      AgentConfig        `koanf:"agent" yaml:"agent" json:"agent"`
-	P2P        P2PConfig          `koanf:"p2p" yaml:"p2p" json:"p2p"`
-	HTTP       HTTPConfig         `koanf:"http" yaml:"http" json:"http"`
-	MCP        MCPBridgeConfig    `koanf:"mcp" yaml:"mcp" json:"mcp"`
-	LLM        LLMConfig          `koanf:"llm" yaml:"llm" json:"llm"`
-	Logging    LogConfig          `koanf:"logging" yaml:"logging" json:"logging"`
-	Prometheus PrometheusConfig   `koanf:"prometheus" yaml:"prometheus" json:"prometheus"`
+	Agent      AgentConfig      `koanf:"agent" yaml:"agent" json:"agent"`
+	P2P        P2PConfig        `koanf:"p2p" yaml:"p2p" json:"p2p"`
+	HTTP       HTTPConfig       `koanf:"http" yaml:"http" json:"http"`
+	MCP        MCPBridgeConfig  `koanf:"mcp" yaml:"mcp" json:"mcp"`
+	LLM        LLMConfig        `koanf:"llm" yaml:"llm" json:"llm"`
+	Logging    LogConfig        `koanf:"logging" yaml:"logging" json:"logging"`
+	Prometheus PrometheusConfig `koanf:"prometheus" yaml:"prometheus" json:"prometheus"`
 }
 
 // ToolConfig определяет конфигурацию одного инструмента в YAML.
@@ -70,10 +70,10 @@ type AgentConfig struct {
 	Version              string              `koanf:"version" yaml:"version" json:"version"`
 	Description          string              `koanf:"description" yaml:"description" json:"description"`
 	URL                  string              `koanf:"url" yaml:"url" json:"url"`
-	SharedDir            string              `koanf:"shared_dir" yaml:"shared_dir" json:"shared_dir"`                         // Base directory for filesystem tools
-	Tools                []ToolConfig        `koanf:"tools" yaml:"tools"`                                                // Список инструментов, доступных агенту
+	SharedDir            string              `koanf:"shared_dir" yaml:"shared_dir" json:"shared_dir"`                                     // Base directory for filesystem tools
+	Tools                []ToolConfig        `koanf:"tools" yaml:"tools"`                                                                 // Список инструментов, доступных агенту
 	ExternalMCPEndpoints []ExternalMCPConfig `koanf:"external_mcp_endpoints" yaml:"external_mcp_endpoints" json:"external_mcp_endpoints"` // Внешние MCP серверы для автообнаружения
-	ExternalMCPServers   []ExternalMCPConfig `koanf:"external_mcp_servers" yaml:"external_mcp_servers" json:"external_mcp_servers"`     // Alias для ExternalMCPEndpoints
+	ExternalMCPServers   []ExternalMCPConfig `koanf:"external_mcp_servers" yaml:"external_mcp_servers" json:"external_mcp_servers"`       // Alias для ExternalMCPEndpoints
 	Identity             IdentityConfig      `koanf:"identity" yaml:"identity" json:"identity"`
 	Security             AgentSecurityConfig `koanf:"security" yaml:"security" json:"security"`
 	DIDCacheTTL          time.Duration       `koanf:"did_cache_ttl" yaml:"did_cache_ttl" json:"did_cache_ttl"`
@@ -193,11 +193,11 @@ type LogConfig struct {
 
 // PrometheusConfig contains Prometheus metrics configuration
 type PrometheusConfig struct {
-	Enabled         bool          `koanf:"enabled" yaml:"enabled" json:"enabled"`
-	RemoteWriteURL  string        `koanf:"remote_write_url" yaml:"remote_write_url" json:"remote_write_url"`
-	PushInterval    time.Duration `koanf:"push_interval" yaml:"push_interval" json:"push_interval"`
-	Username        string        `koanf:"username" yaml:"username" json:"username"`
-	Password        string        `koanf:"password" yaml:"password" json:"password"`
+	Enabled        bool          `koanf:"enabled" yaml:"enabled" json:"enabled"`
+	RemoteWriteURL string        `koanf:"remote_write_url" yaml:"remote_write_url" json:"remote_write_url"`
+	PushInterval   time.Duration `koanf:"push_interval" yaml:"push_interval" json:"push_interval"`
+	Username       string        `koanf:"username" yaml:"username" json:"username"`
+	Password       string        `koanf:"password" yaml:"password" json:"password"`
 }
 
 // DefaultConfig returns the default configuration
