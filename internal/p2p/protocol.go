@@ -822,4 +822,3 @@ func (h *P2PProtocolHandler) GetPeerA2ACards() map[peer.ID]*a2a.AgentCard {
 	}
 	return cards
 }
-

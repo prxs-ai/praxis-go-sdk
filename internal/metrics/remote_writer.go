@@ -10,8 +10,8 @@ import (
 
 	"github.com/golang/snappy"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/prometheus/prompb"
 	dto "github.com/prometheus/client_model/go"
+	"github.com/prometheus/prometheus/prompb"
 	"github.com/sirupsen/logrus"
 )
 
