@@ -12,8 +12,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
-	"github.com/praxis/praxis-go-sdk/internal/a2a"
-	internalcrypto "github.com/praxis/praxis-go-sdk/internal/crypto"
 	"github.com/praxis/praxis-go-sdk/internal/did"
 	"github.com/sirupsen/logrus"
 )
@@ -23,25 +21,19 @@ const (
 	ProtocolMCP         = protocol.ID("/praxis/mcp/1.0.0")
 	ProtocolCard        = protocol.ID("/praxis/card/1.0.0")
 	ProtocolTool        = protocol.ID("/praxis/tool/1.0.0")
-	ProtocolA2A         = protocol.ID("/praxis/a2a/1.0.0")      // A2A Protocol
-	ProtocolA2ACard     = protocol.ID("/praxis/a2a.card/0.3.0") // A2A Card Exchange Protocol
 	ProtocolDidRegister = protocol.ID("/praxis/did-register/1.0.0")
 )
 
 // P2PProtocolHandler handles P2P protocol messages
 type P2PProtocolHandler struct {
-	host         host.Host
-	logger       *logrus.Logger
-	handlers     map[protocol.ID]StreamHandler
-	peerCards    map[peer.ID]*AgentCard
-	peerA2ACards map[peer.ID]*a2a.AgentCard // A2A cards from peers
-	ourCard      *AgentCard                 // Our own agent card
-	mcpBridge    *P2PMCPBridge              // Reference to MCP bridge for tool execution
-	agent        A2AAgent                   // Interface to agent for A2A protocol
-	a2aProvider  A2ACardProvider            // A2A card provider
-	didResolver  did.Resolver
-	security     SecurityOptions
-	mu           sync.RWMutex
+	host        host.Host
+	logger      *logrus.Logger
+	handlers    map[protocol.ID]StreamHandler
+	ourCard     *AgentCard    // Our own agent card
+	mcpBridge   *P2PMCPBridge // Reference to MCP bridge for tool execution
+	didResolver did.Resolver
+	security    SecurityOptions
+	mu          sync.RWMutex
 }
 
 // SecurityOptions toggles signature handling in the protocol handler.
@@ -49,11 +41,6 @@ type SecurityOptions struct {
 	VerifyPeerCards bool
 	SignA2A         bool
 	VerifyA2A       bool
-}
-
-// A2AAgent interface for A2A protocol operations
-type A2AAgent interface {
-	DispatchA2ARequest(req a2a.JSONRPCRequest) a2a.JSONRPCResponse
 }
 
 // StreamHandler handles incoming streams
@@ -107,19 +94,15 @@ func NewP2PProtocolHandler(host host.Host, logger *logrus.Logger) *P2PProtocolHa
 	}
 
 	handler := &P2PProtocolHandler{
-		host:         host,
-		logger:       logger,
-		handlers:     make(map[protocol.ID]StreamHandler),
-		peerCards:    make(map[peer.ID]*AgentCard),
-		peerA2ACards: make(map[peer.ID]*a2a.AgentCard),
+		host:     host,
+		logger:   logger,
+		handlers: make(map[protocol.ID]StreamHandler),
 	}
 
 	// Register protocol handlers
 	host.SetStreamHandler(ProtocolMCP, handler.handleMCPStream)
 	host.SetStreamHandler(ProtocolCard, handler.handleCardStream)
 	host.SetStreamHandler(ProtocolTool, handler.handleToolStream)
-	host.SetStreamHandler(ProtocolA2A, handler.handleA2AStream)
-	host.SetStreamHandler(ProtocolA2ACard, handler.handleA2ACardStream)
 
 	logger.Info("P2P protocol handlers registered")
 
@@ -130,12 +113,6 @@ func NewP2PProtocolHandler(host host.Host, logger *logrus.Logger) *P2PProtocolHa
 func (h *P2PProtocolHandler) SetMCPBridge(bridge *P2PMCPBridge) {
 	h.mcpBridge = bridge
 	h.logger.Debug("MCP bridge set for P2P protocol handler")
-}
-
-// SetAgent sets the agent for A2A protocol operations
-func (h *P2PProtocolHandler) SetAgent(agent A2AAgent) {
-	h.agent = agent
-	h.logger.Debug("A2A agent interface set for P2P protocol handler")
 }
 
 func (h *P2PProtocolHandler) ConfigureSecurity(opts SecurityOptions) {
@@ -204,11 +181,6 @@ func (h *P2PProtocolHandler) handleCardStream(stream network.Stream) {
 		return
 	}
 
-	// Store peer's card
-	h.mu.Lock()
-	h.peerCards[peerID] = &peerCard
-	h.mu.Unlock()
-
 	h.logger.Infof("✅ Card exchange complete with %s: %s v%s",
 		peerID.ShortString(), peerCard.Name, peerCard.Version)
 }
@@ -246,49 +218,6 @@ func (h *P2PProtocolHandler) handleToolStream(stream network.Stream) {
 	}
 
 	h.logger.Infof("📤 Tool response sent for: %s", request.Name)
-}
-
-// RequestCard requests an agent card from a peer
-func (h *P2PProtocolHandler) RequestCard(ctx context.Context, peerID peer.ID) (*AgentCard, error) {
-	// Check cache first
-	h.mu.RLock()
-	if card, exists := h.peerCards[peerID]; exists {
-		h.mu.RUnlock()
-		return card, nil
-	}
-	h.mu.RUnlock()
-
-	h.logger.Infof("🎴 Requesting card from peer: %s", peerID.ShortString())
-
-	stream, err := h.host.NewStream(ctx, peerID, ProtocolCard)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open card stream: %w", err)
-	}
-	defer stream.Close()
-
-	// Send our card first
-	ourCard := h.getOurCard()
-	encoder := json.NewEncoder(stream)
-	if err := encoder.Encode(ourCard); err != nil {
-		return nil, fmt.Errorf("failed to send our card: %w", err)
-	}
-
-	// Receive peer's card
-	decoder := json.NewDecoder(stream)
-	var peerCard AgentCard
-	if err := decoder.Decode(&peerCard); err != nil {
-		return nil, fmt.Errorf("failed to receive peer card: %w", err)
-	}
-
-	// Cache the card
-	h.mu.Lock()
-	h.peerCards[peerID] = &peerCard
-	h.mu.Unlock()
-
-	h.logger.Infof("✅ Received card from %s: %s v%s",
-		peerID.ShortString(), peerCard.Name, peerCard.Version)
-
-	return &peerCard, nil
 }
 
 // InvokeTool invokes a tool on a remote peer
@@ -362,18 +291,6 @@ func (h *P2PProtocolHandler) SendMCPRequest(ctx context.Context, peerID peer.ID,
 	}
 
 	return &response, nil
-}
-
-// GetPeerCards returns all cached peer cards
-func (h *P2PProtocolHandler) GetPeerCards() map[peer.ID]*AgentCard {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-
-	cards := make(map[peer.ID]*AgentCard)
-	for id, card := range h.peerCards {
-		cards[id] = card
-	}
-	return cards
 }
 
 // processMCPMessage processes incoming MCP messages
@@ -523,303 +440,3 @@ type ToolResponse struct {
 func generateID() string {
 	return fmt.Sprintf("%d", time.Now().UnixNano())
 }
-
-// handleA2AStream handles A2A protocol streams with JSON-RPC 2.0
-func (h *P2PProtocolHandler) handleA2AStream(stream network.Stream) {
-	defer stream.Close()
-
-	peerID := stream.Conn().RemotePeer()
-	h.logger.Infof("🔗 Handling A2A stream from peer: %s", peerID.ShortString())
-
-	decoder := json.NewDecoder(stream)
-	encoder := json.NewEncoder(stream)
-
-	for {
-		var rpcRequest a2a.JSONRPCRequest
-		if err := decoder.Decode(&rpcRequest); err != nil {
-			if err != io.EOF {
-				h.logger.Errorf("[PeerID: %s] Failed to decode JSON-RPC request: %v", peerID.ShortString(), err)
-			}
-			break
-		}
-
-		h.logger.Debugf("[PeerID: %s] Received JSON-RPC request. Method: %s, ID: %v",
-			peerID.ShortString(), rpcRequest.Method, rpcRequest.ID)
-
-		// Route to agent if available
-		var response a2a.JSONRPCResponse
-		if h.agent != nil {
-			response = h.agent.DispatchA2ARequest(rpcRequest)
-		} else {
-			response = a2a.NewJSONRPCErrorResponse(rpcRequest.ID,
-				a2a.NewRPCError(a2a.ErrorCodeInternalError, "Agent not available"))
-		}
-
-		if err := encoder.Encode(response); err != nil {
-			h.logger.Errorf("[PeerID: %s] Failed to send JSON-RPC response: %v", peerID.ShortString(), err)
-			break
-		}
-
-		h.logger.Debugf("[PeerID: %s] Sent JSON-RPC response. ID: %v", peerID.ShortString(), response.ID)
-	}
-}
-
-// SendA2ARequest sends an A2A JSON-RPC request to a peer
-func (h *P2PProtocolHandler) SendA2ARequest(ctx context.Context, peerID peer.ID, request a2a.JSONRPCRequest) (a2a.JSONRPCResponse, error) {
-	h.logger.Infof("📨 Sending A2A JSON-RPC request to peer: %s, method: %s", peerID.ShortString(), request.Method)
-
-	stream, err := h.host.NewStream(ctx, peerID, ProtocolA2A)
-	if err != nil {
-		return a2a.JSONRPCResponse{}, fmt.Errorf("failed to open A2A stream: %w", err)
-	}
-	defer stream.Close()
-
-	encoder := json.NewEncoder(stream)
-	if err := encoder.Encode(request); err != nil {
-		return a2a.JSONRPCResponse{}, fmt.Errorf("failed to send A2A request: %w", err)
-	}
-
-	decoder := json.NewDecoder(stream)
-	var response a2a.JSONRPCResponse
-	if err := decoder.Decode(&response); err != nil {
-		return a2a.JSONRPCResponse{}, fmt.Errorf("failed to receive A2A response: %w", err)
-	}
-
-	h.logger.Debugf("📩 Received A2A JSON-RPC response from peer: %s, ID: %v", peerID.ShortString(), response.ID)
-	return response, nil
-}
-
-// A2ACardProvider interface for providing A2A agent cards
-type A2ACardProvider interface {
-	GetA2ACard() *a2a.AgentCard
-}
-
-// SetA2ACardProvider sets the A2A card provider for the P2P protocol
-func (h *P2PProtocolHandler) SetA2ACardProvider(provider A2ACardProvider) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
-	h.a2aProvider = provider
-	if provider != nil {
-		card := provider.GetA2ACard()
-		if card != nil {
-			h.logger.Infof("🎴 A2A Card provider set with card: %s v%s", card.Name, card.Version)
-		} else {
-			h.logger.Warn("⚠️ A2A Card provider returned nil card")
-		}
-	}
-}
-
-// CallA2AJSONRPC sends a JSON-RPC request to a peer via A2A protocol
-func (h *P2PProtocolHandler) CallA2AJSONRPC(ctx context.Context, peerID peer.ID, method string, params interface{}) (a2a.JSONRPCResponse, error) {
-	h.logger.Infof("📨 Calling A2A JSON-RPC: peer=%s, method=%s", peerID.ShortString(), method)
-
-	request := a2a.JSONRPCRequest{
-		JSONRPC: "2.0",
-		ID:      generateID(),
-		Method:  method,
-		Params:  params,
-	}
-
-	stream, err := h.host.NewStream(ctx, peerID, ProtocolA2A)
-	if err != nil {
-		return a2a.JSONRPCResponse{}, fmt.Errorf("failed to open A2A stream: %w", err)
-	}
-	defer stream.Close()
-
-	encoder := json.NewEncoder(stream)
-	if err := encoder.Encode(request); err != nil {
-		return a2a.JSONRPCResponse{}, fmt.Errorf("failed to send JSON-RPC request: %w", err)
-	}
-
-	decoder := json.NewDecoder(stream)
-	var response a2a.JSONRPCResponse
-	if err := decoder.Decode(&response); err != nil {
-		return a2a.JSONRPCResponse{}, fmt.Errorf("failed to receive JSON-RPC response: %w", err)
-	}
-
-	h.logger.Debugf("📩 A2A JSON-RPC response received: peer=%s, ID=%v", peerID.ShortString(), response.ID)
-	return response, nil
-}
-
-// handleA2ACardStream handles A2A card exchange streams
-func (h *P2PProtocolHandler) handleA2ACardStream(stream network.Stream) {
-	defer stream.Close()
-
-	peerID := stream.Conn().RemotePeer()
-	h.logger.Infof("🎴 Handling A2A card exchange from peer: %s", peerID.ShortString())
-
-	decoder := json.NewDecoder(stream)
-	encoder := json.NewEncoder(stream)
-
-	// Receive peer's A2A card request/offer
-	var request map[string]interface{}
-	if err := decoder.Decode(&request); err != nil {
-		h.logger.Errorf("Failed to decode A2A card request: %v", err)
-		return
-	}
-
-	requestType, _ := request["type"].(string)
-
-	switch requestType {
-	case "request_card":
-		// Send our A2A card
-		var ourA2ACard *a2a.AgentCard
-		if h.a2aProvider != nil {
-			if card := h.a2aProvider.GetA2ACard(); card != nil {
-				ourA2ACard = card
-			}
-		}
-		response := map[string]interface{}{
-			"type": "card_response",
-			"card": ourA2ACard,
-		}
-		if err := encoder.Encode(response); err != nil {
-			h.logger.Errorf("Failed to send A2A card: %v", err)
-			return
-		}
-
-		h.logger.Infof("✅ Sent A2A card to peer %s", peerID.ShortString())
-
-	case "card_offer":
-		// Store peer's A2A card
-		cardData, exists := request["card"]
-		if !exists {
-			h.logger.Warn("Received card offer without card payload")
-			return
-		}
-
-		cardBytes, err := json.Marshal(cardData)
-		if err != nil {
-			h.logger.Errorf("Failed to marshal offered A2A card: %v", err)
-			return
-		}
-
-		var offeredCard a2a.AgentCard
-		if err := json.Unmarshal(cardBytes, &offeredCard); err != nil {
-			h.logger.Errorf("Failed to decode offered A2A card: %v", err)
-			return
-		}
-
-		h.mu.RLock()
-		verify := h.security.VerifyPeerCards
-		resolver := h.didResolver
-		h.mu.RUnlock()
-
-		if verify {
-			if resolver == nil {
-				h.logger.Warn("Verification requested but DID resolver is not configured")
-			} else if err := internalcrypto.VerifyAgentCard(context.Background(), &offeredCard, resolver); err != nil {
-				h.logger.Warnf("Rejected A2A card from %s: %v", peerID.ShortString(), err)
-				return
-			}
-		}
-
-		cardCopy := offeredCard
-		h.mu.Lock()
-		h.peerA2ACards[peerID] = &cardCopy
-		h.mu.Unlock()
-
-		// Send acknowledgment
-		ack := map[string]interface{}{
-			"type":   "card_ack",
-			"status": "received",
-		}
-
-		if err := encoder.Encode(ack); err != nil {
-			h.logger.Errorf("Failed to send A2A card ack: %v", err)
-			return
-		}
-
-		h.logger.Infof("✅ Received A2A card from peer %s", peerID.ShortString())
-
-	default:
-		h.logger.Warnf("Unknown A2A card request type: %s", requestType)
-	}
-}
-
-// RequestA2ACard requests an A2A card from a peer
-func (h *P2PProtocolHandler) RequestA2ACard(ctx context.Context, peerID peer.ID) (*a2a.AgentCard, error) {
-	// Check cache first
-	h.mu.RLock()
-	if card, exists := h.peerA2ACards[peerID]; exists {
-		h.mu.RUnlock()
-		return card, nil
-	}
-	h.mu.RUnlock()
-
-	h.logger.Infof("🎴 Requesting A2A card from peer: %s", peerID.ShortString())
-
-	stream, err := h.host.NewStream(ctx, peerID, ProtocolA2ACard)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open A2A card stream: %w", err)
-	}
-	defer stream.Close()
-
-	// Send card request
-	request := map[string]interface{}{
-		"type":      "request_card",
-		"timestamp": time.Now().Unix(),
-	}
-
-	encoder := json.NewEncoder(stream)
-	if err := encoder.Encode(request); err != nil {
-		return nil, fmt.Errorf("failed to send A2A card request: %w", err)
-	}
-	// Receive response
-	decoder := json.NewDecoder(stream)
-	var response map[string]interface{}
-	if err := decoder.Decode(&response); err != nil {
-		return nil, fmt.Errorf("failed to receive A2A card response: %w", err)
-	}
-	if responseType, _ := response["type"].(string); responseType == "card_response" {
-		cardData, exists := response["card"]
-		if !exists {
-			return nil, fmt.Errorf("A2A card response missing card payload from peer %s", peerID.ShortString())
-		}
-
-		cardBytes, err := json.Marshal(cardData)
-		if err != nil {
-			return nil, fmt.Errorf("marshal A2A card payload: %w", err)
-		}
-
-		var card a2a.AgentCard
-		if err := json.Unmarshal(cardBytes, &card); err != nil {
-			return nil, fmt.Errorf("decode A2A card: %w", err)
-		}
-
-		h.mu.RLock()
-		verify := h.security.VerifyPeerCards
-		resolver := h.didResolver
-		h.mu.RUnlock()
-
-		if verify {
-			if resolver == nil {
-				h.logger.Warn("Verification requested but DID resolver is not configured")
-			} else if err := internalcrypto.VerifyAgentCard(context.Background(), &card, resolver); err != nil {
-				return nil, fmt.Errorf("verify A2A card from %s: %w", peerID.ShortString(), err)
-			}
-		}
-
-		cardCopy := card
-		h.mu.Lock()
-		h.peerA2ACards[peerID] = &cardCopy
-		h.mu.Unlock()
-
-		h.logger.Infof("✅ Received A2A card from peer %s", peerID.ShortString())
-		return &cardCopy, nil
-	}
-	return nil, fmt.Errorf("invalid A2A card response from peer %s", peerID.ShortString())
-}
-
-// GetPeerA2ACards returns all cached A2A cards from peers
-func (h *P2PProtocolHandler) GetPeerA2ACards() map[peer.ID]*a2a.AgentCard {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	cards := make(map[peer.ID]*a2a.AgentCard)
-	for id, card := range h.peerA2ACards {
-		cards[id] = card
-	}
-	return cards
-}
-

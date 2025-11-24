@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"math"
 	"net"
 	"net/http"
@@ -22,7 +21,6 @@ import (
 
 	"github.com/caddyserver/certmagic"
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	p2pforge "github.com/ipshipyard/p2p-forge/client"
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -36,8 +34,6 @@ import (
 	mcpTypes "github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	maddr "github.com/multiformats/go-multiaddr"
-	"github.com/praxis/praxis-go-sdk/internal/a2a"
-	"github.com/praxis/praxis-go-sdk/internal/api"
 	"github.com/praxis/praxis-go-sdk/internal/bus"
 	appconfig "github.com/praxis/praxis-go-sdk/internal/config"
 	"github.com/praxis/praxis-go-sdk/internal/contracts"
@@ -45,54 +41,46 @@ import (
 	"github.com/praxis/praxis-go-sdk/internal/did"
 	didweb "github.com/praxis/praxis-go-sdk/internal/did/web"
 	didwebvh "github.com/praxis/praxis-go-sdk/internal/did/webvh"
-	"github.com/praxis/praxis-go-sdk/internal/dsl"
 	applogger "github.com/praxis/praxis-go-sdk/internal/logger"
 	"github.com/praxis/praxis-go-sdk/internal/mcp"
 	"github.com/praxis/praxis-go-sdk/internal/metrics"
 	"github.com/praxis/praxis-go-sdk/internal/p2p"
-	"github.com/praxis/praxis-go-sdk/internal/workflow"
 	"github.com/sirupsen/logrus"
 )
 
 const autoTLSUserAgent = "praxis-agent/autotls"
 
 type PraxisAgent struct {
-	name                 string
-	version              string
-	host                 host.Host
-	discovery            *p2p.Discovery
-	mcpServer            *mcp.MCPServerWrapper
-	p2pBridge            *p2p.P2PMCPBridge
-	p2pProtocol          *p2p.P2PProtocolHandler
-	dslAnalyzer          *dsl.Analyzer
-	orchestratorAnalyzer *dsl.OrchestratorAnalyzer
-	httpServer           *gin.Engine
-	httpPort             int
-	p2pPort              int
-	ssePort              int
-	websocketPort        int
-	eventBus             *bus.EventBus
-	websocketGateway     *api.WebSocketGateway
-	orchestrator         *workflow.WorkflowOrchestrator
-	logger               *logrus.Logger
-	ctx                  context.Context
-	cancel               context.CancelFunc
-	wg                   sync.WaitGroup
-	cardMu               sync.RWMutex
-	card                 *AgentCard
-	a2aCard              *a2a.AgentCard // Canonical A2A Agent Card
-	transportManager     *mcp.TransportManager
-	executionEngines     map[string]contracts.ExecutionEngine
-	appConfig            *appconfig.AppConfig
-	taskManager          *a2a.TaskManager // A2A Task Manager
-	registryMaddr        string
-	did                  string
-	identityManager      *IdentityManager
-	didResolver          did.Resolver
-	securityConfig       appconfig.AgentSecurityConfig
-	autoTLSCertMgr       *p2pforge.P2PForgeCertMgr
-	httpSrv              *http.Server
-	metricsCollector     *metrics.MetricsCollector
+	name             string
+	version          string
+	host             host.Host
+	discovery        *p2p.Discovery
+	mcpServer        *mcp.MCPServerWrapper
+	p2pBridge        *p2p.P2PMCPBridge
+	p2pProtocol      *p2p.P2PProtocolHandler
+	httpServer       *gin.Engine
+	httpPort         int
+	p2pPort          int
+	ssePort          int
+	websocketPort    int
+	eventBus         *bus.EventBus
+	logger           *logrus.Logger
+	ctx              context.Context
+	cancel           context.CancelFunc
+	wg               sync.WaitGroup
+	cardMu           sync.RWMutex
+	card             *AgentCard
+	transportManager *mcp.TransportManager
+	executionEngines map[string]contracts.ExecutionEngine
+	appConfig        *appconfig.AppConfig
+	registryMaddr    string
+	did              string
+	identityManager  *IdentityManager
+	didResolver      did.Resolver
+	securityConfig   appconfig.AgentSecurityConfig
+	autoTLSCertMgr   *p2pforge.P2PForgeCertMgr
+	httpSrv          *http.Server
+	metricsCollector *metrics.MetricsCollector
 }
 
 type Config struct {
@@ -147,9 +135,6 @@ func NewPraxisAgent(config Config) (*PraxisAgent, error) {
 	agent.transportManager = mcp.NewTransportManager(logger)
 	agent.executionEngines = make(map[string]contracts.ExecutionEngine)
 
-	// Initialize A2A Task Manager
-	agent.taskManager = a2a.NewTaskManager(eventBus, logger)
-
 	// Инициализация Remote MCP Engine (всегда доступен)
 	remoteMCPEngine := mcp.NewRemoteMCPEngine(agent.transportManager)
 	agent.executionEngines["remote-mcp"] = remoteMCPEngine
@@ -178,11 +163,7 @@ func NewPraxisAgent(config Config) (*PraxisAgent, error) {
 	agent.metricsCollector = metrics.NewMetricsCollector(logger, config.AgentName, config.AgentVersion, peerID)
 	logger.Info("📊 Metrics collector initialized")
 
-	agent.initializeDSL()
 	agent.initializeAgentCard()
-
-	// Initialize A2A card after P2P host is available
-	agent.initializeA2ACard()
 
 	if err := agent.initializeIdentity(); err != nil {
 		cancel()
@@ -192,11 +173,6 @@ func NewPraxisAgent(config Config) (*PraxisAgent, error) {
 	// Initialize HTTP server AFTER A2A card is initialized
 	agent.initializeHTTP()
 
-	// Set up P2P protocol with A2A card provider
-	if agent.p2pProtocol != nil {
-		agent.p2pProtocol.SetA2ACardProvider(agent)
-	}
-
 	if config.MCPEnabled {
 		if err := agent.initializeMCP(); err != nil {
 			cancel()
@@ -205,28 +181,6 @@ func NewPraxisAgent(config Config) (*PraxisAgent, error) {
 
 		// Auto-discover and register external MCP tools
 		go agent.discoverAndRegisterExternalTools(ctx)
-	}
-
-	// Initialize Workflow Orchestrator
-	agent.orchestrator = workflow.NewWorkflowOrchestrator(agent.eventBus, agent.dslAnalyzer, logger)
-	agent.orchestrator.SetAgentInterface(agent)
-
-	// Initialize WebSocket Gateway
-	agent.websocketGateway = api.NewWebSocketGateway(
-		config.WebSocketPort,
-		agent.eventBus,
-		agent.dslAnalyzer,
-		logger,
-	)
-	agent.websocketGateway.SetOrchestrator(agent.orchestrator)
-
-	// Set orchestrator analyzer for WebSocket gateway
-	if agent.orchestratorAnalyzer != nil {
-		logger.Info("🔗 Setting OrchestratorAnalyzer in WebSocket Gateway")
-		agent.websocketGateway.SetOrchestratorAnalyzer(agent.orchestratorAnalyzer)
-	} else {
-		logger.Error("❌ OrchestratorAnalyzer is nil, cannot set in WebSocket Gateway!")
-		// This should not happen if initializeDSL was called
 	}
 
 	logger.Infof("Praxis Agent %s v%s initialized", config.AgentName, config.AgentVersion)
@@ -391,9 +345,6 @@ func (a *PraxisAgent) initializeP2P() error {
 		SignA2A:         a.securityConfig.SignA2A,
 		VerifyA2A:       a.securityConfig.VerifyA2A,
 	})
-
-	// Set agent interface for A2A protocol
-	a.p2pProtocol.SetAgent(a)
 
 	// Initialize discovery
 	discovery, err := p2p.NewDiscovery(host, a.logger)
@@ -675,12 +626,6 @@ func (a *PraxisAgent) initializeMCP() error {
 }
 
 func (a *PraxisAgent) registerMCPHandlers() {
-	// Register system tools (always available)
-	if a.dslAnalyzer != nil {
-		dslTool := mcp.NewDSLTool(a.dslAnalyzer, a.logger)
-		a.mcpServer.AddTool(dslTool.GetTool(), dslTool.Handler)
-	}
-
 	if a.card != nil {
 		cardResource := mcp.NewAgentCardResource(a.card, a.logger)
 		a.mcpServer.AddResource(cardResource.GetResource(), cardResource.Handler)
@@ -689,15 +634,6 @@ func (a *PraxisAgent) registerMCPHandlers() {
 	p2pTool := mcp.NewP2PTool(a.p2pBridge, a.logger)
 	a.mcpServer.AddTool(p2pTool.GetListPeersTool(), p2pTool.ListPeersHandler)
 	a.mcpServer.AddTool(p2pTool.GetSendMessageTool(), p2pTool.SendMessageHandler)
-
-	executeTool := mcpTypes.NewTool("execute_workflow",
-		mcpTypes.WithDescription("Execute a workflow defined in DSL"),
-		mcpTypes.WithString("dsl",
-			mcpTypes.Required(),
-			mcpTypes.Description("DSL definition of the workflow"),
-		),
-	)
-	a.mcpServer.AddTool(executeTool, a.handleExecuteWorkflow)
 
 	// Dynamic tool registration from configuration
 	a.registerDynamicTools()
@@ -867,50 +803,6 @@ func (a *PraxisAgent) handleDaggerTool(ctx context.Context, req mcpTypes.CallToo
 	return mcpTypes.NewToolResultText(result), nil
 }
 
-func (a *PraxisAgent) handleExecuteWorkflow(ctx context.Context, req mcpTypes.CallToolRequest) (*mcpTypes.CallToolResult, error) {
-	args := req.GetArguments()
-
-	// Extract DSL (optional, maybe workflow DSL comes directly as nodes/edges)
-	dslQuery, _ := args["dsl"].(string)
-
-	// Extract params and secrets
-	rawParams, _ := args["params"].(map[string]interface{})
-	rawSecrets, _ := args["secrets"].(map[string]interface{})
-
-	// Convert secrets to map[string]interface{}
-	secrets := map[string]interface{}{}
-	for k, v := range rawSecrets {
-		secrets[k] = v
-	}
-
-	// Logging (mask secrets!)
-	if len(rawParams) > 0 {
-		a.logger.Infof("📦 Params received from frontend: %v", rawParams)
-	} else {
-		a.logger.Infof("📦 No params received from frontend")
-	}
-	if len(secrets) > 0 {
-		a.logger.Infof("🔑 Secrets received from frontend: %v", redactSecrets(secrets))
-	} else {
-		a.logger.Infof("🔑 No secrets received from frontend")
-	}
-
-	// Inject into context
-	ctx = dsl.WithParams(ctx, rawParams)
-	ctx = dsl.WithSecrets(ctx, secrets)
-
-	if dslQuery == "" {
-		return mcpTypes.NewToolResultError("DSL query is required"), nil
-	}
-
-	result, err := a.dslAnalyzer.AnalyzeDSL(ctx, dslQuery)
-	if err != nil {
-		return mcpTypes.NewToolResultError(fmt.Sprintf("Failed to execute workflow: %v", err)), nil
-	}
-	safeResult := redactSecretsDeep(result)
-	return mcpTypes.NewToolResultText(fmt.Sprintf("Workflow executed: %v", safeResult)), nil
-}
-
 // updateP2PCardWithTools updates the P2P card with full tool specifications
 func (a *PraxisAgent) updateP2PCardWithTools() {
 	if a.p2pProtocol == nil || a.mcpServer == nil {
@@ -969,27 +861,12 @@ func (a *PraxisAgent) initializeHTTP() {
 	a.httpServer.Static("/reports", reportsDir)
 
 	a.httpServer.GET("/health", a.handleHealth)
-	a.httpServer.GET("/agent/card", a.handleGetCard)
 	a.httpServer.GET("/peers", a.handleListPeers)
-	a.httpServer.POST("/execute", a.handleExecuteDSL)
-	a.httpServer.GET("/p2p/cards", a.handleGetP2PCards)
 	a.httpServer.POST("/p2p/tool", a.handleInvokeP2PTool)
 	if a.identityManager != nil {
 		a.httpServer.GET("/.well-known/did.json", a.handleGetDIDDocument)
 	}
 
-	// A2A endpoints
-	a.httpServer.POST("/a2a/message/send", a.handleA2AMessageSend)
-	a.httpServer.POST("/a2a/tasks/get", a.handleA2ATasksGet)
-	a.httpServer.GET("/a2a/tasks", a.handleA2ATasksList)
-
-	// A2A JSON-RPC endpoints for v0.2.9
-	a.httpServer.POST("/a2a/v1", a.handleA2AJSONRPC) // Main A2A JSON-RPC endpoint
-	a.httpServer.POST("/", a.handleA2AJSONRPC)       // Optional compatibility endpoint
-
-	// A2A card endpoints
-	a.httpServer.GET("/.well-known/agent-card.json", a.handleGetA2ACard)
-	a.httpServer.GET("/v1/card", a.handleGetAuthenticatedExtendedCardHTTP)
 	// ERC-8004 offchain data endpoints
 	a.httpServer.GET("/.well-known/feedback.json", a.handleFeedbackData)
 	a.httpServer.GET("/.well-known/validation-requests.json", a.handleValidationRequests)
@@ -1003,24 +880,8 @@ func (a *PraxisAgent) initializeHTTP() {
 	// Diagnostic endpoints
 	a.httpServer.GET("/p2p/info", a.handleGetP2PInfo)
 	a.httpServer.GET("/mcp/tools", a.handleGetMCPTools)
-	a.httpServer.GET("/cache/stats", a.handleGetCacheStats)
-	a.httpServer.DELETE("/cache", a.handleClearCache)
 
 	a.logger.Info("HTTP server initialized")
-}
-
-func (a *PraxisAgent) initializeDSL() {
-	// Create analyzer with agent integration for real execution
-	a.dslAnalyzer = dsl.NewAnalyzerWithAgent(a.logger, a)
-	a.logger.Info("DSL analyzer initialized with agent integration")
-
-	// Create orchestrator analyzer for complex workflows
-	a.orchestratorAnalyzer = dsl.NewOrchestratorAnalyzer(a.logger, a, a.eventBus)
-	if a.orchestratorAnalyzer != nil {
-		a.logger.Info("✅ Orchestrator analyzer initialized successfully with event bus integration")
-	} else {
-		a.logger.Error("❌ Failed to initialize orchestrator analyzer - it's nil!")
-	}
 }
 
 func (a *PraxisAgent) initializeAgentCard() {
@@ -1108,61 +969,6 @@ func (a *PraxisAgent) initializeAgentCard() {
 	}
 }
 
-func (a *PraxisAgent) initializeA2ACard() {
-	// Initialize canonical A2A card according to specification
-	// Derive dynamic skills (engines + tools) for canonical A2A card
-	dynamicSkills := a.buildA2ASkillsFromConfig()
-
-	card := &a2a.AgentCard{
-		ProtocolVersion: "0.2.9",
-		Name:            a.name,
-		Description:     "Praxis P2P Agent with A2A and MCP support",
-		Capabilities: a2a.AgentCapabilities{
-			Streaming:              false,
-			PushNotifications:      false,
-			StateTransitionHistory: true,
-		},
-		// Dynamic skills first, then core capabilities for completeness
-		Skills: append(dynamicSkills, []a2a.AgentSkill{
-			{
-				ID:          "p2p-communication",
-				Name:        "P2P Communication",
-				Description: "Communicate with other agents via A2A protocol",
-				Tags:        []string{"p2p", "a2a"},
-			},
-			{
-				ID:          "task-management",
-				Name:        "Task Management",
-				Description: "Asynchronous task lifecycle management",
-				Tags:        []string{"a2a", "tasks"},
-			},
-			{
-				ID:          "mcp-integration",
-				Name:        "MCP Integration",
-				Description: "Model Context Protocol support for tool invocation and discovery",
-				Tags:        []string{"mcp", "tools", "discovery"},
-			},
-		}...),
-		DefaultInputModes:                 []string{"text/plain", "application/json"},
-		DefaultOutputModes:                []string{"application/json"},
-		SupportsAuthenticatedExtendedCard: true,
-		// ERC-8004 top-level fields
-		TrustModels: []string{"feedback", "inference-validation"},
-		SecuritySchemes: map[string]any{
-			"none": map[string]interface{}{
-				"type": "none",
-			},
-		},
-	}
-
-	a.cardMu.Lock()
-	a.a2aCard = card
-	a.cardMu.Unlock()
-
-	a.logger.Infof("✅ Canonical A2A Agent Card initialized for agent '%s' on port %d", a.name, a.httpPort)
-	a.signA2ACard()
-}
-
 func (a *PraxisAgent) initializeIdentity() error {
 	cfg := a.appConfig.Agent.Identity
 	if cfg.DID == "" {
@@ -1180,15 +986,6 @@ func (a *PraxisAgent) initializeIdentity() error {
 		a.card.DID = manager.DID()
 		a.card.DIDDocURI = manager.DIDDocumentURI()
 	}
-
-	a.cardMu.Lock()
-	if a.a2aCard != nil {
-		a.a2aCard.DID = manager.DID()
-		a.a2aCard.DIDDocURI = manager.DIDDocumentURI()
-	}
-	a.cardMu.Unlock()
-
-	a.signA2ACard()
 
 	allowInsecure := strings.HasPrefix(strings.ToLower(manager.DIDDocumentURI()), "http://") || strings.HasPrefix(strings.ToLower(a.appConfig.Agent.URL), "http://")
 	webResolver := &didweb.Resolver{AllowInsecure: allowInsecure}
@@ -1209,39 +1006,6 @@ func (a *PraxisAgent) initializeIdentity() error {
 	}
 
 	return nil
-}
-
-func (a *PraxisAgent) signA2ACard() {
-	if a.identityManager == nil {
-		return
-	}
-	a.cardMu.Lock()
-	defer a.cardMu.Unlock()
-	if a.a2aCard == nil {
-		return
-	}
-	if err := a.identityManager.SignAgentCard(a.a2aCard); err != nil {
-		a.logger.Errorf("Failed to sign A2A card: %v", err)
-	}
-}
-
-func (a *PraxisAgent) snapshotA2ACard() *a2a.AgentCard {
-	a.cardMu.RLock()
-	defer a.cardMu.RUnlock()
-	if a.a2aCard == nil {
-		return nil
-	}
-	data, err := json.Marshal(a.a2aCard)
-	if err != nil {
-		a.logger.Errorf("Failed to marshal A2A card snapshot: %v", err)
-		return nil
-	}
-	var clone a2a.AgentCard
-	if err := json.Unmarshal(data, &clone); err != nil {
-		a.logger.Errorf("Failed to unmarshal A2A card snapshot: %v", err)
-		return nil
-	}
-	return &clone
 }
 
 // buildSkillsFromConfig constructs internal AgentCard skills from the loaded configuration.
@@ -1301,52 +1065,6 @@ func (a *PraxisAgent) buildSkillsFromConfig() ([]AgentSkill, []string) {
 	return skills, engineNames
 }
 
-// buildA2ASkillsFromConfig constructs A2A canonical skills from config.
-func (a *PraxisAgent) buildA2ASkillsFromConfig() []a2a.AgentSkill {
-	if a.appConfig == nil {
-		return nil
-	}
-
-	enginesSet := map[string]struct{}{}
-	skills := make([]a2a.AgentSkill, 0, 8)
-
-	for _, t := range a.appConfig.Agent.Tools {
-		if t.Engine != "" {
-			enginesSet[strings.ToLower(t.Engine)] = struct{}{}
-		}
-	}
-
-	// Engine skills
-	if _, ok := enginesSet["dagger"]; ok {
-		skills = append(skills, a2a.AgentSkill{
-			ID:          "engine-dagger",
-			Name:        "Dagger Engine",
-			Description: "Executes containerized tools via Dagger engine",
-			Tags:        []string{"engine", "dagger"},
-		})
-	}
-	if _, ok := enginesSet["local-go"]; ok {
-		skills = append(skills, a2a.AgentSkill{
-			ID:          "engine-local",
-			Name:        "Local Tools",
-			Description: "Executes built-in tools on local runtime",
-			Tags:        []string{"engine", "local-go"},
-		})
-	}
-
-	// Tool skills
-	for _, t := range a.appConfig.Agent.Tools {
-		skills = append(skills, a2a.AgentSkill{
-			ID:          strings.ToLower(t.Name),
-			Name:        humanizeName(t.Name),
-			Description: t.Description,
-			Tags:        []string{"tool", strings.ToLower(t.Engine)},
-		})
-	}
-
-	return skills
-}
-
 // humanizeName converts identifiers like "twitter_scraper" or "tg-poster" to "Twitter Scraper" or "Tg Poster".
 func humanizeName(s string) string {
 	if s == "" {
@@ -1382,18 +1100,6 @@ func (a *PraxisAgent) Start() error {
 			a.logger.Errorf("HTTP server error: %v", err)
 		}
 	}()
-
-	// Start WebSocket Gateway
-	if a.websocketGateway != nil {
-		a.wg.Add(1)
-		go func() {
-			defer a.wg.Done()
-			if err := a.websocketGateway.Run(); err != nil {
-				a.logger.Errorf("WebSocket gateway error: %v", err)
-			}
-		}()
-		a.logger.Infof("WebSocket gateway started on port %d", a.websocketPort)
-	}
 
 	// Start Prometheus remote writer if enabled
 	if a.appConfig.Prometheus.Enabled && a.appConfig.Prometheus.RemoteWriteURL != "" {
@@ -1510,10 +1216,6 @@ func (a *PraxisAgent) handleHealth(c *gin.Context) {
 	})
 }
 
-func (a *PraxisAgent) handleGetCard(c *gin.Context) {
-	c.JSON(200, a.card)
-}
-
 func (a *PraxisAgent) handleListPeers(c *gin.Context) {
 	// Get peers from discovery
 	discoveredPeers := a.discovery.GetConnectedPeers()
@@ -1529,69 +1231,6 @@ func (a *PraxisAgent) handleListPeers(c *gin.Context) {
 	}
 
 	c.JSON(200, gin.H{"peers": peers})
-}
-
-func (a *PraxisAgent) handleExecuteDSL(c *gin.Context) {
-	// Read the request body
-	bodyBytes, err := io.ReadAll(c.Request.Body)
-	if err != nil {
-		c.JSON(400, gin.H{"error": "Failed to read request body"})
-		return
-	}
-
-	// Try to parse as JSON-RPC first
-	var rpcRequest a2a.JSONRPCRequest
-	if err := json.Unmarshal(bodyBytes, &rpcRequest); err == nil && rpcRequest.JSONRPC == "2.0" {
-		// Handle as A2A JSON-RPC request
-		a.logger.Infof("Received A2A JSON-RPC request. Method: %s, RequestID: %v", rpcRequest.Method, rpcRequest.ID)
-		response := a.DispatchA2ARequest(rpcRequest)
-		c.Header("Content-Type", "application/json")
-		c.JSON(200, response)
-		return
-	}
-
-	// Fallback: try legacy DSL format
-	var legacyRequest struct {
-		DSL string `json:"dsl"`
-	}
-	if err := json.Unmarshal(bodyBytes, &legacyRequest); err != nil || legacyRequest.DSL == "" {
-		c.JSON(400, gin.H{"error": "Invalid request format - expected A2A JSON-RPC or legacy DSL"})
-		return
-	}
-
-	a.logger.Infof("Received legacy DSL request, converting to A2A format")
-
-	// Convert legacy DSL to A2A Message and create JSON-RPC request
-	msg := a2a.Message{
-		Role:      "user",
-		Parts:     []a2a.Part{a2a.NewTextPart(legacyRequest.DSL)},
-		MessageID: uuid.New().String(),
-		Kind:      "message",
-	}
-
-	rpcRequest = a2a.JSONRPCRequest{
-		JSONRPC: "2.0",
-		ID:      1,
-		Method:  "message/send",
-		Params: map[string]interface{}{
-			"message": map[string]interface{}{
-				"role":      msg.Role,
-				"parts":     msg.Parts,
-				"messageId": msg.MessageID,
-				"kind":      msg.Kind,
-			},
-		},
-	}
-
-	// Process through A2A dispatcher
-	response := a.DispatchA2ARequest(rpcRequest)
-	c.Header("Content-Type", "application/json")
-	c.JSON(200, response)
-}
-
-func (a *PraxisAgent) handleGetP2PCards(c *gin.Context) {
-	cards := a.p2pProtocol.GetPeerCards()
-	c.JSON(200, gin.H{"cards": cards})
 }
 
 func (a *PraxisAgent) handleInvokeP2PTool(c *gin.Context) {
@@ -1860,45 +1499,6 @@ func (a *PraxisAgent) GetLocalTools() []string {
 	return toolNames
 }
 
-// FindAgentWithTool finds an agent that has a specific tool
-func (a *PraxisAgent) FindAgentWithTool(toolName string) (string, error) {
-	ctx := context.Background()
-	// First check the P2P protocol handler's peer cards
-	if a.p2pProtocol != nil {
-		peerCards := a.p2pProtocol.GetPeerCards()
-		for peerID, card := range peerCards {
-			// Check if this peer has the tool in their Tools list
-			for _, toolSpec := range card.Tools {
-				if toolSpec.Name == toolName {
-					a.logger.Infof("Found peer %s with tool %s", peerID, toolName)
-					return peerID.String(), nil
-				}
-			}
-		}
-	}
-
-	// Check connected peers directly
-	if a.discovery != nil {
-		connectedPeers := a.discovery.GetConnectedPeers()
-		for _, peerInfo := range connectedPeers {
-			// Request card if we don't have it
-			if a.p2pProtocol != nil {
-				card, err := a.p2pProtocol.RequestCard(ctx, peerInfo.ID)
-				if err == nil && card != nil {
-					for _, toolSpec := range card.Tools {
-						if toolSpec.Name == toolName {
-							a.logger.Infof("Found peer %s with tool %s", peerInfo.ID, toolName)
-							return peerInfo.ID.String(), nil
-						}
-					}
-				}
-			}
-		}
-	}
-
-	return "", fmt.Errorf("no agent found with tool %s", toolName)
-}
-
 // discoverAndRegisterExternalTools automatically discovers and registers tools from external MCP servers
 func (a *PraxisAgent) discoverAndRegisterExternalTools(ctx context.Context) {
 	// Support both field names for backward compatibility
@@ -2160,43 +1760,6 @@ func (a *PraxisAgent) ExecuteRemoteTool(ctx context.Context, peerIDStr string, t
 	return result, nil
 }
 
-// GetPeerCards returns all known peer agent cards
-func (a *PraxisAgent) GetPeerCards() map[string]*p2p.AgentCard {
-	if a.p2pProtocol == nil {
-		return make(map[string]*p2p.AgentCard)
-	}
-
-	peerCards := a.p2pProtocol.GetPeerCards()
-	result := make(map[string]*p2p.AgentCard)
-
-	for peerID, card := range peerCards {
-		result[peerID.String()] = card
-	}
-
-	return result
-}
-
-// GetAgentNameByPeerID returns the agent name for a given peer ID
-func (a *PraxisAgent) GetAgentNameByPeerID(peerIDStr string) string {
-	peerCards := a.GetPeerCards()
-	if card, exists := peerCards[peerIDStr]; exists {
-		return card.Name
-	}
-
-	// Try short peer ID
-	shortID := peerIDStr
-	if len(peerIDStr) > 8 {
-		shortID = peerIDStr[:8]
-	}
-	for pid, card := range peerCards {
-		if strings.Contains(pid, shortID) {
-			return card.Name
-		}
-	}
-
-	return fmt.Sprintf("Agent %s", shortID)
-}
-
 // handleGetP2PInfo returns P2P host information
 func (a *PraxisAgent) handleGetP2PInfo(c *gin.Context) {
 	if a.host == nil {
@@ -2233,384 +1796,7 @@ func (a *PraxisAgent) handleGetMCPTools(c *gin.Context) {
 	})
 }
 
-// handleGetCacheStats returns cache statistics
-func (a *PraxisAgent) handleGetCacheStats(c *gin.Context) {
-	stats := a.dslAnalyzer.GetCacheStats()
-
-	c.JSON(200, gin.H{
-		"cache": stats,
-		"agent": a.name,
-	})
-}
-
-// handleClearCache clears the tool execution cache
-func (a *PraxisAgent) handleClearCache(c *gin.Context) {
-	a.dslAnalyzer.ClearCache()
-
-	c.JSON(200, gin.H{
-		"status": "cache cleared",
-		"agent":  a.name,
-	})
-}
-
-// ============= A2A Protocol Implementation =============
-
-// DispatchA2ARequest handles JSON-RPC requests for A2A protocol
-func (a *PraxisAgent) DispatchA2ARequest(req a2a.JSONRPCRequest) a2a.JSONRPCResponse {
-	a.logger.Infof("A2A Request received. Method: %s, RequestID: %v", req.Method, req.ID)
-
-	var result interface{}
-	var rpcErr *a2a.RPCError
-
-	params, ok := req.Params.(map[string]interface{})
-	if !ok && req.Params != nil {
-		rpcErr = a2a.NewRPCError(a2a.ErrorCodeInvalidParams, "Invalid params format")
-		return a2a.NewJSONRPCErrorResponse(req.ID, rpcErr)
-	}
-
-	switch req.Method {
-	case "message/send":
-		result, rpcErr = a.handleMessageSend(params)
-	case "tasks/get":
-		result, rpcErr = a.handleTasksGet(params)
-	case "tasks/cancel":
-		result, rpcErr = a.handleTasksCancel(params)
-	case "agent/getAuthenticatedExtendedCard":
-		result, rpcErr = a.handleGetAuthenticatedExtendedCard(params)
-	default:
-		rpcErr = a2a.NewRPCError(a2a.ErrorCodeMethodNotFound, "Method not found")
-	}
-
-	if rpcErr != nil {
-		return a2a.NewJSONRPCErrorResponse(req.ID, rpcErr)
-	}
-	return a2a.NewJSONRPCResponse(req.ID, result)
-}
-
-// handleMessageSend handles message/send JSON-RPC method
-func (a *PraxisAgent) handleMessageSend(params map[string]interface{}) (interface{}, *a2a.RPCError) {
-	// Parse message from params
-	msgData, ok := params["message"].(map[string]interface{})
-	if !ok {
-		return nil, a2a.NewRPCError(a2a.ErrorCodeInvalidParams, "Missing message parameter")
-	}
-
-	// Convert to A2A Message
-	msg, err := a.parseMessageFromParams(msgData)
-	if err != nil {
-		return nil, a2a.NewRPCError(a2a.ErrorCodeInvalidParams, fmt.Sprintf("Invalid message format: %v", err))
-	}
-
-	// Create task
-	task := a.taskManager.CreateTask(*msg)
-	a.logger.Infof("A2A Task %s created in 'submitted' state for message: %s", task.ID, msg.MessageID)
-
-	// Start async processing
-	go a.processTask(context.Background(), task)
-
-	return task, nil
-}
-
-// handleTasksGet handles tasks/get JSON-RPC method
-func (a *PraxisAgent) handleTasksGet(params map[string]interface{}) (interface{}, *a2a.RPCError) {
-	taskID, ok := params["id"].(string)
-	if !ok {
-		return nil, a2a.NewRPCError(a2a.ErrorCodeInvalidParams, "Missing or invalid task id")
-	}
-
-	task, exists := a.taskManager.GetTask(taskID)
-	if !exists {
-		return nil, a2a.NewRPCError(a2a.ErrorCodeTaskNotFound, "Task not found")
-	}
-
-	return task, nil
-}
-
-// handleTasksCancel handles tasks/cancel JSON-RPC method
-func (a *PraxisAgent) handleTasksCancel(params map[string]interface{}) (interface{}, *a2a.RPCError) {
-	taskID, ok := params["id"].(string)
-	if !ok {
-		return nil, a2a.NewRPCError(a2a.ErrorCodeInvalidParams, "Missing or invalid task id")
-	}
-
-	task, err := a.taskManager.CancelTask(taskID)
-	if err != nil {
-		// Map task manager errors to A2A RPC errors
-		if rpcErr, ok := err.(*a2a.RPCError); ok {
-			return nil, rpcErr
-		}
-		// Fallback for unexpected errors
-		return nil, a2a.NewRPCError(a2a.ErrorCodeInternalError, fmt.Sprintf("Failed to cancel task: %v", err))
-	}
-
-	return task, nil
-}
-
-// handleGetAuthenticatedExtendedCard handles agent/getAuthenticatedExtendedCard JSON-RPC method
-func (a *PraxisAgent) handleGetAuthenticatedExtendedCard(params map[string]interface{}) (interface{}, *a2a.RPCError) {
-	// For now, return the same canonical A2A card
-	// In a full implementation, this would include extended information for authenticated clients
-	a.signA2ACard()
-	card := a.snapshotA2ACard()
-	if card == nil {
-		return nil, a2a.NewRPCError(a2a.ErrorCodeInternalError, "A2A card not initialized")
-	}
-
-	return card, nil
-}
-
-// HandoffA2AOverP2P sends A2A message/send request over P2P JSON-RPC
-func (a *PraxisAgent) HandoffA2AOverP2P(ctx context.Context, peerIDStr string, message a2a.Message) (*a2a.Task, error) {
-	if a.p2pProtocol == nil {
-		return nil, fmt.Errorf("P2P protocol handler not available")
-	}
-
-	// Parse peer ID string
-	peerID, err := peer.Decode(peerIDStr)
-	if err != nil {
-		return nil, fmt.Errorf("invalid peer ID %s: %w", peerIDStr, err)
-	}
-
-	// Create JSON-RPC request for message/send
-	rpcRequest := a2a.JSONRPCRequest{
-		JSONRPC: "2.0",
-		ID:      uuid.New().String(),
-		Method:  "message/send",
-		Params: map[string]interface{}{
-			"message": map[string]interface{}{
-				"role":      message.Role,
-				"parts":     message.Parts,
-				"messageId": message.MessageID,
-				"contextId": message.ContextID,
-				"kind":      message.Kind,
-			},
-		},
-	}
-
-	// Send request over P2P
-	response, err := a.p2pProtocol.SendA2ARequest(ctx, peerID, rpcRequest)
-	if err != nil {
-		return nil, fmt.Errorf("failed to send A2A request over P2P: %w", err)
-	}
-
-	// Parse response as Task
-	if response.Error != nil {
-		return nil, fmt.Errorf("A2A request failed: %s", response.Error.Message)
-	}
-
-	// Convert response result to Task
-	taskData, ok := response.Result.(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("invalid response format from peer")
-	}
-
-	// Parse task from response
-	taskBytes, err := json.Marshal(taskData)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal task data: %w", err)
-	}
-
-	var task a2a.Task
-	if err := json.Unmarshal(taskBytes, &task); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal task: %w", err)
-	}
-
-	return &task, nil
-}
-
-// processTask processes a task asynchronously
-func (a *PraxisAgent) processTask(ctx context.Context, task *a2a.Task) {
-	a.taskManager.UpdateTaskStatus(task.ID, "working", nil)
-	a.logger.Infof("[TaskID: %s] Starting processing for user input: \"%s\"",
-		task.ID, a.getTextFromMessage(task.History[0]))
-
-	userText := a.getTextFromMessage(task.History[0])
-
-	// Validate userText is not empty before processing
-	if strings.TrimSpace(userText) == "" {
-		a.logger.Errorf("[TaskID: %s] Empty user message received", task.ID)
-		a.taskManager.UpdateTaskStatus(task.ID, "failed", &a2a.Message{
-			Role:      "agent",
-			Parts:     []a2a.Part{a2a.NewTextPart("Cannot process empty message. Please provide a valid request.")},
-			MessageID: uuid.New().String(),
-		})
-		return
-	}
-
-	a.logger.Infof("[TaskID: %s] Processing user request: \"%s\" (length: %d)", task.ID, userText, len(userText))
-
-	// Get execution plan (separated from execution)
-	executionPlan, err := a.orchestratorAnalyzer.AnalyzeWithOrchestration(ctx, userText)
-	if err != nil {
-		a.logger.Errorf("[TaskID: %s] Failed to create execution plan: %v", task.ID, err)
-		a.taskManager.UpdateTaskStatus(task.ID, "failed", &a2a.Message{
-			Role:      "agent",
-			Parts:     []a2a.Part{a2a.NewTextPart(fmt.Sprintf("Failed to analyze request: %v", err))},
-			MessageID: uuid.New().String(),
-		})
-		return
-	}
-
-	a.logger.Infof("[TaskID: %s] Execution plan received", task.ID)
-
-	// Create artifact with execution result
-	artifactParts := []a2a.Part{a2a.NewDataPart(executionPlan)}
-
-	artifact := a2a.NewArtifact(
-		uuid.New().String(),
-		"Execution Result",
-		artifactParts,
-	)
-
-	a.taskManager.AddArtifactToTask(task.ID, *artifact)
-	a.taskManager.UpdateTaskStatus(task.ID, "completed", &a2a.Message{
-		Role:      "agent",
-		Parts:     []a2a.Part{a2a.NewTextPart("Task completed successfully")},
-		MessageID: uuid.New().String(),
-	})
-
-	a.logger.Infof("[TaskID: %s] Status updated to 'completed'", task.ID)
-}
-
-// parseMessageFromParams converts params map to A2A Message
-func (a *PraxisAgent) parseMessageFromParams(msgData map[string]interface{}) (*a2a.Message, error) {
-	role, _ := msgData["role"].(string)
-	messageID, _ := msgData["messageId"].(string)
-	contextID, _ := msgData["contextId"].(string)
-
-	if role == "" {
-		role = "user" // default
-	}
-	if messageID == "" {
-		messageID = uuid.New().String()
-	}
-
-	// Parse parts
-	var parts []a2a.Part
-	if partsData, ok := msgData["parts"].([]interface{}); ok {
-		for _, partInterface := range partsData {
-			if partMap, ok := partInterface.(map[string]interface{}); ok {
-				part := a2a.Part{}
-				part.Kind, _ = partMap["kind"].(string)
-				part.Text, _ = partMap["text"].(string)
-				part.Data = partMap["data"]
-
-				parts = append(parts, part)
-			}
-		}
-	}
-
-	// Validate that we have at least one non-empty text part
-	hasValidText := false
-	for _, part := range parts {
-		if part.Kind == "text" && strings.TrimSpace(part.Text) != "" {
-			hasValidText = true
-			break
-		}
-	}
-
-	if !hasValidText {
-		return nil, fmt.Errorf("message must contain at least one non-empty text part")
-	}
-
-	msg := &a2a.Message{
-		Role:      role,
-		Parts:     parts,
-		MessageID: messageID,
-		ContextID: contextID,
-		Kind:      "message",
-	}
-
-	return msg, nil
-}
-
-// getTextFromMessage extracts text content from a message
-func (a *PraxisAgent) getTextFromMessage(msg a2a.Message) string {
-	for _, part := range msg.Parts {
-		if part.Kind == "text" && part.Text != "" {
-			return part.Text
-		}
-	}
-	return ""
-}
-
 // ============= A2A HTTP Handlers =============
-
-// handleA2AMessageSend handles direct A2A message/send requests
-func (a *PraxisAgent) handleA2AMessageSend(c *gin.Context) {
-	var params a2a.MessageSendParams
-	if err := c.ShouldBindJSON(&params); err != nil {
-		c.JSON(400, a2a.NewJSONRPCErrorResponse(nil,
-			a2a.NewRPCError(a2a.ErrorCodeInvalidParams, err.Error())))
-		return
-	}
-
-	// Create JSON-RPC request
-	rpcRequest := a2a.JSONRPCRequest{
-		JSONRPC: "2.0",
-		ID:      1,
-		Method:  "message/send",
-		Params: map[string]interface{}{
-			"message": params.Message,
-		},
-	}
-
-	response := a.DispatchA2ARequest(rpcRequest)
-	c.JSON(200, response)
-}
-
-// handleA2ATasksGet handles direct A2A tasks/get requests
-func (a *PraxisAgent) handleA2ATasksGet(c *gin.Context) {
-	var params a2a.TasksGetParams
-	if err := c.ShouldBindJSON(&params); err != nil {
-		c.JSON(400, a2a.NewJSONRPCErrorResponse(nil,
-			a2a.NewRPCError(a2a.ErrorCodeInvalidParams, err.Error())))
-		return
-	}
-
-	// Create JSON-RPC request
-	rpcRequest := a2a.JSONRPCRequest{
-		JSONRPC: "2.0",
-		ID:      1,
-		Method:  "tasks/get",
-		Params: map[string]interface{}{
-			"id": params.ID,
-		},
-	}
-
-	response := a.DispatchA2ARequest(rpcRequest)
-	c.JSON(200, response)
-}
-
-// handleA2ATasksList lists all tasks for debugging
-func (a *PraxisAgent) handleA2ATasksList(c *gin.Context) {
-	tasks := a.taskManager.ListTasks()
-	counts := a.taskManager.GetTaskCount()
-
-	c.JSON(200, gin.H{
-		"tasks":  tasks,
-		"counts": counts,
-		"agent":  a.name,
-	})
-}
-
-// handleGetA2ACard handles GET /.well-known/agent-card.json requests
-func (a *PraxisAgent) handleGetA2ACard(c *gin.Context) {
-	a.signA2ACard()
-	a.logger.Infof("📋 A2A card requested via /.well-known/agent-card.json endpoint")
-
-	card := a.snapshotA2ACard()
-	if card == nil {
-		a.logger.Error("❌ A2A card is nil when requested!")
-		c.JSON(503, gin.H{"error": "A2A card not initialized"})
-		return
-	}
-
-	a.logger.Infof("✅ Serving A2A card for agent '%s' (protocol version: %s)", card.Name, card.ProtocolVersion)
-
-	c.Header("Content-Type", "application/json")
-	c.JSON(200, card)
-}
 
 func (a *PraxisAgent) handleGetDIDDocument(c *gin.Context) {
 	if a.identityManager == nil {
@@ -2630,44 +1816,6 @@ func (a *PraxisAgent) handleGetDIDDocument(c *gin.Context) {
 	a.logger.Infof("📄 Serving DID document for %s", docCopy.ID)
 	c.Header("Content-Type", "application/json")
 	c.JSON(200, &docCopy)
-}
-
-// handleGetAuthenticatedExtendedCardHTTP handles GET /v1/card requests
-func (a *PraxisAgent) handleGetAuthenticatedExtendedCardHTTP(c *gin.Context) {
-	a.signA2ACard()
-	card := a.snapshotA2ACard()
-	if card == nil {
-		c.JSON(503, gin.H{"error": "A2A card not initialized"})
-		return
-	}
-
-	// For authenticated extended card, we could add additional information
-	// For now, return the canonical card
-	c.Header("Content-Type", "application/json")
-	c.JSON(200, card)
-}
-
-// GetA2ACard returns the canonical A2A Agent Card (implements A2ACardProvider interface)
-func (a *PraxisAgent) GetA2ACard() *a2a.AgentCard {
-	a.signA2ACard()
-	return a.snapshotA2ACard()
-}
-
-// handleA2AJSONRPC handles A2A JSON-RPC 2.0 requests
-func (a *PraxisAgent) handleA2AJSONRPC(c *gin.Context) {
-	body, err := io.ReadAll(c.Request.Body)
-	if err != nil {
-		c.JSON(400, a2a.NewJSONRPCErrorResponse(nil, a2a.NewRPCError(a2a.ErrorCodeParseError, "Failed to read body")))
-		return
-	}
-	var rpc a2a.JSONRPCRequest
-	if err := json.Unmarshal(body, &rpc); err != nil || rpc.JSONRPC != "2.0" {
-		c.JSON(400, a2a.NewJSONRPCErrorResponse(nil, a2a.NewRPCError(a2a.ErrorCodeParseError, "Invalid JSON-RPC 2.0 payload")))
-		return
-	}
-	resp := a.DispatchA2ARequest(rpc)
-	c.Header("Content-Type", "application/json")
-	c.JSON(200, resp)
 }
 
 // --- ERC-8004 Offchain Data Handlers ---
@@ -2694,35 +1842,6 @@ func (a *PraxisAgent) handleValidationResponses(c *gin.Context) {
 	c.JSON(200, data)
 }
 
-// SetERC8004Registration updates the A2A card with an on-chain registration record.
-// Use this after successful IdentityRegistry.NewAgent/UpdateAgent calls.
-func (a *PraxisAgent) SetERC8004Registration(chainID uint64, agentID uint64, agentAddress string, signature string) {
-	a.cardMu.Lock()
-	if a.a2aCard == nil {
-		a.cardMu.Unlock()
-		return
-	}
-	caip10 := fmt.Sprintf("eip155:%d:%s", chainID, strings.ToLower(agentAddress))
-	reg := a2a.ERC8004Registration{
-		AgentID:      agentID,
-		AgentAddress: caip10,
-		Signature:    signature,
-	}
-	replaced := false
-	for i, existing := range a.a2aCard.Registrations {
-		if existing.AgentID == reg.AgentID && strings.EqualFold(existing.AgentAddress, reg.AgentAddress) {
-			a.a2aCard.Registrations[i] = reg
-			replaced = true
-			break
-		}
-	}
-	if !replaced {
-		a.a2aCard.Registrations = append(a.a2aCard.Registrations, reg)
-	}
-	a.cardMu.Unlock()
-	a.signA2ACard()
-}
-
 // handleAdminSetRegistration allows adding a registration entry via HTTP (for testing/admin flows).
 // Body: {"chainId":11155111, "agentId":1, "agentAddress":"0x...", "signature":"0x..."}
 func (a *PraxisAgent) handleAdminSetRegistration(c *gin.Context) {
@@ -2746,6 +1865,5 @@ func (a *PraxisAgent) handleAdminSetRegistration(c *gin.Context) {
 			eoa = parts[len(parts)-1]
 		}
 	}
-	a.SetERC8004Registration(req.ChainID, req.AgentID, eoa, req.Signature)
 	c.JSON(200, gin.H{"status": "ok"})
 }

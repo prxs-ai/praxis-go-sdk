@@ -4,14 +4,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
-	"time"
 
+	"github.com/knadh/koanf/parsers/yaml"
+	"github.com/knadh/koanf/providers/env/v2"
+	"github.com/knadh/koanf/providers/file"
+	"github.com/knadh/koanf/v2"
 	"github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v3"
-
-	"github.com/praxis/praxis-go-sdk/pkg/utils"
 )
 
 // LoadConfig loads configuration from a YAML file
@@ -20,35 +18,25 @@ func LoadConfig(path string, logger *logrus.Logger) (*AppConfig, error) {
 	// Start with default configuration
 	config := DefaultConfig()
 
+	k := koanf.New(".")
+
 	// Check if the config file exists
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		logger.Warnf("Configuration file %s not found, using defaults", path)
-		// Still apply environment overrides even with defaults
-		applyEnvironmentOverrides(config)
-		return config, nil
+	} else {
+		if err := k.Load(file.Provider(path), yaml.Parser()); err != nil {
+			return nil, fmt.Errorf("failed to parse config file: %w", err)
+		}
 	}
 
-	// Read the configuration file
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read config file: %w", err)
-	}
+	k = applyEnvs(k)
 
-	// Expand environment variables in the configuration
-	configString := utils.ExpandEnvVars(string(data))
-
-	// Parse YAML
-	if err := yaml.Unmarshal([]byte(configString), config); err != nil {
-		return nil, fmt.Errorf("failed to parse config file: %w", err)
-	}
+	k.Unmarshal("", &config)
 
 	// Validate the configuration
 	if err := validateConfig(config); err != nil {
 		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
-
-	// Override with environment variables
-	applyEnvironmentOverrides(config)
 
 	return config, nil
 }
@@ -61,8 +49,10 @@ func SaveConfig(config *AppConfig, path string) error {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
+	k := koanf.New(".")
+
 	// Marshal to YAML
-	data, err := yaml.Marshal(config)
+	data, err := k.Marshal(yaml.Parser())
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
@@ -75,223 +65,63 @@ func SaveConfig(config *AppConfig, path string) error {
 	return nil
 }
 
-// validateConfig checks if the configuration is valid
-func validateConfig(config *AppConfig) error {
-	// Basic validation
-	if config.Agent.Name == "" {
-		return fmt.Errorf("agent name cannot be empty")
-	}
+func applyEnvs(k *koanf.Koanf) *koanf.Koanf {
+	convertor := envsConvertor()
 
-	// P2P validation
-	if config.P2P.Enabled && config.P2P.Rendezvous == "" {
-		return fmt.Errorf("rendezvous string cannot be empty when P2P is enabled")
-	}
-
-	if config.P2P.AutoTLS.Enabled {
-		if config.P2P.Port <= 0 {
-			return fmt.Errorf("p2p.port must be a fixed, non-zero value when AutoTLS is enabled")
-		}
-		if config.P2P.AutoTLS.IdentityKeyPath == "" {
-			return fmt.Errorf("p2p.autotls.identity_key must be set when AutoTLS is enabled")
-		}
-		if config.P2P.AutoTLS.CertDir == "" {
-			return fmt.Errorf("p2p.autotls.cert_dir must be set when AutoTLS is enabled")
-		}
-		switch strings.ToLower(config.P2P.AutoTLS.CA) {
-		case "", "staging", "production":
-			if config.P2P.AutoTLS.CA == "" {
-				config.P2P.AutoTLS.CA = "staging"
+	k.Load(env.Provider(".", env.Opt{
+		TransformFunc: func(k, v string) (string, any) {
+			if newK, exists := convertor[k]; exists {
+				k = newK
 			}
-		default:
-			if !strings.HasPrefix(config.P2P.AutoTLS.CA, "http://") && !strings.HasPrefix(config.P2P.AutoTLS.CA, "https://") {
-				return fmt.Errorf("p2p.autotls.ca must be 'staging', 'production', or a custom HTTPS endpoint")
-			}
-		}
-		if config.P2P.AutoTLS.RegistrationDelaySec < 0 {
-			return fmt.Errorf("p2p.autotls.registration_delay_sec не может быть отрицательным")
-		}
-		if config.P2P.AutoTLS.ForgeDomain != "" && config.P2P.AutoTLS.RegistrationEndpoint == "" {
-			return fmt.Errorf("p2p.autotls.registration_endpoint must be set when forge_domain is provided")
-		}
-		if config.P2P.AutoTLS.TrustedRootsFile != "" {
-			if _, err := os.Stat(config.P2P.AutoTLS.TrustedRootsFile); err != nil {
-				return fmt.Errorf("p2p.autotls.trusted_roots_file is not accessible: %w", err)
-			}
-		}
-		if config.P2P.AutoTLS.ResolverNetwork == "" && config.P2P.AutoTLS.ResolverAddress != "" {
-			config.P2P.AutoTLS.ResolverNetwork = "udp"
-		}
-	}
 
-	// LLM validation
-	if config.LLM.Enabled {
-		if config.LLM.Provider == "" {
-			return fmt.Errorf("LLM provider cannot be empty when LLM is enabled")
-		}
-		if config.LLM.Provider == "openai" && config.LLM.APIKey == "" {
-			return fmt.Errorf("OpenAI API key cannot be empty when using OpenAI provider")
-		}
-	}
+			return k, v
+		},
+	}), nil)
 
-	// MCP validation
-	if config.MCP.Enabled {
-		for _, server := range config.MCP.Servers {
-			if err := validateMCPServer(&server); err != nil {
-				return err
-			}
-		}
-	}
-
-	if config.Agent.Security.SignCards || config.Agent.Security.VerifyPeerCards || config.Agent.Security.SignA2A || config.Agent.Security.VerifyA2A {
-		if config.Agent.Identity.DID == "" {
-			return fmt.Errorf("agent identity DID must be configured when security features are enabled")
-		}
-	}
-
-	return nil
+	return k
 }
 
-// validateMCPServer validates an MCP server configuration
-func validateMCPServer(server *MCPServerConfig) error {
-	if server.Name == "" {
-		return fmt.Errorf("MCP server name cannot be empty")
-	}
+func envsConvertor() map[string]string {
+	return map[string]string{
+		"HTTP_ENABLED": "http.enabled",
+		"HTTP_PORT":    "http.port",
 
-	if server.Transport != "stdio" && server.Transport != "sse" {
-		return fmt.Errorf("MCP server transport must be 'stdio' or 'sse', got '%s'", server.Transport)
-	}
+		"MCP_ENABLED": "mcp.enabled",
 
-	if server.Transport == "stdio" && server.Command == "" {
-		return fmt.Errorf("command is required for stdio transport in MCP server '%s'", server.Name)
-	}
+		"LOG_LEVEL": "logging.level",
 
-	if server.Transport == "sse" && server.URL == "" {
-		return fmt.Errorf("URL is required for sse transport in MCP server '%s'", server.Name)
-	}
+		"AGENT_NAME":        "agent.name",
+		"AGENT_VERSION":     "agent.version",
+		"AGENT_DESCRIPTION": "agent.description",
+		"AGENT_URL":         "agent.url",
 
-	return nil
-}
+		"P2P_ENABLED":         "p2p.enabled",
+		"P2P_PORT":            "p2p.port",
+		"INSECURE_P2P":        "p2p.secure",
+		"NAT_PORTMAP_ENABLED": "p2p.enable_nat_portmap",
+		"P2P_ADVERTISE_ADDRS": "p2p.advertise_addrs",
 
-// applyEnvironmentOverrides applies environment variable overrides to the configuration
-func applyEnvironmentOverrides(config *AppConfig) {
-	// Agent overrides
-	if name := os.Getenv("AGENT_NAME"); name != "" {
-		config.Agent.Name = name
-	}
-	if version := os.Getenv("AGENT_VERSION"); version != "" {
-		config.Agent.Version = version
-	}
-	if desc := os.Getenv("AGENT_DESCRIPTION"); desc != "" {
-		config.Agent.Description = desc
-	}
-	if url := os.Getenv("AGENT_URL"); url != "" {
-		config.Agent.URL = url
-	}
+		"AUTOTLS_ENABLED":                "p2p.autotls.enabled",
+		"AUTOTLS_CA":                     "p2p.autotls.ca",
+		"AUTOTLS_CERT_DIR":               "p2p.autotls.cert_dir",
+		"AUTOTLS_IDENTITY_KEY":           "p2p.autotls.identity_key",
+		"AUTOTLS_FORGE_DOMAIN":           "p2p.autotls.forge_domain",
+		"AUTOTLS_REGISTRATION_ENDPOINT":  "p2p.autotls.registration_endpoint",
+		"AUTOTLS_FORGE_AUTH_TOKEN":       "p2p.autotls.forge_auth_token",
+		"AUTOTLS_TRUSTED_ROOTS_FILE":     "p2p.autotls.trusted_roots_file",
+		"AUTOTLS_RESOLVER_ADDR":          "p2p.autotls.resolver_address",
+		"AUTOTLS_RESOLVER_NET":           "p2p.autotls.resolver_network",
+		"AUTOTLS_REGISTRATION_DELAY_SEC": "p2p.autotls.registration_delay_sec",
+		"AUTOTLS_ALLOW_PRIVATE_ADDRS":    "p2p.autotls.allow_private_addresses",
 
-	// P2P overrides
-	config.P2P.Enabled = utils.BoolFromEnv("P2P_ENABLED", config.P2P.Enabled)
-	if portStr := os.Getenv("P2P_PORT"); portStr != "" {
-		if _, err := fmt.Sscanf(portStr, "%d", &config.P2P.Port); err != nil {
-			// Log error but don't fail
-			logrus.Warnf("Invalid P2P_PORT: %s", portStr)
-		}
-	}
-	config.P2P.Secure = !utils.BoolFromEnv("INSECURE_P2P", !config.P2P.Secure)
-	config.P2P.EnableNATPortMap = utils.BoolFromEnv("NAT_PORTMAP_ENABLED", config.P2P.EnableNATPortMap)
-	config.P2P.AutoTLS.Enabled = utils.BoolFromEnv("AUTOTLS_ENABLED", config.P2P.AutoTLS.Enabled)
-	if advertise := os.Getenv("P2P_ADVERTISE_ADDRS"); advertise != "" {
-		parts := strings.Split(advertise, ",")
-		config.P2P.AdvertiseAddrs = config.P2P.AdvertiseAddrs[:0]
-		for _, part := range parts {
-			addr := strings.TrimSpace(part)
-			if addr == "" {
-				continue
-			}
-			config.P2P.AdvertiseAddrs = append(config.P2P.AdvertiseAddrs, addr)
-		}
-	}
-	if ca := os.Getenv("AUTOTLS_CA"); ca != "" {
-		config.P2P.AutoTLS.CA = strings.ToLower(ca)
-	}
-	if dir := os.Getenv("AUTOTLS_CERT_DIR"); dir != "" {
-		config.P2P.AutoTLS.CertDir = dir
-	}
-	if key := os.Getenv("AUTOTLS_IDENTITY_KEY"); key != "" {
-		config.P2P.AutoTLS.IdentityKeyPath = key
-	}
-	if domain := os.Getenv("AUTOTLS_FORGE_DOMAIN"); domain != "" {
-		config.P2P.AutoTLS.ForgeDomain = domain
-	}
-	if endpoint := os.Getenv("AUTOTLS_REGISTRATION_ENDPOINT"); endpoint != "" {
-		config.P2P.AutoTLS.RegistrationEndpoint = endpoint
-	}
-	if token := os.Getenv("AUTOTLS_FORGE_AUTH_TOKEN"); token != "" {
-		config.P2P.AutoTLS.ForgeAuthToken = token
-	}
-	if roots := os.Getenv("AUTOTLS_TRUSTED_ROOTS_FILE"); roots != "" {
-		config.P2P.AutoTLS.TrustedRootsFile = roots
-	}
-	if resolverAddr := os.Getenv("AUTOTLS_RESOLVER_ADDR"); resolverAddr != "" {
-		config.P2P.AutoTLS.ResolverAddress = resolverAddr
-	}
-	if resolverNet := os.Getenv("AUTOTLS_RESOLVER_NET"); resolverNet != "" {
-		config.P2P.AutoTLS.ResolverNetwork = resolverNet
-	}
-	if delay := os.Getenv("AUTOTLS_REGISTRATION_DELAY_SEC"); delay != "" {
-		if v, err := strconv.Atoi(delay); err != nil {
-			logrus.Warnf("Invalid AUTOTLS_REGISTRATION_DELAY_SEC: %s", delay)
-		} else {
-			config.P2P.AutoTLS.RegistrationDelaySec = v
-		}
-	}
-	config.P2P.AutoTLS.AllowPrivateAddresses = utils.BoolFromEnv("AUTOTLS_ALLOW_PRIVATE_ADDRS", config.P2P.AutoTLS.AllowPrivateAddresses)
-	config.P2P.AutoTLS.ProduceShortAddrs = utils.BoolFromEnv("AUTOTLS_SHORT_ADDRS", config.P2P.AutoTLS.ProduceShortAddrs)
+		"LLM_ENABLED":    "llm.enabled",
+		"OPENAI_API_KEY": "llm.api_key",
+		"LLM_MODEL":      "llm.model",
 
-	// HTTP overrides
-	config.HTTP.Enabled = utils.BoolFromEnv("HTTP_ENABLED", config.HTTP.Enabled)
-	if portStr := os.Getenv("HTTP_PORT"); portStr != "" {
-		if _, err := fmt.Sscanf(portStr, "%d", &config.HTTP.Port); err != nil {
-			logrus.Warnf("Invalid HTTP_PORT: %s", portStr)
-		}
-	}
-
-	// MCP overrides
-	config.MCP.Enabled = utils.BoolFromEnv("MCP_ENABLED", config.MCP.Enabled)
-
-	// LLM overrides
-	config.LLM.Enabled = utils.BoolFromEnv("LLM_ENABLED", config.LLM.Enabled)
-	if apiKey := os.Getenv("OPENAI_API_KEY"); apiKey != "" {
-		config.LLM.APIKey = apiKey
-	}
-	if model := os.Getenv("LLM_MODEL"); model != "" {
-		config.LLM.Model = model
-	}
-
-	// Logging overrides
-	if level := os.Getenv("LOG_LEVEL"); level != "" {
-		config.Logging.Level = level
-	}
-
-	// Prometheus overrides
-	config.Prometheus.Enabled = utils.BoolFromEnv("PROMETHEUS_ENABLED", config.Prometheus.Enabled)
-	if remoteWriteURL := os.Getenv("PROMETHEUS_REMOTE_WRITE_URL"); remoteWriteURL != "" {
-		config.Prometheus.RemoteWriteURL = remoteWriteURL
-	}
-	if pushIntervalStr := os.Getenv("PROMETHEUS_PUSH_INTERVAL"); pushIntervalStr != "" {
-		if duration, err := time.ParseDuration(pushIntervalStr); err == nil {
-			config.Prometheus.PushInterval = duration
-		} else {
-			logrus.Warnf("Invalid PROMETHEUS_PUSH_INTERVAL: %s", pushIntervalStr)
-		}
-	}
-	if username := os.Getenv("PROMETHEUS_USERNAME"); username != "" {
-		config.Prometheus.Username = username
-	}
-	if password := os.Getenv("PROMETHEUS_PASSWORD"); password != "" {
-		config.Prometheus.Password = password
-	}
-
-	if config.P2P.AutoTLS.ResolverNetwork == "" && config.P2P.AutoTLS.ResolverAddress != "" {
-		config.P2P.AutoTLS.ResolverNetwork = "udp"
+		"PROMETHEUS_ENABLED":          "prometheus.enabled",
+		"PROMETHEUS_REMOTE_WRITE_URL": "prometheus.remote_write_url",
+		"PROMETHEUS_PUSH_INTERVAL":    "prometheus.push_interval",
+		"PROMETHEUS_USERNAME":         "prometheus.username",
+		"PROMETHEUS_PASSWORD":         "prometheus.password",
 	}
 }
