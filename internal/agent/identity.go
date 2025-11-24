@@ -10,10 +10,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/multiformats/go-multibase"
-	"github.com/praxis/praxis-go-sdk/internal/a2a"
 	"github.com/praxis/praxis-go-sdk/internal/config"
 	internalcrypto "github.com/praxis/praxis-go-sdk/internal/crypto"
 	"github.com/praxis/praxis-go-sdk/internal/did"
@@ -102,13 +100,6 @@ func (m *IdentityManager) DIDDocumentURI() string {
 
 func (m *IdentityManager) KeyID() string {
 	return m.keyID
-}
-
-func (m *IdentityManager) SignAgentCard(card *a2a.AgentCard) error {
-	if m.signer == nil {
-		return fmt.Errorf("identity: signer not initialized")
-	}
-	return m.signer.Sign(card, time.Now().UTC())
 }
 
 func (m *IdentityManager) PublicKey() ed25519.PublicKey {

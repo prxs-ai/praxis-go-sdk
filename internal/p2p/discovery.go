@@ -10,7 +10,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/discovery/mdns"
 	"github.com/multiformats/go-multiaddr"
-	"github.com/praxis/praxis-go-sdk/internal/a2a"
 	"github.com/sirupsen/logrus"
 )
 
@@ -37,7 +36,6 @@ type PeerInfo struct {
 	FoundAt     time.Time
 	LastSeen    time.Time
 	AgentCard   interface{}
-	A2ACard     *a2a.AgentCard // каноническая A2A карта пира
 	IsConnected bool
 }
 
@@ -187,39 +185,6 @@ func (d *Discovery) connectToPeer(pi peer.AddrInfo) {
 		peerInfo.IsConnected = true
 	}
 	d.mu.Unlock()
-
-	// Automatically exchange cards with the new peer
-	if d.protocolHandler != nil {
-		go func() {
-			time.Sleep(1 * time.Second) // Small delay to ensure connection is stable
-			card, err := d.protocolHandler.RequestCard(context.Background(), pi.ID)
-			if err != nil {
-				d.logger.Errorf("Failed to exchange cards with %s: %v", pi.ID, err)
-			} else {
-				d.logger.Infof("✅ Automatically exchanged cards with %s", pi.ID)
-				// Update peer info with card
-				d.mu.Lock()
-				if peerInfo, exists := d.foundPeers[pi.ID]; exists {
-					peerInfo.AgentCard = card
-				}
-				d.mu.Unlock()
-			}
-
-			// Also request A2A card
-			a2aCard, err := d.protocolHandler.RequestA2ACard(context.Background(), pi.ID)
-			if err != nil {
-				d.logger.Errorf("Failed to exchange A2A card with %s: %v", pi.ID, err)
-			} else {
-				d.logger.Infof("✅ Successfully received A2A card from %s", pi.ID)
-				// Update peer info with A2A card
-				d.mu.Lock()
-				if peerInfo, exists := d.foundPeers[pi.ID]; exists {
-					peerInfo.A2ACard = a2aCard
-				}
-				d.mu.Unlock()
-			}
-		}()
-	}
 }
 
 // SetProtocolHandler sets the protocol handler for automatic card exchange
@@ -265,21 +230,6 @@ func (d *Discovery) GetPeerInfo(peerID peer.ID) (*PeerInfo, bool) {
 
 	peerInfo, exists := d.foundPeers[peerID]
 	return peerInfo, exists
-}
-
-// GetPeerA2ACards returns A2A cards from all connected peers
-func (d *Discovery) GetPeerA2ACards() map[peer.ID]*a2a.AgentCard {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
-
-	a2aCards := make(map[peer.ID]*a2a.AgentCard)
-	for peerID, peerInfo := range d.foundPeers {
-		if peerInfo.A2ACard != nil {
-			a2aCards[peerID] = peerInfo.A2ACard
-		}
-	}
-
-	return a2aCards
 }
 
 func (d *Discovery) ConnectToBootstrapPeers(bootstrapPeers []string) error {
